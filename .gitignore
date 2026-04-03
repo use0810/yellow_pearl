@@ -1,0 +1,9 @@
+# すべて無視
+*
+
+# 以下だけ追跡する
+!.gitignore
+!index.html
+!style.css
+!assets/
+!assets/**
