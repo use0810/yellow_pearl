@@ -22,13 +22,13 @@ html {
 body {
   background: var(--black);
   color: var(--text-light);
-  font-family: 'Noto Serif JP', serif;
+  font-family: "Noto Serif JP", serif;
   font-weight: 300;
   overflow-x: hidden;
 }
 
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
@@ -47,7 +47,11 @@ body::before {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: radial-gradient(ellipse 80% 60% at 50% 40%, #1e1600 0%, var(--black) 70%);
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 40%,
+    #1e1600 0%,
+    var(--black) 70%
+  );
 }
 
 .particles {
@@ -104,7 +108,7 @@ body::before {
 }
 
 .hero-eyebrow {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: clamp(0.6rem, 1.2vw, 0.8rem);
   letter-spacing: 0.5em;
   color: var(--gold);
@@ -114,11 +118,17 @@ body::before {
 }
 
 .hero-title {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: clamp(3.5rem, 10vw, 8rem);
   font-weight: 600;
   line-height: 1;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, #fff8e0 60%, var(--gold) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--gold) 0%,
+    var(--gold-bright) 40%,
+    #fff8e0 60%,
+    var(--gold) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -129,7 +139,7 @@ body::before {
 }
 
 .hero-subtitle-jp {
-  font-family: 'Noto Serif JP', serif;
+  font-family: "Noto Serif JP", serif;
   font-size: clamp(0.9rem, 2vw, 1.2rem);
   font-weight: 200;
   letter-spacing: 0.4em;
@@ -158,7 +168,7 @@ body::before {
 }
 
 .hero-tagline {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: "Cormorant Garamond", serif;
   font-style: italic;
   font-size: clamp(1rem, 2.5vw, 1.4rem);
   color: var(--cream);
@@ -192,7 +202,7 @@ body::before {
 }
 
 .scroll-hint span {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.55rem;
   letter-spacing: 0.4em;
   color: var(--gold);
@@ -221,7 +231,7 @@ body::before {
 /* SECTIONS */
 
 .section-label {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.65rem;
   letter-spacing: 0.5em;
   color: var(--gold);
@@ -246,7 +256,11 @@ body::before {
 }
 
 .story-bg {
-  background: radial-gradient(ellipse 60% 80% at 80% 50%, rgba(201, 168, 76, 0.06) 0%, transparent 60%);
+  background: radial-gradient(
+    ellipse 60% 80% at 80% 50%,
+    rgba(201, 168, 76, 0.06) 0%,
+    transparent 60%
+  );
 }
 
 .story-grid {
@@ -269,7 +283,7 @@ body::before {
 }
 
 .quote-mark {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 8rem;
   line-height: 0.5;
   color: var(--gold);
@@ -279,7 +293,7 @@ body::before {
 }
 
 .quote-text {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: "Cormorant Garamond", serif;
   font-style: italic;
   font-size: clamp(1.2rem, 2.5vw, 1.6rem);
   line-height: 1.8;
@@ -288,7 +302,7 @@ body::before {
 }
 
 .quote-attribution {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.7rem;
   letter-spacing: 0.3em;
   color: var(--gold);
@@ -296,7 +310,7 @@ body::before {
 }
 
 .story-text h2 {
-  font-family: 'Noto Serif JP', serif;
+  font-family: "Noto Serif JP", serif;
   font-size: clamp(1.6rem, 3vw, 2.4rem);
   font-weight: 300;
   line-height: 1.7;
@@ -325,12 +339,12 @@ body::before {
 }
 
 .stripe::before {
-  content: 'YELLOW PEARL';
+  content: "YELLOW PEARL";
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: clamp(4rem, 12vw, 10rem);
   font-weight: 700;
   color: rgba(201, 168, 76, 0.04);
@@ -365,7 +379,7 @@ body::before {
 }
 
 .stat-number {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: clamp(2.5rem, 5vw, 4rem);
   font-weight: 400;
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
@@ -376,7 +390,7 @@ body::before {
 }
 
 .stat-label {
-  font-family: 'Noto Serif JP', serif;
+  font-family: "Noto Serif JP", serif;
   font-size: 0.75rem;
   letter-spacing: 0.3em;
   color: rgba(232, 217, 176, 0.6);
@@ -403,7 +417,7 @@ body::before {
 }
 
 .product-title {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: clamp(1.5rem, 4vw, 2.8rem);
   font-weight: 400;
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
@@ -418,14 +432,18 @@ body::before {
   grid-template-columns: 1fr 1fr;
   gap: 4rem;
   align-items: start;
-  background: linear-gradient(135deg, rgba(201, 168, 76, 0.05) 0%, transparent 60%);
+  background: linear-gradient(
+    135deg,
+    rgba(201, 168, 76, 0.05) 0%,
+    transparent 60%
+  );
   border: 1px solid rgba(201, 168, 76, 0.2);
   padding: clamp(2rem, 5vw, 4rem);
   position: relative;
 }
 
 .product-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -1px;
   left: -1px;
@@ -451,10 +469,14 @@ body::before {
 }
 
 .product-visual::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(201, 168, 76, 0.1), transparent 70%);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(201, 168, 76, 0.1),
+    transparent 70%
+  );
 }
 
 .product-info {
@@ -493,14 +515,14 @@ body::before {
 }
 
 .badge-text {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.65rem;
   letter-spacing: 0.35em;
   color: var(--gold);
 }
 
 .product-name-jp {
-  font-family: 'Noto Serif JP', serif;
+  font-family: "Noto Serif JP", serif;
   font-size: clamp(1rem, 2vw, 1.3rem);
   font-weight: 400;
   color: var(--cream);
@@ -515,7 +537,7 @@ body::before {
 }
 
 .limit-number {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: clamp(2rem, 4vw, 3rem);
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
   -webkit-background-clip: text;
@@ -525,7 +547,7 @@ body::before {
 }
 
 .limit-label {
-  font-family: 'Noto Serif JP', serif;
+  font-family: "Noto Serif JP", serif;
   font-size: 0.8rem;
   letter-spacing: 0.2em;
   color: rgba(232, 217, 176, 0.7);
@@ -572,7 +594,7 @@ body::before {
   padding: 1rem 2.5rem;
   background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
   color: var(--black);
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.75rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -581,18 +603,25 @@ body::before {
   border: none;
   position: relative;
   overflow: hidden;
-  transition: transform 0.3s, box-shadow 0.3s;
+  transition:
+    transform 0.3s,
+    box-shadow 0.3s;
   margin-top: 0.5rem;
 }
 
 .cta-btn::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
   transition: left 0.5s;
 }
 
@@ -611,7 +640,11 @@ body::before {
   max-width: 1200px;
   margin: 0 auto;
   padding: clamp(4rem, 10vw, 8rem) clamp(1.5rem, 6vw, 6rem);
-  background: radial-gradient(ellipse 80% 50% at 20% 50%, rgba(201, 168, 76, 0.05), transparent);
+  background: radial-gradient(
+    ellipse 80% 50% at 20% 50%,
+    rgba(201, 168, 76, 0.05),
+    transparent
+  );
 }
 
 .origin-grid {
@@ -629,7 +662,7 @@ body::before {
 }
 
 .origin-title-block h2 {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: clamp(1.8rem, 4vw, 3rem);
   font-weight: 400;
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
@@ -677,7 +710,7 @@ body::before {
 }
 
 .origin-card h3 {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.75rem;
   letter-spacing: 0.3em;
   color: var(--gold);
@@ -704,7 +737,7 @@ footer {
 }
 
 .footer-logo {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 1.2rem;
   letter-spacing: 0.4em;
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
@@ -732,7 +765,9 @@ footer {
 .reveal {
   opacity: 0;
   transform: translateY(30px);
-  transition: opacity 0.9s ease, transform 0.9s ease;
+  transition:
+    opacity 0.9s ease,
+    transform 0.9s ease;
 }
 
 .reveal.visible {
@@ -769,7 +804,7 @@ nav {
 }
 
 .nav-logo {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.85rem;
   letter-spacing: 0.4em;
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
@@ -791,7 +826,7 @@ nav {
 }
 
 .nav-links a {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 0.6rem;
   letter-spacing: 0.3em;
   color: rgba(201, 168, 76, 0.7);
@@ -830,8 +865,8 @@ nav {
 }
 
 .narrative-title {
-  font-family: 'Noto Serif JP', serif;
-  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-family: "Noto Serif JP", serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
   font-weight: 300;
   line-height: 2;
   color: var(--cream);
