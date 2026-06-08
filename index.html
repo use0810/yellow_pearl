@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yellow Pearl | 郷のきみ プレミアムライン</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Noto+Serif+JP:wght@200;300;400;600&family=Cinzel:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <nav>
+      <div class="nav-logo">YELLOW PEARL</div>
+      <ul class="nav-links">
+        <li><a href="#story">STORY</a></li>
+        <li><a href="#product">PRODUCT</a></li>
+        <li><a href="#origin">ORIGIN</a></li>
+        <li><a href="cart.html">RESERVE</a></li>
+      </ul>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="particles" id="particles"></div>
+
+      <div class="hero-inner">
+        <span class="hero-eyebrow">青森県新郷村 プレミアムライン</span>
+        <h1 class="hero-title">Yellow Pearl</h1>
+        <p class="hero-subtitle-jp">イエローパール</p>
+        <div class="hero-divider"></div>
+      </div>
+
+      <!-- <div class="scroll-hint">
+        <span>SCROLL</span>
+        <div class="scroll-line"></div>
+      </div> -->
+    </section>
+
+    <!-- STORY -->
+    <div class="story-bg" id="story">
+      <div class="story-wrap">
+        <div class="story-grid reveal">
+          <div class="quote-block">
+            <span class="quote-mark">"</span>
+            <p class="quote-text">
+              これは黄色い宝石だ。<br />イエローパールという<br />名前はどうだろう？
+            </p>
+            <span class="quote-attribution">— 青森県知事</span>
+          </div>
+
+          <div class="story-text">
+            <span class="section-label">The Story</span>
+            <div class="gold-line"></div>
+            <h2>16年間の<br />追求から生まれた<br />一粒の奇跡</h2>
+            <p>
+              独自の甘味を追求し試行錯誤を繰り返した16年間。台風の猛威、青森豪雨での被災、生産者の激減——数々の苦難を乗り越えて生み出された「郷のきみ」。
+            </p>
+            <p>
+              そのこだわり抜いた畑でも、わずか3%しか収穫できない郷のきみに、青森県知事自らが「イエローパール」と名付けてくれました。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCT -->
+    <div id="product">
+      <div class="product-section">
+        <div class="product-card reveal">
+          <div class="product-visual">
+            <img
+              src="assets/image/image-bg-kimi_v1.jpg"
+              alt="郷のきみ イエローパール"
+              style="width: min(240px, 80%)"
+            />
+          </div>
+
+          <div class="product-info">
+            <div class="product-badge">
+              <span class="badge-dot"></span>
+              <span class="badge-text">2026 Limited Release</span>
+            </div>
+
+            <div>
+              <p class="product-name-jp">郷のきみ プレミアムライン</p>
+              <h2
+                style="
+                  font-family: &quot;Cinzel&quot;, serif;
+                  font-size: clamp(1.8rem, 4vw, 2.8rem);
+                  font-weight: 400;
+                  background: linear-gradient(
+                    135deg,
+                    var(--gold),
+                    var(--gold-bright)
+                  );
+                  -webkit-background-clip: text;
+                  -webkit-text-fill-color: transparent;
+                  background-clip: text;
+                  letter-spacing: 0.15em;
+                "
+              >
+                Yellow Pearl
+              </h2>
+            </div>
+
+            <div class="product-limit">
+              <span class="limit-number" id="stock-display">1,000本限定</span>
+              <span id="stock-remaining" style="
+                font-family: 'Noto Serif JP', serif;
+                font-size: 0.8rem;
+                color: rgba(232,217,176,0.6);
+                letter-spacing: 0.1em;
+                display: none;
+              "></span>
+            </div>
+
+            <div class="product-specs">
+              <div class="spec-row">
+                <span class="spec-key">発送期間</span>
+                <span class="spec-val">9月1日 〜 9月30日</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">日付指定</span>
+                <span class="spec-val">不可（選果基準が厳しいため）</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">産地</span>
+                <span class="spec-val">青森県新郷村</span>
+              </div>
+            </div>
+
+            <p class="note">
+              ※選果基準を厳しく設定しておりますので、収穫条件が限定されるため日付指定は行えません。発送は9月1日より9月30日の間となります。
+            </p>
+
+            <a class="cta-btn" href="cart.html" id="reserve-btn">予約する — Reserve</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORIGIN -->
+    <div id="origin">
+      <div class="origin-wrap">
+        <div class="origin-grid">
+          <div class="origin-title-block reveal">
+            <span class="section-label">Origin</span>
+            <div class="gold-line"></div>
+            <h2>青森県<br />新郷村</h2>
+            <p>
+              豊かな自然と清冽な水に恵まれた青森県新郷村。その大地が育む「郷のきみ」は、村の風土そのものが生み出す稀有な味わいです。
+            </p>
+          </div>
+
+          <div class="origin-cards">
+            <div class="origin-card reveal">
+              <h3>TERROIR</h3>
+              <p>
+                新郷村の豊かな土壌と昼夜の寒暖差が、独自の甘みを引き出します。
+              </p>
+            </div>
+            <div class="origin-card reveal reveal-delay-1">
+              <h3>WATER</h3>
+              <p>清冽な山の湧水が、一本一本のトウモロコシを丁寧に育てます。</p>
+            </div>
+            <div class="origin-card reveal reveal-delay-2">
+              <h3>TIME</h3>
+              <p>
+                16年間の研究と改良が積み重なった、揺るぎない品質への誠実な姿勢。
+              </p>
+            </div>
+            <div class="origin-card reveal reveal-delay-3">
+              <h3>SELECTION</h3>
+              <p>
+                厳格な選果基準により選ばれた、畑でも稀少な最高品のみをお届けします。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- CLOSING -->
+    <div
+      style="
+        padding: clamp(4rem, 8vw, 7rem) clamp(1.5rem, 6vw, 6rem);
+        text-align: center;
+      "
+    >
+      <div class="sep reveal" style="margin-bottom: 3rem">
+        <div class="sep-line"></div>
+        <div class="sep-diamond"></div>
+        <div class="sep-line right"></div>
+      </div>
+
+      <div style="max-width: 800px; margin: 0 auto">
+        <p class="narrative-title reveal">
+          <strong>郷のきみ</strong>の中でも、<br />わずか3%しか穫れない。
+          <br />それが<strong>イエローパール</strong><br />
+        </p>
+        <div style="text-align: center; margin-bottom: 2rem">
+          <a class="cta-btn" href="cart.html" id="reserve-btn-2">予約する — Reserve</a>
+        </div>
+        <div class="sep reveal" style="margin: 2rem auto 3rem">
+          <div class="sep-line"></div>
+          <div class="sep-diamond"></div>
+          <div class="sep-line right"></div>
+        </div>
+        <!-- 
+          <a class="cta-btn reveal" href="#">今すぐ予約する</a> -->
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="footer-logo">YELLOW PEARL</div>
+      <div class="footer-sub">郷のきみ プレミアムライン ／ 青森県新郷村</div>
+      <p class="footer-note">
+        本商品は当サイトでは年間1,000本限定のため、予定数に達し次第受付を終了いたします。
+      </p>
+      <p
+        style="
+          font-size: 0.65rem;
+          color: rgba(232, 217, 176, 0.2);
+          letter-spacing: 0.1em;
+        "
+      >
+        © Yellow Pearl — Shingo Village, Aomori
+      </p>
+    </footer>
+
+    <script>
+      // ── 在庫取得・ボタン制御 ──
+      const WORKER_URL = 'https://b1a959ad.yellow-pearl.pages.dev';
+
+      async function loadStock() {
+        try {
+          const res = await fetch(`${WORKER_URL}/api/stock`);
+          const data = await res.json();
+
+          const display = document.getElementById('stock-display');
+          const remaining = document.getElementById('stock-remaining');
+          const btns = [
+            document.getElementById('reserve-btn'),
+            document.getElementById('reserve-btn-2'),
+          ];
+
+          if (data.sold_out) {
+            // 在庫なし
+            display.textContent = '受付終了';
+            display.style.color = 'rgba(232,217,176,0.4)';
+            btns.forEach((btn) => {
+              if (!btn) return;
+              btn.textContent = '受付終了';
+              btn.style.pointerEvents = 'none';
+              btn.style.opacity = '0.4';
+              btn.removeAttribute('href');
+            });
+          } else {
+            // 在庫あり
+            display.textContent = `残り ${data.stock.toLocaleString()} 本`;
+            remaining.textContent = `（年間 ${data.total.toLocaleString()} 本限定）`;
+            remaining.style.display = 'block';
+
+            // 残り10%以下なら警告色
+            if (data.remaining_pct <= 10) {
+              display.style.color = '#ff9955';
+            }
+          }
+        } catch (e) {
+          // Worker未設定時はデフォルト表示のまま
+          console.warn('在庫APIに接続できませんでした:', e);
+        }
+      }
+
+      loadStock();
+
+      // Particle system
+      const container = document.getElementById("particles");
+      for (let i = 0; i < 40; i++) {
+        const p = document.createElement("div");
+        p.className = "particle";
+        p.style.cssText = `
+          left: ${Math.random() * 100}%;
+          width: ${Math.random() * 3 + 1}px;
+          height: ${Math.random() * 3 + 1}px;
+          animation-duration: ${Math.random() * 10 + 8}s;
+          animation-delay: ${Math.random() * 10}s;
+          opacity: ${Math.random() * 0.6};
+        `;
+        container.appendChild(p);
+      }
+
+      // Scroll reveal
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) e.target.classList.add("visible");
+          });
+        },
+        { threshold: 0.15 },
+      );
+      document
+        .querySelectorAll(".reveal")
+        .forEach((el) => observer.observe(el));
+    </script>
+  </body>
+</html>

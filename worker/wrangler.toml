@@ -1,0 +1,12 @@
+name = "yellow-pearl-api"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Pages公開後にドメインを設定する（例: https://yellow-pearl.pages.dev）
+[vars]
+ALLOWED_ORIGIN = "*"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yellow-pearl-db"
+database_id = "38e93369-2734-4b1a-a73a-734568897ffb"

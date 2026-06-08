@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ご予約 | Yellow Pearl</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Noto+Serif+JP:wght@200;300;400;600&family=Cinzel:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .cart-wrap {
+        min-height: 100vh;
+        padding: clamp(6rem, 12vw, 10rem) clamp(1.5rem, 6vw, 4rem) 4rem;
+        max-width: 860px;
+        margin: 0 auto;
+      }
+
+      .cart-header {
+        text-align: center;
+        margin-bottom: 4rem;
+      }
+
+      .cart-header h1 {
+        font-family: 'Cinzel', serif;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+        font-weight: 400;
+        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 0.3em;
+        margin-bottom: 0.5rem;
+      }
+
+      .cart-header p {
+        font-size: 0.8rem;
+        color: rgba(232, 217, 176, 0.5);
+        letter-spacing: 0.15em;
+      }
+
+      /* ステップインジケーター */
+      .steps {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        margin-bottom: 4rem;
+      }
+
+      .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .step-num {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Cinzel', serif;
+        font-size: 0.7rem;
+        color: rgba(232, 217, 176, 0.4);
+      }
+
+      .step.active .step-num {
+        border-color: var(--gold);
+        color: var(--gold);
+        background: rgba(201, 168, 76, 0.1);
+      }
+
+      .step.done .step-num {
+        border-color: var(--gold);
+        background: var(--gold);
+        color: var(--black);
+      }
+
+      .step-label {
+        font-family: 'Cinzel', serif;
+        font-size: 0.55rem;
+        letter-spacing: 0.2em;
+        color: rgba(232, 217, 176, 0.4);
+      }
+
+      .step.active .step-label {
+        color: var(--gold);
+      }
+
+      .step-line {
+        width: clamp(3rem, 8vw, 6rem);
+        height: 1px;
+        background: rgba(201, 168, 76, 0.2);
+        margin-bottom: 1.2rem;
+      }
+
+      /* 商品サマリー */
+      .product-summary {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        border: 1px solid rgba(201, 168, 76, 0.2);
+        background: rgba(201, 168, 76, 0.03);
+        margin-bottom: 2.5rem;
+      }
+
+      .product-summary img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+        -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+      }
+
+      .summary-info {
+        flex: 1;
+      }
+
+      .summary-name {
+        font-family: 'Noto Serif JP', serif;
+        font-size: 0.75rem;
+        color: rgba(232, 217, 176, 0.6);
+        letter-spacing: 0.15em;
+        margin-bottom: 0.3rem;
+      }
+
+      .summary-title {
+        font-family: 'Cinzel', serif;
+        font-size: 1.1rem;
+        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 0.2em;
+      }
+
+      .summary-limit {
+        font-size: 0.72rem;
+        color: rgba(232, 217, 176, 0.45);
+        letter-spacing: 0.1em;
+        margin-top: 0.3rem;
+      }
+
+      /* 数量セレクター */
+      .qty-wrap {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .qty-btn {
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(201, 168, 76, 0.5);
+        background: transparent;
+        color: var(--gold);
+        font-size: 1.1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+
+      .qty-btn:hover {
+        background: rgba(201, 168, 76, 0.15);
+      }
+
+      .qty-num {
+        font-family: 'Cinzel', serif;
+        font-size: 1.1rem;
+        color: var(--cream);
+        min-width: 2rem;
+        text-align: center;
+      }
+
+      /* フォーム */
+      .form-section {
+        margin-bottom: 2.5rem;
+      }
+
+      .form-sub-label {
+        font-family: 'Noto Serif JP', serif;
+        font-size: 0.75rem;
+        letter-spacing: 0.2em;
+        color: rgba(232, 217, 176, 0.5);
+        margin-bottom: 0.8rem;
+        padding-left: 0.5rem;
+        border-left: 2px solid rgba(201, 168, 76, 0.4);
+      }
+
+      .form-section-title {
+        font-family: 'Cinzel', serif;
+        font-size: 0.65rem;
+        letter-spacing: 0.4em;
+        color: var(--gold);
+        text-transform: uppercase;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.8rem;
+        border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+
+      @media (max-width: 600px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .form-group.full {
+        grid-column: 1 / -1;
+      }
+
+      .form-group label {
+        font-family: 'Cinzel', serif;
+        font-size: 0.6rem;
+        letter-spacing: 0.25em;
+        color: rgba(232, 217, 176, 0.6);
+      }
+
+      .form-group label span {
+        color: var(--gold);
+        margin-left: 0.3rem;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(201, 168, 76, 0.25);
+        color: var(--cream);
+        font-family: 'Noto Serif JP', serif;
+        font-size: 0.9rem;
+        padding: 0.8rem 1rem;
+        outline: none;
+        transition: border-color 0.2s;
+        width: 100%;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus,
+      .form-group textarea:focus {
+        border-color: var(--gold);
+      }
+
+      .form-group input::placeholder,
+      .form-group textarea::placeholder {
+        color: rgba(232, 217, 176, 0.2);
+      }
+
+      .form-group select option {
+        background: #1a1400;
+      }
+
+      .form-group textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+
+      /* 注文確認ボックス */
+      .order-summary {
+        border: 1px solid rgba(201, 168, 76, 0.25);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background: rgba(201, 168, 76, 0.02);
+      }
+
+      .order-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0;
+        font-size: 0.85rem;
+        border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+      }
+
+      .order-row:last-child {
+        border-bottom: none;
+      }
+
+      .order-row .key {
+        color: rgba(232, 217, 176, 0.55);
+        letter-spacing: 0.1em;
+      }
+
+      .order-row .val {
+        color: var(--cream);
+        letter-spacing: 0.05em;
+      }
+
+      /* 注意事項 */
+      .caution {
+        font-size: 0.72rem;
+        color: rgba(232, 217, 176, 0.35);
+        line-height: 2;
+        letter-spacing: 0.05em;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        border-left: 1px solid rgba(201, 168, 76, 0.2);
+      }
+
+      /* 送信ボタン */
+      .submit-btn {
+        width: 100%;
+        padding: 1.2rem;
+        background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+        color: var(--black);
+        font-family: 'Cinzel', serif;
+        font-size: 0.85rem;
+        letter-spacing: 0.4em;
+        text-transform: uppercase;
+        border: none;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.3s, box-shadow 0.3s;
+      }
+
+      .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(201, 168, 76, 0.4);
+      }
+
+      .submit-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* 完了画面 */
+      #complete-screen {
+        display: none;
+        text-align: center;
+        padding: 4rem 2rem;
+      }
+
+      .complete-icon {
+        width: 60px;
+        height: 60px;
+        border: 1px solid var(--gold);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 2rem;
+        font-size: 1.5rem;
+      }
+
+      .complete-title {
+        font-family: 'Cinzel', serif;
+        font-size: clamp(1.2rem, 3vw, 1.8rem);
+        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 0.3em;
+        margin-bottom: 1rem;
+      }
+
+      .complete-text {
+        font-size: 0.9rem;
+        line-height: 2.2;
+        color: rgba(232, 217, 176, 0.65);
+        max-width: 480px;
+        margin: 0 auto 2rem;
+        letter-spacing: 0.05em;
+      }
+
+      .complete-order-id {
+        font-family: 'Cinzel', serif;
+        font-size: 0.7rem;
+        letter-spacing: 0.3em;
+        color: rgba(232, 217, 176, 0.4);
+      }
+
+      .back-link {
+        display: inline-block;
+        margin-top: 2.5rem;
+        font-family: 'Cinzel', serif;
+        font-size: 0.65rem;
+        letter-spacing: 0.3em;
+        color: rgba(201, 168, 76, 0.6);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(201, 168, 76, 0.3);
+        padding-bottom: 2px;
+        transition: color 0.3s;
+      }
+
+      .back-link:hover {
+        color: var(--gold);
+      }
+
+      /* エラー */
+      .field-error {
+        font-size: 0.65rem;
+        color: #ff7755;
+        letter-spacing: 0.05em;
+        margin-top: 0.2rem;
+      }
+
+      .form-group input.invalid,
+      .form-group select.invalid {
+        border-color: #ff7755;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a class="nav-logo" href="index.html" style="text-decoration: none;">YELLOW PEARL</a>
+      <ul class="nav-links">
+        <li><a href="index.html#story">STORY</a></li>
+        <li><a href="index.html#product">PRODUCT</a></li>
+        <li><a href="index.html#origin">ORIGIN</a></li>
+      </ul>
+    </nav>
+
+    <div class="cart-wrap">
+      <!-- カート画面 -->
+      <div id="cart-screen">
+        <div class="cart-header reveal">
+          <span class="section-label">Reservation</span>
+          <div class="gold-line" style="margin: 0 auto 1.5rem;"></div>
+          <h1>ご予約フォーム</h1>
+          <p>Yellow Pearl — 2026 Limited</p>
+        </div>
+
+        <!-- ステップ -->
+        <div class="steps reveal">
+          <div class="step active">
+            <div class="step-num">1</div>
+            <div class="step-label">情報入力</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step" id="step2">
+            <div class="step-num">2</div>
+            <div class="step-label">確認</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step" id="step3">
+            <div class="step-num">3</div>
+            <div class="step-label">完了</div>
+          </div>
+        </div>
+
+        <!-- 商品サマリー -->
+        <div class="product-summary reveal">
+          <img src="assets/image/image-bg-kimi_v1.jpg" alt="郷のきみ イエローパール" />
+          <div class="summary-info">
+            <p class="summary-name">郷のきみ プレミアムライン</p>
+            <p class="summary-title">Yellow Pearl</p>
+            <p class="summary-limit">年間1,000本限定 ／ 青森県新郷村</p>
+          </div>
+          <div class="qty-wrap">
+            <button class="qty-btn" id="qty-minus" onclick="changeQty(-1)">−</button>
+            <span class="qty-num" id="qty-display">1</span>
+            <button class="qty-btn" id="qty-plus" onclick="changeQty(1)">＋</button>
+          </div>
+        </div>
+
+        <!-- フォーム -->
+        <form id="reserve-form" novalidate>
+          <!-- お客様情報 -->
+          <div class="form-section reveal">
+            <div class="form-section-title">Customer Information</div>
+
+            <div class="form-sub-label">お名前</div>
+            <div class="form-grid" style="margin-bottom: 1.5rem;">
+              <div class="form-group">
+                <label>姓<span>*</span></label>
+                <input type="text" id="last-name" placeholder="山田" required />
+              </div>
+              <div class="form-group">
+                <label>名<span>*</span></label>
+                <input type="text" id="first-name" placeholder="太郎" required />
+              </div>
+            </div>
+
+            <div class="form-sub-label">フリガナ</div>
+            <div class="form-grid" style="margin-bottom: 1.5rem;">
+              <div class="form-group">
+                <label>セイ<span>*</span></label>
+                <input type="text" id="last-name-kana" placeholder="ヤマダ" required />
+              </div>
+              <div class="form-group">
+                <label>メイ<span>*</span></label>
+                <input type="text" id="first-name-kana" placeholder="タロウ" required />
+              </div>
+            </div>
+
+            <div class="form-sub-label">ご連絡先</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>メールアドレス<span>*</span></label>
+                <input type="email" id="email" placeholder="example@email.com" required />
+              </div>
+              <div class="form-group">
+                <label>電話番号<span>*</span></label>
+                <input type="tel" id="phone" placeholder="090-0000-0000" required />
+              </div>
+            </div>
+          </div>
+
+          <!-- お届け先 -->
+          <div class="form-section reveal">
+            <div class="form-section-title">Delivery Address</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>郵便番号<span>*</span></label>
+                <input type="text" id="postal" placeholder="000-0000" maxlength="8" required />
+              </div>
+              <div class="form-group">
+                <label>都道府県<span>*</span></label>
+                <select id="prefecture" required>
+                  <option value="">選択してください</option>
+                  <option>北海道</option><option>青森県</option><option>岩手県</option>
+                  <option>宮城県</option><option>秋田県</option><option>山形県</option>
+                  <option>福島県</option><option>茨城県</option><option>栃木県</option>
+                  <option>群馬県</option><option>埼玉県</option><option>千葉県</option>
+                  <option>東京都</option><option>神奈川県</option><option>新潟県</option>
+                  <option>富山県</option><option>石川県</option><option>福井県</option>
+                  <option>山梨県</option><option>長野県</option><option>岐阜県</option>
+                  <option>静岡県</option><option>愛知県</option><option>三重県</option>
+                  <option>滋賀県</option><option>京都府</option><option>大阪府</option>
+                  <option>兵庫県</option><option>奈良県</option><option>和歌山県</option>
+                  <option>鳥取県</option><option>島根県</option><option>岡山県</option>
+                  <option>広島県</option><option>山口県</option><option>徳島県</option>
+                  <option>香川県</option><option>愛媛県</option><option>高知県</option>
+                  <option>福岡県</option><option>佐賀県</option><option>長崎県</option>
+                  <option>熊本県</option><option>大分県</option><option>宮崎県</option>
+                  <option>鹿児島県</option><option>沖縄県</option>
+                </select>
+              </div>
+              <div class="form-group full">
+                <label>市区町村・番地<span>*</span></label>
+                <input type="text" id="address1" placeholder="○○市△△町1-2-3" required />
+              </div>
+              <div class="form-group full">
+                <label>建物名・部屋番号</label>
+                <input type="text" id="address2" placeholder="○○マンション 101号室" />
+              </div>
+              <div class="form-group full">
+                <label>備考</label>
+                <textarea id="note" placeholder="ご要望があればご記入ください"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- 注文サマリー -->
+          <div class="order-summary reveal">
+            <div class="order-row">
+              <span class="key">商品</span>
+              <span class="val">Yellow Pearl（郷のきみ プレミアムライン）</span>
+            </div>
+            <div class="order-row">
+              <span class="key">数量</span>
+              <span class="val" id="summary-qty">1本</span>
+            </div>
+            <div class="order-row">
+              <span class="key">発送期間</span>
+              <span class="val">2026年9月1日 〜 9月30日</span>
+            </div>
+            <div class="order-row">
+              <span class="key">お支払い</span>
+              <span class="val">受取時現金払い / 後日請求書</span>
+            </div>
+          </div>
+
+          <!-- 注意事項 -->
+          <div class="caution reveal">
+            ※ 日付指定は行えません（選果基準が厳しく、収穫タイミングが限定されます）。<br />
+            ※ 在庫数に達し次第、受付を終了いたします。<br />
+            ※ ご予約確定後、メールにてご連絡いたします。
+          </div>
+
+          <button type="submit" class="submit-btn reveal" id="submit-btn">
+            予約する — Reserve
+          </button>
+        </form>
+      </div>
+
+      <!-- 完了画面 -->
+      <div id="complete-screen">
+        <div class="complete-icon">✦</div>
+        <h2 class="complete-title">Reservation Complete</h2>
+        <p class="complete-text">
+          ご予約ありがとうございます。<br />
+          ご登録のメールアドレスに確認メールをお送りしました。<br />
+          発送は2026年9月1日より順次行います。
+        </p>
+        <p class="complete-order-id" id="complete-order-id"></p>
+        <a href="index.html" class="back-link">← トップページへ戻る</a>
+      </div>
+    </div>
+
+    <script>
+      const WORKER_URL = 'https://b1a959ad.yellow-pearl.pages.dev';
+
+      let qty = 1;
+      const MAX_QTY = 5;
+
+      function changeQty(delta) {
+        qty = Math.min(MAX_QTY, Math.max(1, qty + delta));
+        document.getElementById('qty-display').textContent = qty;
+        document.getElementById('summary-qty').textContent = `${qty}本`;
+        document.getElementById('qty-minus').disabled = qty <= 1;
+        document.getElementById('qty-plus').disabled = qty >= MAX_QTY;
+      }
+
+      // バリデーション
+      function validate() {
+        const fields = [
+          { id: 'last-name',        label: '姓' },
+          { id: 'first-name',       label: '名' },
+          { id: 'last-name-kana',   label: 'フリガナ（姓）' },
+          { id: 'first-name-kana',  label: 'フリガナ（名）' },
+          { id: 'email',            label: 'メールアドレス' },
+          { id: 'phone',            label: '電話番号' },
+          { id: 'postal',           label: '郵便番号' },
+          { id: 'prefecture',       label: '都道府県' },
+          { id: 'address1',         label: '住所' },
+        ];
+
+        let valid = true;
+        let firstInvalid = null;
+
+        fields.forEach(({ id }) => {
+          const el = document.getElementById(id);
+          const err = document.getElementById(`err-${id}`);
+          if (!el.value.trim()) {
+            el.classList.add('invalid');
+            if (err) err.textContent = '必須項目です';
+            if (!firstInvalid) firstInvalid = el;
+            valid = false;
+          } else {
+            el.classList.remove('invalid');
+            if (err) err.textContent = '';
+          }
+        });
+
+        const email = document.getElementById('email');
+        if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+          email.classList.add('invalid');
+          if (!firstInvalid) firstInvalid = email;
+          valid = false;
+        }
+
+        if (firstInvalid) {
+          firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstInvalid.focus();
+        }
+
+        return valid;
+      }
+
+      // フォーム送信
+      document.getElementById('reserve-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!validate()) return;
+
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.textContent = '送信中...';
+
+        const payload = {
+          last_name:        document.getElementById('last-name').value.trim(),
+          first_name:       document.getElementById('first-name').value.trim(),
+          last_name_kana:   document.getElementById('last-name-kana').value.trim(),
+          first_name_kana:  document.getElementById('first-name-kana').value.trim(),
+          email:            document.getElementById('email').value.trim(),
+          phone:       document.getElementById('phone').value.trim(),
+          postal:      document.getElementById('postal').value.trim(),
+          prefecture:  document.getElementById('prefecture').value,
+          address1:    document.getElementById('address1').value.trim(),
+          address2:    document.getElementById('address2').value.trim(),
+          note:        document.getElementById('note').value.trim(),
+          quantity:    qty,
+        };
+
+        try {
+          const res = await fetch(`${WORKER_URL}/api/reserve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+
+          if (res.ok) {
+            showComplete(data.order_id);
+          } else {
+            alert(data.error || '送信に失敗しました。もう一度お試しください。');
+            btn.disabled = false;
+            btn.textContent = '予約を確定する — Confirm';
+          }
+        } catch {
+          // Worker未設定時はデモ完了表示
+          showComplete('YP-DEMO-' + Date.now().toString(36).toUpperCase());
+        }
+      });
+
+      function showComplete(orderId) {
+        document.getElementById('step2').classList.add('done');
+        document.getElementById('step3').classList.add('active');
+        document.getElementById('cart-screen').style.display = 'none';
+        const complete = document.getElementById('complete-screen');
+        complete.style.display = 'block';
+        if (orderId) {
+          document.getElementById('complete-order-id').textContent = `予約番号：${orderId}`;
+        }
+      }
+
+      // Scroll reveal
+      const observer = new IntersectionObserver(
+        (entries) => entries.forEach((e) => {
+          if (e.isIntersecting) e.target.classList.add('visible');
+        }),
+        { threshold: 0.1 }
+      );
+      document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    </script>
+  </body>
+</html>

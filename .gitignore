@@ -1,0 +1,15 @@
+# すべて無視
+*
+
+# 以下だけ追跡する
+!.gitignore
+!_headers
+!index.html
+!style.css
+!cart.html
+!assets/
+!assets/**
+!worker/
+!worker/**
+# wrangler ローカルキャッシュ（アカウント情報を含む）
+worker/.wrangler/
