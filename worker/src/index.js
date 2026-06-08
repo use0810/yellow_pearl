@@ -1,7 +1,5 @@
 const DEFAULT_ORIGIN = '*';
 const PRODUCT_ID = 'yellow-pearl';
-const MAX_RESERVE_PER_HOUR = 5;
-const MAX_ADMIN_PER_MIN = 30;
 
 const MAX_LEN = { name: 50, email: 100, phone: 20, postal: 10, address: 200, note: 500 };
 
@@ -23,12 +21,6 @@ function json(data, status = 200, headers = {}) {
     status,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers },
   });
-}
-
-function getClientIp(request) {
-  return request.headers.get('CF-Connecting-IP')
-    || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
-    || '0.0.0.0';
 }
 
 function generateOrderId() {
@@ -55,38 +47,10 @@ function verifyAccess(request, env) {
         return { error: '認証が無効です', status: 403 };
       }
     }
-    return { email: payload.email, ip: getClientIp(request) };
+    return { ok: true };
   } catch {
     return { error: '認証が必要です', status: 401 };
   }
-}
-
-async function countRecent(db, ip, minutes, endpoint) {
-  const row = await db.prepare(
-    `SELECT COUNT(*) as cnt FROM rate_limits
-     WHERE ip = ? AND endpoint = ?
-     AND attempted_at > datetime('now', '+9 hours', '-' || ? || ' minutes')`
-  ).bind(ip, endpoint, minutes).first();
-  return row?.cnt ?? 0;
-}
-
-async function recordRateLimit(db, ip, endpoint) {
-  await db.prepare(
-    'INSERT INTO rate_limits (ip, endpoint) VALUES (?, ?)'
-  ).bind(ip, endpoint).run();
-  await db.prepare(
-    `DELETE FROM rate_limits WHERE attempted_at <= datetime('now', '+9 hours', '-1 days')`
-  ).run();
-}
-
-async function requireAdmin(db, request, env) {
-  const auth = verifyAccess(request, env);
-  if (auth.error) return auth;
-
-  const hits = await countRecent(db, auth.ip, 1, 'admin');
-  if (hits >= MAX_ADMIN_PER_MIN) return { error: 'リクエストが多すぎます', status: 429 };
-
-  return auth;
 }
 
 async function handleStock(env, CORS) {
@@ -105,12 +69,6 @@ async function handleStock(env, CORS) {
 }
 
 async function handleReserve(request, env, CORS) {
-  const ip = getClientIp(request);
-  const hits = await countRecent(env.DB, ip, 60, 'reserve');
-  if (hits >= MAX_RESERVE_PER_HOUR) {
-    return json({ error: '予約の上限に達しました。しばらくしてからお試しください。' }, 429, CORS);
-  }
-
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: 'Invalid JSON' }, 400, CORS);
 
@@ -170,7 +128,6 @@ async function handleReserve(request, env, CORS) {
     ).bind(qty, qty, PRODUCT_ID),
   ]);
 
-  await recordRateLimit(env.DB, ip, 'reserve');
   return json({ order_id }, 200, CORS);
 }
 
@@ -180,11 +137,11 @@ async function handleAdminDashboard(env, CORS) {
   ).bind(PRODUCT_ID).first();
 
   const sold = await env.DB.prepare(
-    'SELECT COALESCE(SUM(quantity), 0) as sold FROM orders'
+    'SELECT COALESCE(SUM(quantity), 0) AS sold FROM orders'
   ).first();
 
   const orderCount = await env.DB.prepare(
-    'SELECT COUNT(*) as cnt FROM orders'
+    'SELECT COUNT(*) AS cnt FROM orders'
   ).first();
 
   const recent = await env.DB.prepare(
@@ -229,43 +186,35 @@ export default {
     const isAdmin = url.pathname.startsWith('/api/admin/');
     const CORS = buildCors(env, request, { credentials: isAdmin });
 
-    try {
-      if (request.method === 'OPTIONS') {
-        return new Response(null, { headers: CORS });
-      }
-
-      if (!env.DB) {
-        return json({ error: 'DB binding が設定されていません' }, 500, CORS);
-      }
-
-      if (url.pathname === '/api/stock' && request.method === 'GET') {
-        return handleStock(env, CORS);
-      }
-
-      if (url.pathname === '/api/reserve' && request.method === 'POST') {
-        return handleReserve(request, env, CORS);
-      }
-
-      if (isAdmin) {
-        const auth = await requireAdmin(env.DB, request, env);
-        if (auth.error) return json({ error: auth.error }, auth.status, CORS);
-        try {
-          await recordRateLimit(env.DB, auth.ip, 'admin');
-        } catch { /* rate_limits 未作成時も管理 API は動作させる */ }
-
-        if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
-          return handleAdminDashboard(env, CORS);
-        }
-
-        if (url.pathname === '/api/admin/inventory' && request.method === 'PUT') {
-          return handleAdminInventoryUpdate(request, env, CORS);
-        }
-      }
-
-      return json({ error: 'Not found' }, 404, CORS);
-    } catch (err) {
-      console.error(err);
-      return json({ error: 'サーバーエラー', detail: String(err?.message || err) }, 500, CORS);
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: CORS });
     }
+
+    if (!env.DB) {
+      return json({ error: 'DB binding が設定されていません' }, 500, CORS);
+    }
+
+    if (url.pathname === '/api/stock' && request.method === 'GET') {
+      return handleStock(env, CORS);
+    }
+
+    if (url.pathname === '/api/reserve' && request.method === 'POST') {
+      return handleReserve(request, env, CORS);
+    }
+
+    if (isAdmin) {
+      const auth = verifyAccess(request, env);
+      if (auth.error) return json({ error: auth.error }, auth.status, CORS);
+
+      if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
+        return handleAdminDashboard(env, CORS);
+      }
+
+      if (url.pathname === '/api/admin/inventory' && request.method === 'PUT') {
+        return handleAdminInventoryUpdate(request, env, CORS);
+      }
+    }
+
+    return json({ error: 'Not found' }, 404, CORS);
   },
 };
