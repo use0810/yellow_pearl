@@ -254,12 +254,40 @@
         outline: none;
         transition: border-color 0.2s;
         width: 100%;
+        border-radius: 0;
+        -webkit-appearance: none;
+        appearance: none;
+        color-scheme: dark;
       }
 
       .form-group input:focus,
       .form-group select:focus,
       .form-group textarea:focus {
         border-color: var(--gold);
+        outline: none;
+        box-shadow: none;
+      }
+
+      /* ブラウザのオートフィル色を上書き */
+      .form-group input:-webkit-autofill,
+      .form-group input:-webkit-autofill:hover,
+      .form-group input:-webkit-autofill:focus,
+      .form-group input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 1000px #0f0d08 inset !important;
+        -webkit-text-fill-color: var(--cream) !important;
+        caret-color: var(--cream);
+        border: 1px solid rgba(201, 168, 76, 0.25);
+        transition: background-color 99999s ease-out;
+      }
+
+      .form-group input:-webkit-autofill:focus {
+        border-color: var(--gold);
+      }
+
+      .form-group input:autofill {
+        box-shadow: 0 0 0 1000px #0f0d08 inset !important;
+        -webkit-text-fill-color: var(--cream) !important;
+        caret-color: var(--cream);
       }
 
       .form-group input::placeholder,
@@ -267,8 +295,19 @@
         color: rgba(232, 217, 176, 0.2);
       }
 
+      .form-group select {
+        cursor: pointer;
+        padding-right: 2.5rem;
+        accent-color: var(--gold);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23c9a84c' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        background-color: rgba(255, 255, 255, 0.03);
+      }
+
       .form-group select option {
         background: #1a1400;
+        color: var(--cream);
       }
 
       .form-group textarea {
@@ -499,11 +538,13 @@
             <div class="form-grid" style="margin-bottom: 1.5rem;">
               <div class="form-group">
                 <label>セイ<span>*</span></label>
-                <input type="text" id="last-name-kana" placeholder="ヤマダ" required />
+                <input type="text" id="last-name-kana" placeholder="ヤマダ" required inputmode="katakana" />
+                <span class="field-error" id="err-last-name-kana"></span>
               </div>
               <div class="form-group">
                 <label>メイ<span>*</span></label>
-                <input type="text" id="first-name-kana" placeholder="タロウ" required />
+                <input type="text" id="first-name-kana" placeholder="タロウ" required inputmode="katakana" />
+                <span class="field-error" id="err-first-name-kana"></span>
               </div>
             </div>
 
@@ -626,6 +667,8 @@
         document.getElementById('qty-plus').disabled = qty >= MAX_QTY;
       }
 
+      const KANA_RE = /^[ァ-ヴー・]+$/;
+
       // バリデーション
       function validate() {
         const fields = [
@@ -663,6 +706,21 @@
           if (!firstInvalid) firstInvalid = email;
           valid = false;
         }
+
+        [
+          { id: 'last-name-kana',  label: 'セイ' },
+          { id: 'first-name-kana', label: 'メイ' },
+        ].forEach(({ id }) => {
+          const el = document.getElementById(id);
+          const err = document.getElementById(`err-${id}`);
+          const val = el.value.trim();
+          if (val && !KANA_RE.test(val)) {
+            el.classList.add('invalid');
+            if (err) err.textContent = 'カタカナで入力してください';
+            if (!firstInvalid) firstInvalid = el;
+            valid = false;
+          }
+        });
 
         if (firstInvalid) {
           firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
