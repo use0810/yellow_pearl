@@ -290,14 +290,20 @@
     </div>
 
     <script>
-      const WORKER_URL = 'https://yellow-pearl-api.shingo-satokimi2021.workers.dev';
+      // 同一ドメイン経由（Worker Route: yellow-pearl.com/api/* が必要）
+      const WORKER_URL = window.location.origin;
 
       async function api(path, options = {}) {
-        const res = await fetch(`${WORKER_URL}${path}`, {
-          ...options,
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', ...options.headers },
-        });
+        let res;
+        try {
+          res = await fetch(`${WORKER_URL}${path}`, {
+            ...options,
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', ...options.headers },
+          });
+        } catch {
+          throw new Error('APIに接続できません。Worker Route（yellow-pearl.com/api/*）の設定を確認してください。');
+        }
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'エラーが発生しました');
         return data;
@@ -380,11 +386,7 @@
         }
       });
 
-      loadDashboard().catch((err) => {
-        showAuthError(
-          err.message + ' — Cloudflare Access で管理画面と Worker API の両方を保護しているか確認してください。'
-        );
-      });
+      loadDashboard().catch((err) => showAuthError(err.message));
     </script>
   </body>
 </html>
