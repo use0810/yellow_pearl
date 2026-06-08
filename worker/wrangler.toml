@@ -6,6 +6,10 @@ compatibility_date = "2024-01-01"
 [vars]
 ALLOWED_ORIGIN = "*"
 
+# 管理者認証: Cloudflare Zero Trust Access を使用（自前 ID/パスワード不要）
+# Worker の Application AUD タグを設定する場合:
+# [vars] ACCESS_AUD = "<Access Application の AUD tag>"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "yellow-pearl-db"

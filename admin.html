@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>管理画面 | Yellow Pearl</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@200;300;400;600&family=Cinzel:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .admin-wrap {
+        min-height: 100vh;
+        padding: clamp(5rem, 10vw, 8rem) clamp(1.5rem, 5vw, 3rem) 3rem;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+
+      .admin-header {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+
+      .admin-header h1 {
+        font-family: 'Cinzel', serif;
+        font-size: clamp(1.2rem, 3vw, 1.6rem);
+        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 0.3em;
+      }
+
+      .panel {
+        border: 1px solid rgba(201, 168, 76, 0.25);
+        background: rgba(201, 168, 76, 0.03);
+        padding: 2rem;
+        margin-bottom: 2rem;
+      }
+
+      .panel-title {
+        font-family: 'Cinzel', serif;
+        font-size: 0.65rem;
+        letter-spacing: 0.35em;
+        color: var(--gold);
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.6rem;
+        border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1.2rem;
+      }
+
+      .form-group label {
+        font-family: 'Cinzel', serif;
+        font-size: 0.6rem;
+        letter-spacing: 0.2em;
+        color: rgba(232, 217, 176, 0.6);
+      }
+
+      .form-group input {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(201, 168, 76, 0.25);
+        color: var(--cream);
+        font-family: 'Noto Serif JP', serif;
+        font-size: 0.9rem;
+        padding: 0.8rem 1rem;
+        outline: none;
+        width: 100%;
+        color-scheme: dark;
+      }
+
+      .form-group input:focus {
+        border-color: var(--gold);
+      }
+
+      .btn {
+        font-family: 'Cinzel', serif;
+        font-size: 0.7rem;
+        letter-spacing: 0.25em;
+        padding: 0.9rem 2rem;
+        border: 1px solid var(--gold);
+        background: transparent;
+        color: var(--gold);
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .btn:hover:not(:disabled) {
+        background: rgba(201, 168, 76, 0.15);
+      }
+
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, rgba(201, 168, 76, 0.2), rgba(255, 217, 102, 0.1));
+      }
+
+      .error-msg {
+        color: #ff7755;
+        font-size: 0.75rem;
+        margin-top: 0.5rem;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      .stat-card {
+        text-align: center;
+        padding: 1.2rem;
+        border: 1px solid rgba(201, 168, 76, 0.2);
+        background: rgba(0, 0, 0, 0.3);
+      }
+
+      .stat-num {
+        font-family: 'Cinzel', serif;
+        font-size: 1.8rem;
+        color: var(--gold-bright);
+        margin-bottom: 0.3rem;
+      }
+
+      .stat-label {
+        font-size: 0.7rem;
+        color: rgba(232, 217, 176, 0.5);
+        letter-spacing: 0.1em;
+      }
+
+      .inventory-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+
+      @media (max-width: 600px) {
+        .inventory-form { grid-template-columns: 1fr; }
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin: 1rem 0;
+        font-size: 0.8rem;
+        color: rgba(232, 217, 176, 0.7);
+      }
+
+      .checkbox-row input { accent-color: var(--gold); }
+
+      .orders-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+      }
+
+      .orders-table th,
+      .orders-table td {
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid rgba(201, 168, 76, 0.15);
+        text-align: left;
+      }
+
+      .orders-table th {
+        font-family: 'Cinzel', serif;
+        font-size: 0.55rem;
+        letter-spacing: 0.15em;
+        color: var(--gold);
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .status-badge {
+        font-size: 0.65rem;
+        padding: 0.3rem 0.8rem;
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        color: var(--gold);
+        letter-spacing: 0.1em;
+      }
+
+      .status-badge.sold-out {
+        border-color: rgba(255, 119, 85, 0.5);
+        color: #ff7755;
+      }
+
+      .success-msg { color: var(--gold-light); font-size: 0.75rem; margin-top: 0.5rem; }
+
+      #auth-error { display: none; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="admin-wrap">
+      <div class="admin-header">
+        <span class="section-label">Admin</span>
+        <div class="gold-line" style="margin: 0 auto 1rem;"></div>
+        <h1>Yellow Pearl</h1>
+      </div>
+
+      <div id="auth-error" class="panel">
+        <p class="error-msg" id="auth-error-msg"></p>
+      </div>
+
+      <div id="dashboard-screen">
+        <div class="toolbar">
+          <span class="status-badge" id="status-badge">受付中</span>
+          <button class="btn" id="refresh-btn">更新</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-num" id="stat-sold">—</div>
+            <div class="stat-label">売れた本数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" id="stat-stock">—</div>
+            <div class="stat-label">残り在庫</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" id="stat-total">—</div>
+            <div class="stat-label">年間総数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" id="stat-orders">—</div>
+            <div class="stat-label">予約件数</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">INVENTORY</div>
+          <form id="inventory-form">
+            <div class="inventory-form">
+              <div class="form-group">
+                <label>残り在庫（本）</label>
+                <input type="number" id="edit-stock" min="0" required />
+              </div>
+              <div class="form-group">
+                <label>年間総数（本）</label>
+                <input type="number" id="edit-total" min="1" required />
+              </div>
+            </div>
+            <label class="checkbox-row">
+              <input type="checkbox" id="edit-sold-out" />
+              受付終了にする
+            </label>
+            <p class="error-msg" id="inventory-error"></p>
+            <p class="success-msg" id="inventory-success"></p>
+            <button type="submit" class="btn btn-primary" id="save-btn">在庫を更新</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">RECENT ORDERS</div>
+          <div style="overflow-x: auto;">
+            <table class="orders-table">
+              <thead>
+                <tr>
+                  <th>予約番号</th>
+                  <th>お名前</th>
+                  <th>数量</th>
+                  <th>日時</th>
+                </tr>
+              </thead>
+              <tbody id="orders-body">
+                <tr><td colspan="4" style="color: rgba(232,217,176,0.4);">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const WORKER_URL = 'https://yellow-pearl-api.shingo-satokimi2021.workers.dev';
+
+      async function api(path, options = {}) {
+        const res = await fetch(`${WORKER_URL}${path}`, {
+          ...options,
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...options.headers },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'エラーが発生しました');
+        return data;
+      }
+
+      function showAuthError(msg) {
+        document.getElementById('auth-error').style.display = 'block';
+        document.getElementById('auth-error-msg').textContent = msg;
+        document.getElementById('dashboard-screen').style.display = 'none';
+      }
+
+      function renderDashboard(data) {
+        const inv = data.inventory;
+        document.getElementById('stat-sold').textContent = data.sold.toLocaleString();
+        document.getElementById('stat-stock').textContent = inv.stock.toLocaleString();
+        document.getElementById('stat-total').textContent = inv.total.toLocaleString();
+        document.getElementById('stat-orders').textContent = data.order_count.toLocaleString();
+
+        document.getElementById('edit-stock').value = inv.stock;
+        document.getElementById('edit-total').value = inv.total;
+        document.getElementById('edit-sold-out').checked = inv.sold_out;
+
+        const badge = document.getElementById('status-badge');
+        if (inv.sold_out || inv.stock <= 0) {
+          badge.textContent = '受付終了';
+          badge.classList.add('sold-out');
+        } else {
+          badge.textContent = '受付中';
+          badge.classList.remove('sold-out');
+        }
+
+        const tbody = document.getElementById('orders-body');
+        if (!data.recent_orders.length) {
+          tbody.innerHTML = '<tr><td colspan="4" style="color: rgba(232,217,176,0.4);">予約なし</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.recent_orders.map((o) => `
+          <tr>
+            <td>${o.order_id}</td>
+            <td>${o.last_name} ${o.first_name}</td>
+            <td>${o.quantity}本</td>
+            <td>${o.created_at}</td>
+          </tr>
+        `).join('');
+      }
+
+      async function loadDashboard() {
+        const data = await api('/api/admin/dashboard');
+        renderDashboard(data);
+      }
+
+      document.getElementById('refresh-btn').addEventListener('click', () => {
+        loadDashboard().catch((err) => alert(err.message));
+      });
+
+      document.getElementById('inventory-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('inventory-error');
+        const okEl = document.getElementById('inventory-success');
+        const btn = document.getElementById('save-btn');
+        errEl.textContent = '';
+        okEl.textContent = '';
+        btn.disabled = true;
+
+        try {
+          await api('/api/admin/inventory', {
+            method: 'PUT',
+            body: JSON.stringify({
+              stock: parseInt(document.getElementById('edit-stock').value, 10),
+              total: parseInt(document.getElementById('edit-total').value, 10),
+              sold_out: document.getElementById('edit-sold-out').checked,
+            }),
+          });
+          okEl.textContent = '在庫を更新しました';
+          await loadDashboard();
+        } catch (err) {
+          errEl.textContent = err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      loadDashboard().catch((err) => {
+        showAuthError(
+          err.message + ' — Cloudflare Access で管理画面と Worker API の両方を保護しているか確認してください。'
+        );
+      });
+    </script>
+  </body>
+</html>
