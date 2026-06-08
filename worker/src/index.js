@@ -43,7 +43,9 @@ function verifyAccess(request, env) {
   if (!jwt) return { error: '認証が必要です', status: 401 };
 
   try {
-    const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const b64 = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(atob(pad));
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       return { error: '認証が切れました', status: 401 };
     }
@@ -227,32 +229,43 @@ export default {
     const isAdmin = url.pathname.startsWith('/api/admin/');
     const CORS = buildCors(env, request, { credentials: isAdmin });
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS });
-    }
-
-    if (url.pathname === '/api/stock' && request.method === 'GET') {
-      return handleStock(env, CORS);
-    }
-
-    if (url.pathname === '/api/reserve' && request.method === 'POST') {
-      return handleReserve(request, env, CORS);
-    }
-
-    if (isAdmin) {
-      const auth = await requireAdmin(env.DB, request, env);
-      if (auth.error) return json({ error: auth.error }, auth.status, CORS);
-      await recordRateLimit(env.DB, auth.ip, 'admin');
-
-      if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
-        return handleAdminDashboard(env, CORS);
+    try {
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { headers: CORS });
       }
 
-      if (url.pathname === '/api/admin/inventory' && request.method === 'PUT') {
-        return handleAdminInventoryUpdate(request, env, CORS);
+      if (!env.DB) {
+        return json({ error: 'DB binding が設定されていません' }, 500, CORS);
       }
-    }
 
-    return json({ error: 'Not found' }, 404, CORS);
+      if (url.pathname === '/api/stock' && request.method === 'GET') {
+        return handleStock(env, CORS);
+      }
+
+      if (url.pathname === '/api/reserve' && request.method === 'POST') {
+        return handleReserve(request, env, CORS);
+      }
+
+      if (isAdmin) {
+        const auth = await requireAdmin(env.DB, request, env);
+        if (auth.error) return json({ error: auth.error }, auth.status, CORS);
+        try {
+          await recordRateLimit(env.DB, auth.ip, 'admin');
+        } catch { /* rate_limits 未作成時も管理 API は動作させる */ }
+
+        if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
+          return handleAdminDashboard(env, CORS);
+        }
+
+        if (url.pathname === '/api/admin/inventory' && request.method === 'PUT') {
+          return handleAdminInventoryUpdate(request, env, CORS);
+        }
+      }
+
+      return json({ error: 'Not found' }, 404, CORS);
+    } catch (err) {
+      console.error(err);
+      return json({ error: 'サーバーエラー', detail: String(err?.message || err) }, 500, CORS);
+    }
   },
 };
