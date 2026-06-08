@@ -7,3 +7,10 @@
 !style.css
 !assets/
 !assets/**
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
