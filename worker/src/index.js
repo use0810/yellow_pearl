@@ -145,8 +145,10 @@ async function handleAdminDashboard(env, CORS) {
   ).first();
 
   const recent = await env.DB.prepare(
-    `SELECT order_id, last_name, first_name, quantity, created_at
-     FROM orders ORDER BY id DESC LIMIT 20`
+    `SELECT order_id, last_name, first_name, last_name_kana, first_name_kana,
+            email, phone, postal, prefecture, address1, address2, note,
+            quantity, created_at
+     FROM orders ORDER BY id DESC LIMIT 50`
   ).all();
 
   return json({

@@ -5,293 +5,464 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <title>管理画面 | Yellow Pearl</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@200;300;400;600&family=Cinzel:wght@400;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="style.css" />
     <style>
-      .admin-wrap {
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        color: #1a1a1a;
+        background: #f0f2f5;
+      }
+
+      .admin-app {
         min-height: 100vh;
-        padding: clamp(5rem, 10vw, 8rem) clamp(1.5rem, 5vw, 3rem) 3rem;
-        max-width: 960px;
-        margin: 0 auto;
-      }
-
-      .admin-header {
-        text-align: center;
-        margin-bottom: 3rem;
-      }
-
-      .admin-header h1 {
-        font-family: 'Cinzel', serif;
-        font-size: clamp(1.2rem, 3vw, 1.6rem);
-        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        letter-spacing: 0.3em;
-      }
-
-      .panel {
-        border: 1px solid rgba(201, 168, 76, 0.25);
-        background: rgba(201, 168, 76, 0.03);
-        padding: 2rem;
-        margin-bottom: 2rem;
-      }
-
-      .panel-title {
-        font-family: 'Cinzel', serif;
-        font-size: 0.65rem;
-        letter-spacing: 0.35em;
-        color: var(--gold);
-        margin-bottom: 1.5rem;
-        padding-bottom: 0.6rem;
-        border-bottom: 1px solid rgba(201, 168, 76, 0.2);
-      }
-
-      .form-group {
         display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        margin-bottom: 1.2rem;
       }
 
-      .form-group label {
-        font-family: 'Cinzel', serif;
-        font-size: 0.6rem;
-        letter-spacing: 0.2em;
-        color: rgba(232, 217, 176, 0.6);
+      /* ── ナビ（PC: 左サイド） ── */
+      .desktop-nav {
+        display: none;
+        width: 200px;
+        flex-shrink: 0;
+        background: #fff;
+        border-right: 1px solid #e0e0e0;
+        padding: 1.25rem 0;
+        position: sticky;
+        top: 0;
+        height: 100vh;
       }
 
-      .form-group input {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(201, 168, 76, 0.25);
-        color: var(--cream);
-        font-family: 'Noto Serif JP', serif;
-        font-size: 0.9rem;
-        padding: 0.8rem 1rem;
-        outline: none;
+      .nav-brand {
+        padding: 0 1.25rem 1.25rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #666;
+        border-bottom: 1px solid #eee;
+        margin-bottom: 0.75rem;
+      }
+
+      .nav-btn {
+        display: block;
         width: 100%;
-        color-scheme: dark;
+        text-align: left;
+        padding: 0.85rem 1.25rem;
+        border: none;
+        background: none;
+        font-size: 0.95rem;
+        color: #444;
+        cursor: pointer;
+        border-left: 3px solid transparent;
       }
 
-      .form-group input:focus {
-        border-color: var(--gold);
+      .nav-btn:hover { background: #f5f5f5; }
+
+      .nav-btn.active {
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-weight: 600;
+        border-left-color: #1d4ed8;
+      }
+
+      /* ── ナビ（スマホ: 下タブ） ── */
+      .mobile-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border-top: 1px solid #e0e0e0;
+        z-index: 100;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+      }
+
+      .mobile-nav .nav-btn {
+        flex: 1;
+        text-align: center;
+        padding: 0.75rem 0.5rem 0.65rem;
+        border-left: none;
+        border-top: 3px solid transparent;
+        font-size: 0.85rem;
+      }
+
+      .mobile-nav .nav-btn.active {
+        border-left: none;
+        border-top-color: #1d4ed8;
+      }
+
+      /* ── メイン ── */
+      .admin-main {
+        flex: 1;
+        min-width: 0;
+        padding: 1rem 1rem 5rem;
+      }
+
+      @media (min-width: 768px) {
+        .desktop-nav { display: block; }
+        .mobile-nav { display: none; }
+        .admin-main { padding: 1.5rem 2rem 2rem; }
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .topbar h1 {
+        font-size: 1.15rem;
+        font-weight: 700;
+      }
+
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .badge {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.3rem 0.75rem;
+        border-radius: 999px;
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .badge.sold-out {
+        background: #fee2e2;
+        color: #991b1b;
       }
 
       .btn {
-        font-family: 'Cinzel', serif;
-        font-size: 0.7rem;
-        letter-spacing: 0.25em;
-        padding: 0.9rem 2rem;
-        border: 1px solid var(--gold);
-        background: transparent;
-        color: var(--gold);
+        font-size: 0.85rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid #d0d0d0;
+        border-radius: 6px;
+        background: #fff;
+        color: #333;
         cursor: pointer;
-        transition: background 0.2s;
       }
 
-      .btn:hover:not(:disabled) {
-        background: rgba(201, 168, 76, 0.15);
-      }
-
-      .btn:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-      }
+      .btn:hover:not(:disabled) { background: #f5f5f5; }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
       .btn-primary {
-        background: linear-gradient(135deg, rgba(201, 168, 76, 0.2), rgba(255, 217, 102, 0.1));
+        background: #1d4ed8;
+        color: #fff;
+        border-color: #1d4ed8;
       }
 
-      .error-msg {
-        color: #ff7755;
-        font-size: 0.75rem;
-        margin-top: 0.5rem;
+      .btn-primary:hover:not(:disabled) { background: #1e40af; }
+
+      .screen { display: none; }
+      .screen.active { display: block; }
+
+      .card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+      }
+
+      .card-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #555;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #eee;
       }
 
       .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 1rem;
-        margin-bottom: 2rem;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      @media (min-width: 600px) {
+        .stats-grid { grid-template-columns: repeat(4, 1fr); }
       }
 
       .stat-card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem;
         text-align: center;
-        padding: 1.2rem;
-        border: 1px solid rgba(201, 168, 76, 0.2);
-        background: rgba(0, 0, 0, 0.3);
       }
 
       .stat-num {
-        font-family: 'Cinzel', serif;
-        font-size: 1.8rem;
-        color: var(--gold-bright);
-        margin-bottom: 0.3rem;
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #1d4ed8;
+        line-height: 1.2;
       }
 
       .stat-label {
-        font-size: 0.7rem;
-        color: rgba(232, 217, 176, 0.5);
-        letter-spacing: 0.1em;
+        font-size: 0.75rem;
+        color: #888;
+        margin-top: 0.25rem;
       }
 
-      .inventory-form {
+      .form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
       }
 
-      @media (max-width: 600px) {
-        .inventory-form { grid-template-columns: 1fr; }
+      @media (max-width: 500px) {
+        .form-row { grid-template-columns: 1fr; }
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin-bottom: 1rem;
+      }
+
+      .field label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #555;
+      }
+
+      .field input[type="number"] {
+        font-size: 1rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        width: 100%;
+      }
+
+      .field input:focus {
+        outline: 2px solid #93c5fd;
+        border-color: #1d4ed8;
       }
 
       .checkbox-row {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
-        margin: 1rem 0;
-        font-size: 0.8rem;
-        color: rgba(232, 217, 176, 0.7);
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
       }
 
-      .checkbox-row input { accent-color: var(--gold); }
+      .msg-error { color: #dc2626; font-size: 0.85rem; margin-top: 0.5rem; }
+      .msg-success { color: #16a34a; font-size: 0.85rem; margin-top: 0.5rem; }
 
-      .orders-table {
+      /* 顧客テーブル（PC） */
+      .table-wrap { overflow-x: auto; }
+
+      .data-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.75rem;
+        font-size: 0.85rem;
       }
 
-      .orders-table th,
-      .orders-table td {
+      .data-table th,
+      .data-table td {
         padding: 0.6rem 0.5rem;
-        border-bottom: 1px solid rgba(201, 168, 76, 0.15);
+        border-bottom: 1px solid #eee;
         text-align: left;
+        vertical-align: top;
       }
 
-      .orders-table th {
-        font-family: 'Cinzel', serif;
-        font-size: 0.55rem;
-        letter-spacing: 0.15em;
-        color: var(--gold);
+      .data-table th {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #666;
+        white-space: nowrap;
+        background: #fafafa;
       }
 
-      .toolbar {
+      .data-table .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 0.8rem;
+      }
+
+      /* 顧客カード（スマホ） */
+      .order-cards { display: none; }
+
+      @media (max-width: 767px) {
+        .table-wrap { display: none; }
+        .order-cards { display: flex; flex-direction: column; gap: 0.75rem; }
+      }
+
+      .order-card {
+        border: 1px solid #e8e8e8;
+        border-radius: 8px;
+        padding: 1rem;
+        background: #fafafa;
+      }
+
+      .order-card-head {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-        flex-wrap: wrap;
-        gap: 1rem;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
       }
 
-      .status-badge {
-        font-size: 0.65rem;
-        padding: 0.3rem 0.8rem;
-        border: 1px solid rgba(201, 168, 76, 0.4);
-        color: var(--gold);
-        letter-spacing: 0.1em;
+      .order-card-name {
+        font-weight: 700;
+        font-size: 1rem;
       }
 
-      .status-badge.sold-out {
-        border-color: rgba(255, 119, 85, 0.5);
-        color: #ff7755;
+      .order-card-id {
+        font-family: ui-monospace, monospace;
+        font-size: 0.75rem;
+        color: #888;
       }
 
-      .success-msg { color: var(--gold-light); font-size: 0.75rem; margin-top: 0.5rem; }
+      .order-card-dl {
+        display: grid;
+        grid-template-columns: 4.5rem 1fr;
+        gap: 0.2rem 0.5rem;
+        font-size: 0.85rem;
+      }
 
-      #auth-error { display: none; text-align: center; }
+      .order-card-dl dt { color: #888; }
+      .order-card-dl dd { word-break: break-all; }
+
+      .empty-msg {
+        color: #999;
+        text-align: center;
+        padding: 2rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      #auth-error {
+        display: none;
+        max-width: 480px;
+        margin: 4rem auto;
+        padding: 2rem;
+        background: #fff;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      #auth-error .msg-error { margin-top: 0; font-size: 1rem; }
     </style>
   </head>
   <body>
-    <div class="admin-wrap">
-      <div class="admin-header">
-        <span class="section-label">Admin</span>
-        <div class="gold-line" style="margin: 0 auto 1rem;"></div>
-        <h1>Yellow Pearl</h1>
-      </div>
+    <div id="auth-error">
+      <p class="msg-error" id="auth-error-msg"></p>
+    </div>
 
-      <div id="auth-error" class="panel">
-        <p class="error-msg" id="auth-error-msg"></p>
-      </div>
+    <div class="admin-app" id="app" hidden>
+      <nav class="desktop-nav" aria-label="メインメニュー">
+        <div class="nav-brand">Yellow Pearl</div>
+        <button type="button" class="nav-btn active" data-screen="products">商品管理</button>
+        <button type="button" class="nav-btn" data-screen="customers">顧客管理</button>
+      </nav>
 
-      <div id="dashboard-screen">
-        <div class="toolbar">
-          <span class="status-badge" id="status-badge">受付中</span>
-          <button class="btn" id="refresh-btn">更新</button>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-num" id="stat-sold">—</div>
-            <div class="stat-label">売れた本数</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num" id="stat-stock">—</div>
-            <div class="stat-label">残り在庫</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num" id="stat-total">—</div>
-            <div class="stat-label">年間総数</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num" id="stat-orders">—</div>
-            <div class="stat-label">予約件数</div>
+      <main class="admin-main">
+        <div class="topbar">
+          <h1 id="screen-title">商品管理</h1>
+          <div class="topbar-actions">
+            <span class="badge" id="status-badge">受付中</span>
+            <button type="button" class="btn" id="refresh-btn">更新</button>
           </div>
         </div>
 
-        <div class="panel">
-          <div class="panel-title">INVENTORY</div>
-          <form id="inventory-form">
-            <div class="inventory-form">
-              <div class="form-group">
-                <label>残り在庫（本）</label>
-                <input type="number" id="edit-stock" min="0" required />
-              </div>
-              <div class="form-group">
-                <label>年間総数（本）</label>
-                <input type="number" id="edit-total" min="1" required />
-              </div>
+        <!-- 商品管理 -->
+        <section id="screen-products" class="screen active">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-num" id="stat-sold">—</div>
+              <div class="stat-label">売れた本数</div>
             </div>
-            <label class="checkbox-row">
-              <input type="checkbox" id="edit-sold-out" />
-              受付終了にする
-            </label>
-            <p class="error-msg" id="inventory-error"></p>
-            <p class="success-msg" id="inventory-success"></p>
-            <button type="submit" class="btn btn-primary" id="save-btn">在庫を更新</button>
-          </form>
-        </div>
-
-        <div class="panel">
-          <div class="panel-title">RECENT ORDERS</div>
-          <div style="overflow-x: auto;">
-            <table class="orders-table">
-              <thead>
-                <tr>
-                  <th>予約番号</th>
-                  <th>お名前</th>
-                  <th>数量</th>
-                  <th>日時</th>
-                </tr>
-              </thead>
-              <tbody id="orders-body">
-                <tr><td colspan="4" style="color: rgba(232,217,176,0.4);">読み込み中...</td></tr>
-              </tbody>
-            </table>
+            <div class="stat-card">
+              <div class="stat-num" id="stat-stock">—</div>
+              <div class="stat-label">残り在庫</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num" id="stat-total">—</div>
+              <div class="stat-label">年間総数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num" id="stat-orders">—</div>
+              <div class="stat-label">予約件数</div>
+            </div>
           </div>
-        </div>
-      </div>
+
+          <div class="card">
+            <div class="card-title">在庫の更新</div>
+            <form id="inventory-form">
+              <div class="form-row">
+                <div class="field">
+                  <label for="edit-stock">残り在庫（本）</label>
+                  <input type="number" id="edit-stock" min="0" required />
+                </div>
+                <div class="field">
+                  <label for="edit-total">年間総数（本）</label>
+                  <input type="number" id="edit-total" min="1" required />
+                </div>
+              </div>
+              <label class="checkbox-row">
+                <input type="checkbox" id="edit-sold-out" />
+                受付終了にする
+              </label>
+              <p class="msg-error" id="inventory-error"></p>
+              <p class="msg-success" id="inventory-success"></p>
+              <button type="submit" class="btn btn-primary" id="save-btn">在庫を更新</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- 顧客管理 -->
+        <section id="screen-customers" class="screen">
+          <div class="card">
+            <div class="card-title">予約一覧（最新50件）</div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>予約番号</th>
+                    <th>お名前</th>
+                    <th>連絡先</th>
+                    <th>住所</th>
+                    <th>数量</th>
+                    <th>日時</th>
+                  </tr>
+                </thead>
+                <tbody id="orders-table-body">
+                  <tr><td colspan="6" class="empty-msg">読み込み中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="order-cards" id="orders-cards"></div>
+          </div>
+        </section>
+      </main>
+
+      <nav class="mobile-nav" aria-label="メインメニュー">
+        <button type="button" class="nav-btn active" data-screen="products">商品管理</button>
+        <button type="button" class="nav-btn" data-screen="customers">顧客管理</button>
+      </nav>
     </div>
 
     <script>
-      // 同一ドメイン経由（Worker Route: yellow-pearl.com/api/* が必要）
       const WORKER_URL = window.location.origin;
+      const SCREEN_TITLES = { products: '商品管理', customers: '顧客管理' };
+
+      function esc(s) {
+        return String(s ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
 
       async function api(path, options = {}) {
         let res;
@@ -312,7 +483,78 @@
       function showAuthError(msg) {
         document.getElementById('auth-error').style.display = 'block';
         document.getElementById('auth-error-msg').textContent = msg;
-        document.getElementById('dashboard-screen').style.display = 'none';
+        document.getElementById('app').hidden = true;
+      }
+
+      function switchScreen(name) {
+        document.querySelectorAll('.screen').forEach((el) => {
+          el.classList.toggle('active', el.id === `screen-${name}`);
+        });
+        document.querySelectorAll('.nav-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.screen === name);
+        });
+        document.getElementById('screen-title').textContent = SCREEN_TITLES[name] || '';
+      }
+
+      document.querySelectorAll('.nav-btn').forEach((btn) => {
+        btn.addEventListener('click', () => switchScreen(btn.dataset.screen));
+      });
+
+      function formatAddress(o) {
+        const line2 = o.address2 ? ` ${o.address2}` : '';
+        return `〒${o.postal} ${o.prefecture}${o.address1}${line2}`;
+      }
+
+      function formatContact(o) {
+        const kana = (o.last_name_kana || o.first_name_kana)
+          ? `<br><span style="color:#888;font-size:0.8rem">${esc(o.last_name_kana)} ${esc(o.first_name_kana)}</span>`
+          : '';
+        return `${esc(o.email)}<br>${esc(o.phone)}${kana}`;
+      }
+
+      function renderOrders(orders) {
+        const tbody = document.getElementById('orders-table-body');
+        const cards = document.getElementById('orders-cards');
+
+        if (!orders.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">予約なし</td></tr>';
+          cards.innerHTML = '<p class="empty-msg">予約なし</p>';
+          return;
+        }
+
+        tbody.innerHTML = orders.map((o) => {
+          const note = o.note ? `<br><span style="color:#888">備考: ${esc(o.note)}</span>` : '';
+          return `<tr>
+            <td class="mono">${esc(o.order_id)}</td>
+            <td>${esc(o.last_name)} ${esc(o.first_name)}</td>
+            <td>${formatContact(o)}</td>
+            <td>${esc(formatAddress(o))}${note}</td>
+            <td>${o.quantity}本</td>
+            <td style="white-space:nowrap">${esc(o.created_at)}</td>
+          </tr>`;
+        }).join('');
+
+        cards.innerHTML = orders.map((o) => `
+          <article class="order-card">
+            <div class="order-card-head">
+              <div>
+                <div class="order-card-name">${esc(o.last_name)} ${esc(o.first_name)}</div>
+                ${(o.last_name_kana || o.first_name_kana)
+                  ? `<div style="font-size:0.8rem;color:#888">${esc(o.last_name_kana)} ${esc(o.first_name_kana)}</div>`
+                  : ''}
+              </div>
+              <div class="order-card-id">${esc(o.order_id)}</div>
+            </div>
+            <dl class="order-card-dl">
+              <dt>数量</dt><dd>${o.quantity}本</dd>
+              <dt>日時</dt><dd>${esc(o.created_at)}</dd>
+              <dt>メール</dt><dd>${esc(o.email)}</dd>
+              <dt>電話</dt><dd>${esc(o.phone)}</dd>
+              <dt>住所</dt><dd>${esc(formatAddress(o))}</dd>
+              ${o.note ? `<dt>備考</dt><dd>${esc(o.note)}</dd>` : ''}
+            </dl>
+          </article>
+        `).join('');
       }
 
       function renderDashboard(data) {
@@ -335,24 +577,13 @@
           badge.classList.remove('sold-out');
         }
 
-        const tbody = document.getElementById('orders-body');
-        if (!data.recent_orders.length) {
-          tbody.innerHTML = '<tr><td colspan="4" style="color: rgba(232,217,176,0.4);">予約なし</td></tr>';
-          return;
-        }
-        tbody.innerHTML = data.recent_orders.map((o) => `
-          <tr>
-            <td>${o.order_id}</td>
-            <td>${o.last_name} ${o.first_name}</td>
-            <td>${o.quantity}本</td>
-            <td>${o.created_at}</td>
-          </tr>
-        `).join('');
+        renderOrders(data.recent_orders);
       }
 
       async function loadDashboard() {
         const data = await api('/api/admin/dashboard');
         renderDashboard(data);
+        document.getElementById('app').hidden = false;
       }
 
       document.getElementById('refresh-btn').addEventListener('click', () => {
