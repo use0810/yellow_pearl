@@ -81,10 +81,10 @@
       .mobile-nav .nav-btn {
         flex: 1;
         text-align: center;
-        padding: 0.75rem 0.5rem 0.65rem;
+        padding: 0.75rem 0.35rem 0.65rem;
         border-left: none;
         border-top: 3px solid transparent;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
       }
 
       .mobile-nav .nav-btn.active {
@@ -352,6 +352,144 @@
       }
 
       #auth-error .msg-error { margin-top: 0; font-size: 1rem; }
+
+      .card-note {
+        font-size: 0.8rem;
+        color: #888;
+        margin-bottom: 1rem;
+      }
+
+      /* 棒グラフ */
+      .bar-chart {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: clamp(0.75rem, 3vw, 2rem);
+        min-height: 220px;
+        padding: 1rem 0.5rem 0;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid #eee;
+      }
+
+      .bar-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        max-width: 80px;
+        min-width: 48px;
+      }
+
+      .bar-count {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #1d4ed8;
+        margin-bottom: 0.35rem;
+        min-height: 1.1rem;
+      }
+
+      .bar-pillar {
+        width: 100%;
+        max-width: 48px;
+        background: #1d4ed8;
+        border-radius: 4px 4px 0 0;
+        min-height: 4px;
+        transition: height 0.3s ease;
+      }
+
+      .bar-year {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #555;
+        margin-top: 0.5rem;
+      }
+
+      .data-table .num { text-align: right; white-space: nowrap; }
+
+      .shipping-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+        gap: 0.5rem 0.75rem;
+        max-height: 360px;
+        overflow-y: auto;
+        margin-bottom: 1rem;
+        padding-right: 0.25rem;
+      }
+
+      .shipping-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.8rem;
+      }
+
+      .shipping-item label {
+        flex: 1;
+        color: #555;
+        white-space: nowrap;
+      }
+
+      .shipping-item input {
+        width: 72px;
+        padding: 0.35rem 0.45rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 0.85rem;
+      }
+
+      .card-head-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #eee;
+        flex-wrap: wrap;
+      }
+
+      .card-head-row .card-title {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+
+      .ops-cell { min-width: 180px; }
+
+      .ops-cell select,
+      .ops-cell textarea {
+        width: 100%;
+        font-size: 0.8rem;
+        padding: 0.35rem 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: inherit;
+      }
+
+      .ops-cell textarea {
+        min-height: 52px;
+        resize: vertical;
+        margin-top: 0.35rem;
+      }
+
+      .ops-save {
+        margin-top: 0.35rem;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.65rem;
+      }
+
+      .status-pill {
+        display: inline-block;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        margin-bottom: 0.35rem;
+      }
+
+      .status-pill.reserved { background: #dbeafe; color: #1d4ed8; }
+      .status-pill.done { background: #dcfce7; color: #166534; }
+      .status-pill.cancelled { background: #fee2e2; color: #991b1b; }
     </style>
   </head>
   <body>
@@ -363,7 +501,8 @@
       <nav class="desktop-nav" aria-label="メインメニュー">
         <div class="nav-brand">Yellow Pearl</div>
         <button type="button" class="nav-btn active" data-screen="products">商品管理</button>
-        <button type="button" class="nav-btn" data-screen="customers">顧客管理</button>
+        <button type="button" class="nav-btn" data-screen="orders">予約管理</button>
+        <button type="button" class="nav-btn" data-screen="stats">統計</button>
       </nav>
 
       <main class="admin-main">
@@ -409,21 +548,39 @@
                   <input type="number" id="edit-total" min="1" required />
                 </div>
               </div>
+              <div class="field" style="max-width:240px">
+                <label for="edit-unit-price">単価（円／本）</label>
+                <input type="number" id="edit-unit-price" min="0" required />
+              </div>
               <label class="checkbox-row">
                 <input type="checkbox" id="edit-sold-out" />
                 受付終了にする
               </label>
               <p class="msg-error" id="inventory-error"></p>
               <p class="msg-success" id="inventory-success"></p>
-              <button type="submit" class="btn btn-primary" id="save-btn">在庫を更新</button>
+              <button type="submit" class="btn btn-primary" id="save-btn">在庫・単価を保存</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-title">送料（都道府県別）</div>
+            <p class="card-note">金額は円。カートの都道府県選択と連動します。</p>
+            <form id="shipping-form">
+              <div class="shipping-grid" id="shipping-grid"></div>
+              <p class="msg-error" id="shipping-error"></p>
+              <p class="msg-success" id="shipping-success"></p>
+              <button type="submit" class="btn btn-primary" id="save-shipping-btn">送料を保存</button>
             </form>
           </div>
         </section>
 
-        <!-- 顧客管理 -->
-        <section id="screen-customers" class="screen">
+        <!-- 予約管理 -->
+        <section id="screen-orders" class="screen">
           <div class="card">
-            <div class="card-title">予約一覧（最新50件）</div>
+            <div class="card-head-row">
+              <div class="card-title" id="orders-list-title">予約一覧</div>
+              <button type="button" class="btn" id="toggle-orders-filter-btn">キャンセル一覧</button>
+            </div>
             <div class="table-wrap">
               <table class="data-table">
                 <thead>
@@ -433,28 +590,69 @@
                     <th>連絡先</th>
                     <th>住所</th>
                     <th>数量</th>
+                    <th class="num">合計</th>
                     <th>日時</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody id="orders-table-body">
-                  <tr><td colspan="6" class="empty-msg">読み込み中...</td></tr>
+                  <tr><td colspan="8" class="empty-msg">読み込み中...</td></tr>
                 </tbody>
               </table>
             </div>
             <div class="order-cards" id="orders-cards"></div>
           </div>
         </section>
+
+        <!-- 統計 -->
+        <section id="screen-stats" class="screen">
+          <div class="card">
+            <div class="card-title">年度別予約件数</div>
+            <p class="card-note">※ 昨年度までの確定データを表示します（今年度は含みません）</p>
+            <div class="bar-chart" id="year-bar-chart">
+              <p class="empty-msg">読み込み中...</p>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>年度</th>
+                    <th class="num">予約件数</th>
+                    <th class="num">合計（本）</th>
+                    <th class="num">金額（円）</th>
+                  </tr>
+                </thead>
+                <tbody id="stats-table-body">
+                  <tr><td colspan="4" class="empty-msg">読み込み中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </main>
 
       <nav class="mobile-nav" aria-label="メインメニュー">
-        <button type="button" class="nav-btn active" data-screen="products">商品管理</button>
-        <button type="button" class="nav-btn" data-screen="customers">顧客管理</button>
+        <button type="button" class="nav-btn active" data-screen="products">商品</button>
+        <button type="button" class="nav-btn" data-screen="orders">予約</button>
+        <button type="button" class="nav-btn" data-screen="stats">統計</button>
       </nav>
     </div>
 
     <script>
       const WORKER_URL = window.location.origin;
-      const SCREEN_TITLES = { products: '商品管理', customers: '顧客管理' };
+      const SCREEN_TITLES = { products: '商品管理', orders: '予約管理', stats: '統計' };
+      const ORDER_STATUSES = ['予約', '済み', 'キャンセル'];
+      let orderFilter = 'active';
+      const PREFECTURES = [
+        '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+        '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+        '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+        '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+        '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+        '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+        '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+      ];
+      let activeScreen = 'products';
 
       function esc(s) {
         return String(s ?? '')
@@ -486,7 +684,12 @@
         document.getElementById('app').hidden = true;
       }
 
+      function formatYen(n) {
+        return Number(n).toLocaleString('ja-JP');
+      }
+
       function switchScreen(name) {
+        activeScreen = name;
         document.querySelectorAll('.screen').forEach((el) => {
           el.classList.toggle('active', el.id === `screen-${name}`);
         });
@@ -494,51 +697,126 @@
           btn.classList.toggle('active', btn.dataset.screen === name);
         });
         document.getElementById('screen-title').textContent = SCREEN_TITLES[name] || '';
+        if (name === 'stats') loadStats().catch((err) => alert(err.message));
+        if (name === 'orders') loadOrders().catch((err) => alert(err.message));
       }
 
       document.querySelectorAll('.nav-btn').forEach((btn) => {
         btn.addEventListener('click', () => switchScreen(btn.dataset.screen));
       });
 
+      function renderStats(data) {
+        const chart = document.getElementById('year-bar-chart');
+        const tbody = document.getElementById('stats-table-body');
+        const yearly = data.yearly || [];
+
+        if (!yearly.length) {
+          chart.innerHTML = '<p class="empty-msg">昨年度までのデータがありません</p>';
+          tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">データなし</td></tr>';
+          return;
+        }
+
+        const maxCount = Math.max(...yearly.map((y) => y.order_count), 1);
+        chart.innerHTML = yearly.map((y) => {
+          const h = Math.round((y.order_count / maxCount) * 160);
+          return `<div class="bar-col">
+            <span class="bar-count">${y.order_count}件</span>
+            <div class="bar-pillar" style="height:${h}px" title="${y.year}年: ${y.order_count}件"></div>
+            <span class="bar-year">${y.year}</span>
+          </div>`;
+        }).join('');
+
+        tbody.innerHTML = yearly.map((y) => `<tr>
+          <td>${y.year}年度</td>
+          <td class="num">${formatYen(y.order_count)}件</td>
+          <td class="num">${formatYen(y.total_quantity)}本</td>
+          <td class="num">¥${formatYen(y.amount)}</td>
+        </tr>`).join('');
+      }
+
+      function renderShippingGrid(shipping) {
+        const grid = document.getElementById('shipping-grid');
+        grid.innerHTML = PREFECTURES.map((p) => `
+          <div class="shipping-item">
+            <label>${p}</label>
+            <input type="number" min="0" data-pref="${p}" value="${shipping[p] ?? 0}" />
+          </div>
+        `).join('');
+      }
+
+      async function loadStats() {
+        const data = await api('/api/admin/stats');
+        renderStats(data);
+      }
+
       function formatAddress(o) {
+        if (!o.postal && !o.prefecture && !o.address1) return '—';
         const line2 = o.address2 ? ` ${o.address2}` : '';
-        return `〒${o.postal} ${o.prefecture}${o.address1}${line2}`;
+        return `〒${o.postal || ''} ${o.prefecture || ''}${o.address1 || ''}${line2}`.trim();
       }
 
       function formatContact(o) {
+        if (!o.email && !o.phone) return '—';
         const kana = (o.last_name_kana || o.first_name_kana)
           ? `<br><span style="color:#888;font-size:0.8rem">${esc(o.last_name_kana)} ${esc(o.first_name_kana)}</span>`
           : '';
-        return `${esc(o.email)}<br>${esc(o.phone)}${kana}`;
+        const email = o.email ? `${esc(o.email)}` : '';
+        const phone = o.phone ? `${o.email ? '<br>' : ''}${esc(o.phone)}` : '';
+        return `${email}${phone}${kana}` || '—';
+      }
+
+      function statusPillClass(status) {
+        if (status === '済み') return 'done';
+        if (status === 'キャンセル') return 'cancelled';
+        return 'reserved';
+      }
+
+      function renderOpsCell(o) {
+        const status = o.status || '予約';
+        const options = ORDER_STATUSES.map((s) =>
+          `<option value="${s}"${s === status ? ' selected' : ''}>${s}</option>`
+        ).join('');
+        return `<div class="ops-cell" data-order-id="${esc(o.order_id)}">
+          <select class="ops-status">${options}</select>
+          <textarea class="ops-note" placeholder="特記事項（管理者用）">${esc(o.admin_note || '')}</textarea>
+          <button type="button" class="btn ops-save ops-save-btn" data-order-id="${esc(o.order_id)}">保存</button>
+        </div>`;
       }
 
       function renderOrders(orders) {
         const tbody = document.getElementById('orders-table-body');
         const cards = document.getElementById('orders-cards');
+        const emptyLabel = orderFilter === 'cancelled' ? 'キャンセルなし' : '予約なし';
 
         if (!orders.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">予約なし</td></tr>';
-          cards.innerHTML = '<p class="empty-msg">予約なし</p>';
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-msg">${emptyLabel}</td></tr>`;
+          cards.innerHTML = `<p class="empty-msg">${emptyLabel}</p>`;
           return;
         }
 
         tbody.innerHTML = orders.map((o) => {
-          const note = o.note ? `<br><span style="color:#888">備考: ${esc(o.note)}</span>` : '';
-          return `<tr>
+          const note = o.note ? `<br><span style="color:#888">お客様備考: ${esc(o.note)}</span>` : '';
+          const status = o.status || '予約';
+          return `<tr data-order-id="${esc(o.order_id)}">
             <td class="mono">${esc(o.order_id)}</td>
             <td>${esc(o.last_name)} ${esc(o.first_name)}</td>
             <td>${formatContact(o)}</td>
             <td>${esc(formatAddress(o))}${note}</td>
             <td>${o.quantity}本</td>
+            <td class="num">${o.total_amount ? `¥${formatYen(o.total_amount)}` : '—'}</td>
             <td style="white-space:nowrap">${esc(o.created_at)}</td>
+            <td>${renderOpsCell(o)}</td>
           </tr>`;
         }).join('');
 
-        cards.innerHTML = orders.map((o) => `
-          <article class="order-card">
+        cards.innerHTML = orders.map((o) => {
+          const status = o.status || '予約';
+          return `
+          <article class="order-card" data-order-id="${esc(o.order_id)}">
             <div class="order-card-head">
               <div>
                 <div class="order-card-name">${esc(o.last_name)} ${esc(o.first_name)}</div>
+                <span class="status-pill ${statusPillClass(status)}">${esc(status)}</span>
                 ${(o.last_name_kana || o.first_name_kana)
                   ? `<div style="font-size:0.8rem;color:#888">${esc(o.last_name_kana)} ${esc(o.first_name_kana)}</div>`
                   : ''}
@@ -547,14 +825,43 @@
             </div>
             <dl class="order-card-dl">
               <dt>数量</dt><dd>${o.quantity}本</dd>
+              <dt>合計</dt><dd>${o.total_amount ? `¥${formatYen(o.total_amount)}` : '—'}</dd>
               <dt>日時</dt><dd>${esc(o.created_at)}</dd>
               <dt>メール</dt><dd>${esc(o.email)}</dd>
               <dt>電話</dt><dd>${esc(o.phone)}</dd>
               <dt>住所</dt><dd>${esc(formatAddress(o))}</dd>
-              ${o.note ? `<dt>備考</dt><dd>${esc(o.note)}</dd>` : ''}
+              ${o.note ? `<dt>お客様備考</dt><dd>${esc(o.note)}</dd>` : ''}
             </dl>
+            ${renderOpsCell(o)}
           </article>
-        `).join('');
+        `;
+        }).join('');
+      }
+
+      function updateOrdersFilterUI() {
+        const isCancelled = orderFilter === 'cancelled';
+        document.getElementById('orders-list-title').textContent =
+          isCancelled ? 'キャンセル一覧' : '予約一覧';
+        document.getElementById('toggle-orders-filter-btn').textContent =
+          isCancelled ? '予約一覧に戻る' : 'キャンセル一覧';
+      }
+
+      async function loadOrders() {
+        const filter = orderFilter === 'cancelled' ? 'cancelled' : 'active';
+        const data = await api(`/api/admin/orders?filter=${filter}`);
+        updateOrdersFilterUI();
+        renderOrders(data.orders ?? []);
+      }
+
+      async function saveOrder(orderId, container) {
+        const status = container.querySelector('.ops-status').value;
+        const adminNote = container.querySelector('.ops-note').value.trim();
+        await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ status, admin_note: adminNote }),
+        });
+        await loadOrders();
+        await loadDashboard();
       }
 
       function renderDashboard(data) {
@@ -566,6 +873,7 @@
 
         document.getElementById('edit-stock').value = inv.stock;
         document.getElementById('edit-total').value = inv.total;
+        document.getElementById('edit-unit-price').value = inv.unit_price ?? 0;
         document.getElementById('edit-sold-out').checked = inv.sold_out;
 
         const badge = document.getElementById('status-badge');
@@ -577,7 +885,8 @@
           badge.classList.remove('sold-out');
         }
 
-        renderOrders(data.recent_orders);
+        renderShippingGrid(data.shipping ?? {});
+        if (activeScreen === 'orders') loadOrders().catch(() => {});
       }
 
       async function loadDashboard() {
@@ -586,8 +895,14 @@
         document.getElementById('app').hidden = false;
       }
 
-      document.getElementById('refresh-btn').addEventListener('click', () => {
-        loadDashboard().catch((err) => alert(err.message));
+      document.getElementById('refresh-btn').addEventListener('click', async () => {
+        try {
+          await loadDashboard();
+          if (activeScreen === 'stats') await loadStats();
+          if (activeScreen === 'orders') await loadOrders();
+        } catch (err) {
+          alert(err.message);
+        }
       });
 
       document.getElementById('inventory-form').addEventListener('submit', async (e) => {
@@ -605,6 +920,7 @@
             body: JSON.stringify({
               stock: parseInt(document.getElementById('edit-stock').value, 10),
               total: parseInt(document.getElementById('edit-total').value, 10),
+              unit_price: parseInt(document.getElementById('edit-unit-price').value, 10),
               sold_out: document.getElementById('edit-sold-out').checked,
             }),
           });
@@ -615,6 +931,63 @@
         } finally {
           btn.disabled = false;
         }
+      });
+
+      document.getElementById('shipping-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('shipping-error');
+        const okEl = document.getElementById('shipping-success');
+        const btn = document.getElementById('save-shipping-btn');
+        errEl.textContent = '';
+        okEl.textContent = '';
+        btn.disabled = true;
+
+        const rates = [...document.querySelectorAll('#shipping-grid input')].map((el) => ({
+          prefecture: el.dataset.pref,
+          fee: parseInt(el.value, 10) || 0,
+        }));
+
+        try {
+          const data = await api('/api/admin/shipping', {
+            method: 'PUT',
+            body: JSON.stringify({ rates }),
+          });
+          renderShippingGrid(data.shipping ?? {});
+          okEl.textContent = '送料を保存しました';
+        } catch (err) {
+          errEl.textContent = err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      document.getElementById('toggle-orders-filter-btn').addEventListener('click', () => {
+        orderFilter = orderFilter === 'cancelled' ? 'active' : 'cancelled';
+        loadOrders().catch((err) => alert(err.message));
+      });
+
+      document.getElementById('orders-table-body').addEventListener('click', (e) => {
+        if (!e.target.classList.contains('ops-save-btn')) return;
+        const row = e.target.closest('tr');
+        const container = row?.querySelector('.ops-cell');
+        if (!container) return;
+        const btn = e.target;
+        btn.disabled = true;
+        saveOrder(e.target.dataset.orderId, container)
+          .catch((err) => alert(err.message))
+          .finally(() => { btn.disabled = false; });
+      });
+
+      document.getElementById('orders-cards').addEventListener('click', (e) => {
+        if (!e.target.classList.contains('ops-save-btn')) return;
+        const card = e.target.closest('.order-card');
+        const container = card?.querySelector('.ops-cell');
+        if (!container) return;
+        const btn = e.target;
+        btn.disabled = true;
+        saveOrder(e.target.dataset.orderId, container)
+          .catch((err) => alert(err.message))
+          .finally(() => { btn.disabled = false; });
       });
 
       loadDashboard().catch((err) => showAuthError(err.message));

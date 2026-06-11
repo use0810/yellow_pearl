@@ -341,6 +341,12 @@
         letter-spacing: 0.1em;
       }
 
+      .order-row-total .key,
+      .order-row-total .val {
+        font-weight: 600;
+        color: var(--gold-bright);
+      }
+
       .order-row .val {
         color: var(--cream);
         letter-spacing: 0.05em;
@@ -617,6 +623,22 @@
               <span class="val" id="summary-qty">1本</span>
             </div>
             <div class="order-row">
+              <span class="key">単価</span>
+              <span class="val" id="summary-unit-price">—</span>
+            </div>
+            <div class="order-row">
+              <span class="key">小計</span>
+              <span class="val" id="summary-subtotal">—</span>
+            </div>
+            <div class="order-row">
+              <span class="key">送料</span>
+              <span class="val" id="summary-shipping">都道府県を選択してください</span>
+            </div>
+            <div class="order-row order-row-total">
+              <span class="key">合計（税込）</span>
+              <span class="val" id="summary-total">—</span>
+            </div>
+            <div class="order-row">
               <span class="key">発送期間</span>
               <span class="val">2026年9月1日 〜 9月30日</span>
             </div>
@@ -632,6 +654,10 @@
             ※ 在庫数に達し次第、受付を終了いたします。<br />
             ※ ご予約確定後、メールにてご連絡いたします。
           </div>
+
+          <p id="sold-out-notice" class="field-error" style="display:none;text-align:center;margin-bottom:1rem;font-size:0.8rem;">
+            現在、予約の受付を終了しております。
+          </p>
 
           <button type="submit" class="submit-btn reveal" id="submit-btn">
             予約する — Reserve
@@ -658,14 +684,89 @@
 
       let qty = 1;
       const MAX_QTY = 5;
+      let maxStock = MAX_QTY;
+      let soldOut = false;
+      let unitPrice = 0;
+      let shippingMap = {};
+
+      function formatYen(n) {
+        return `¥${Number(n).toLocaleString('ja-JP')}`;
+      }
+
+      function getShippingFee() {
+        const pref = document.getElementById('prefecture').value;
+        if (!pref) return null;
+        return shippingMap[pref] ?? 0;
+      }
+
+      function updatePricingSummary() {
+        const subtotal = unitPrice * qty;
+        const shipping = getShippingFee();
+
+        document.getElementById('summary-unit-price').textContent =
+          unitPrice ? `${formatYen(unitPrice)} / 本` : '—';
+        document.getElementById('summary-subtotal').textContent =
+          unitPrice ? formatYen(subtotal) : '—';
+
+        const shipEl = document.getElementById('summary-shipping');
+        if (shipping === null) {
+          shipEl.textContent = '都道府県を選択してください';
+        } else {
+          shipEl.textContent = formatYen(shipping);
+        }
+
+        document.getElementById('summary-total').textContent =
+          (unitPrice && shipping !== null) ? formatYen(subtotal + shipping) : '—';
+      }
 
       function changeQty(delta) {
-        qty = Math.min(MAX_QTY, Math.max(1, qty + delta));
+        qty = Math.min(maxStock, Math.max(1, qty + delta));
         document.getElementById('qty-display').textContent = qty;
         document.getElementById('summary-qty').textContent = `${qty}本`;
-        document.getElementById('qty-minus').disabled = qty <= 1;
-        document.getElementById('qty-plus').disabled = qty >= MAX_QTY;
+        document.getElementById('qty-minus').disabled = soldOut || qty <= 1;
+        document.getElementById('qty-plus').disabled = soldOut || qty >= maxStock;
+        updatePricingSummary();
       }
+
+      function setSoldOut(closed) {
+        soldOut = closed;
+        const btn = document.getElementById('submit-btn');
+        const notice = document.getElementById('sold-out-notice');
+        btn.disabled = closed;
+        btn.textContent = closed ? '受付終了 — Closed' : '予約する — Reserve';
+        notice.style.display = closed ? 'block' : 'none';
+        document.getElementById('qty-minus').disabled = closed || qty <= 1;
+        document.getElementById('qty-plus').disabled = closed || qty >= maxStock;
+      }
+
+      async function loadStock() {
+        try {
+          const res = await fetch(`${WORKER_URL}/api/stock`);
+          const data = await res.json();
+
+          if (data.sold_out || data.stock <= 0) {
+            setSoldOut(true);
+            return;
+          }
+
+          setSoldOut(false);
+          unitPrice = data.unit_price ?? 0;
+          shippingMap = data.shipping ?? {};
+          maxStock = Math.min(MAX_QTY, data.stock);
+          if (qty > maxStock) {
+            qty = maxStock;
+            document.getElementById('qty-display').textContent = qty;
+            document.getElementById('summary-qty').textContent = `${qty}本`;
+          }
+          changeQty(0);
+        } catch (e) {
+          console.warn('在庫APIに接続できませんでした:', e);
+        }
+      }
+
+      document.getElementById('prefecture').addEventListener('change', updatePricingSummary);
+
+      loadStock();
 
       const KANA_RE = /^[ァ-ヴー・]+$/;
 
@@ -733,6 +834,7 @@
       // フォーム送信
       document.getElementById('reserve-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (soldOut) return;
         if (!validate()) return;
 
         const btn = document.getElementById('submit-btn');
@@ -767,7 +869,7 @@
           } else {
             alert(data.error || '送信に失敗しました。もう一度お試しください。');
             btn.disabled = false;
-            btn.textContent = '予約を確定する — Confirm';
+            btn.textContent = '予約する — Reserve';
           }
         } catch {
           // Worker未設定時はデモ完了表示
