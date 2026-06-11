@@ -538,9 +538,15 @@
                 <label for="edit-stock">残り在庫（本）</label>
                 <input type="number" id="edit-stock" min="0" required />
               </div>
-              <div class="field" style="max-width:240px">
-                <label for="edit-unit-price">単価（円／本）</label>
-                <input type="number" id="edit-unit-price" min="0" required />
+              <div class="form-row">
+                <div class="field">
+                  <label for="edit-unit-price">単価（税抜・円／本）</label>
+                  <input type="number" id="edit-unit-price" min="0" required />
+                </div>
+                <div class="field">
+                  <label for="edit-tax-rate">税率（％）</label>
+                  <input type="number" id="edit-tax-rate" min="0" max="100" value="10" required />
+                </div>
               </div>
               <label class="checkbox-row">
                 <input type="checkbox" id="edit-sold-out" />
@@ -554,7 +560,7 @@
 
           <div class="card">
             <div class="card-title">送料（都道府県別）</div>
-            <p class="card-note">金額は円。カートの都道府県選択と連動します。</p>
+            <p class="card-note">金額は税込みで入力。カートの都道府県選択と連動します。</p>
             <form id="shipping-form">
               <div class="shipping-grid" id="shipping-grid"></div>
               <p class="msg-error" id="shipping-error"></p>
@@ -675,7 +681,11 @@
       }
 
       function formatYen(n) {
-        return Number(n).toLocaleString('ja-JP');
+        return Number(n ?? 0).toLocaleString('ja-JP');
+      }
+
+      function fmtNum(n) {
+        return Number(n ?? 0).toLocaleString('ja-JP');
       }
 
       function switchScreen(name) {
@@ -855,14 +865,15 @@
       }
 
       function renderDashboard(data) {
-        const inv = data.inventory;
-        document.getElementById('stat-sold').textContent = data.sold.toLocaleString();
-        document.getElementById('stat-stock').textContent = inv.stock.toLocaleString();
-        document.getElementById('stat-orders').textContent = data.order_count.toLocaleString();
+        const inv = data?.inventory ?? {};
+        document.getElementById('stat-sold').textContent = fmtNum(data?.sold);
+        document.getElementById('stat-stock').textContent = fmtNum(inv.stock);
+        document.getElementById('stat-orders').textContent = fmtNum(data?.order_count);
 
-        document.getElementById('edit-stock').value = inv.stock;
+        document.getElementById('edit-stock').value = inv.stock ?? 0;
         document.getElementById('edit-unit-price').value = inv.unit_price ?? 0;
-        document.getElementById('edit-sold-out').checked = inv.sold_out;
+        document.getElementById('edit-tax-rate').value = inv.tax_rate ?? 10;
+        document.getElementById('edit-sold-out').checked = !!inv.sold_out;
 
         const badge = document.getElementById('status-badge');
         if (inv.sold_out || inv.stock <= 0) {
@@ -908,6 +919,7 @@
             body: JSON.stringify({
               stock: parseInt(document.getElementById('edit-stock').value, 10),
               unit_price: parseInt(document.getElementById('edit-unit-price').value, 10),
+              tax_rate: parseInt(document.getElementById('edit-tax-rate').value, 10),
               sold_out: document.getElementById('edit-sold-out').checked,
             }),
           });

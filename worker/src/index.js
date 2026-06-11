@@ -64,6 +64,13 @@ function verifyAccess(request, env) {
   }
 }
 
+function calcOrderAmount(unitPrice, qty, taxRate, shippingFee) {
+  const subtotal = unitPrice * qty;
+  const taxAmount = Math.floor(subtotal * taxRate / 100);
+  const totalAmount = subtotal + taxAmount + shippingFee;
+  return { subtotal, taxAmount, totalAmount };
+}
+
 async function getShippingMap(db) {
   const rows = await db.prepare('SELECT prefecture, fee FROM shipping_rates').all();
   const map = Object.fromEntries(PREFECTURES.map((p) => [p, 0]));
@@ -75,7 +82,7 @@ async function getShippingMap(db) {
 
 async function handleStock(env, CORS) {
   const row = await env.DB.prepare(
-    'SELECT stock, sold_out, unit_price FROM inventory WHERE product_id = ?'
+    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
   ).bind(PRODUCT_ID).first();
 
   if (!row) return json({ error: 'Not found' }, 404, CORS);
@@ -86,6 +93,7 @@ async function handleStock(env, CORS) {
     stock: row.stock,
     sold_out: row.sold_out === 1,
     unit_price: row.unit_price ?? 0,
+    tax_rate: row.tax_rate ?? 10,
     shipping,
   }, 200, CORS);
 }
@@ -123,7 +131,7 @@ async function handleReserve(request, env, CORS) {
   }
 
   const inv = await env.DB.prepare(
-    'SELECT stock, sold_out, unit_price FROM inventory WHERE product_id = ?'
+    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
   ).bind(PRODUCT_ID).first();
 
   if (!inv || inv.sold_out || inv.stock < qty) {
@@ -135,14 +143,15 @@ async function handleReserve(request, env, CORS) {
   ).bind(prefecture).first();
 
   const unitPrice = inv.unit_price ?? 0;
+  const taxRate = inv.tax_rate ?? 10;
   const shippingFee = rate?.fee ?? 0;
-  const totalAmount = unitPrice * qty + shippingFee;
+  const { taxAmount, totalAmount } = calcOrderAmount(unitPrice, qty, taxRate, shippingFee);
   const order_id = generateOrderId();
 
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO orders (order_id, last_name, first_name, last_name_kana, first_name_kana, email, phone, postal, prefecture, address1, address2, note, quantity, unit_price, shipping_fee, total_amount, status, admin_note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '予約', '')`
+      `INSERT INTO orders (order_id, last_name, first_name, last_name_kana, first_name_kana, email, phone, postal, prefecture, address1, address2, note, quantity, unit_price, shipping_fee, tax_amount, total_amount, status, admin_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '予約', '')`
     ).bind(
       order_id,
       last_name, first_name,
@@ -150,7 +159,7 @@ async function handleReserve(request, env, CORS) {
       email, phone, postal, prefecture,
       address1,
       body.address2 || '', body.note || '',
-      qty, unitPrice, shippingFee, totalAmount
+      qty, unitPrice, shippingFee, taxAmount, totalAmount
     ),
     env.DB.prepare(
       `UPDATE inventory SET
@@ -160,21 +169,31 @@ async function handleReserve(request, env, CORS) {
     ).bind(qty, qty, PRODUCT_ID),
   ]);
 
-  return json({ order_id, unit_price: unitPrice, shipping_fee: shippingFee, total_amount: totalAmount }, 200, CORS);
+  return json({ order_id, unit_price: unitPrice, tax_amount: taxAmount, shipping_fee: shippingFee, total_amount: totalAmount }, 200, CORS);
 }
 
 async function handleAdminDashboard(env, CORS) {
   const inv = await env.DB.prepare(
-    'SELECT stock, sold_out, unit_price FROM inventory WHERE product_id = ?'
+    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
   ).bind(PRODUCT_ID).first();
 
-  const sold = await env.DB.prepare(
-    `SELECT COALESCE(SUM(quantity), 0) AS sold FROM orders WHERE status != 'キャンセル'`
-  ).first();
-
-  const orderCount = await env.DB.prepare(
-    `SELECT COUNT(*) AS cnt FROM orders WHERE status != 'キャンセル'`
-  ).first();
+  let sold = { sold: 0 };
+  let orderCount = { cnt: 0 };
+  try {
+    sold = await env.DB.prepare(
+      `SELECT COALESCE(SUM(quantity), 0) AS sold FROM orders WHERE status != 'キャンセル'`
+    ).first() ?? { sold: 0 };
+    orderCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS cnt FROM orders WHERE status != 'キャンセル'`
+    ).first() ?? { cnt: 0 };
+  } catch {
+    sold = await env.DB.prepare(
+      'SELECT COALESCE(SUM(quantity), 0) AS sold FROM orders'
+    ).first() ?? { sold: 0 };
+    orderCount = await env.DB.prepare(
+      'SELECT COUNT(*) AS cnt FROM orders'
+    ).first() ?? { cnt: 0 };
+  }
 
   const shipping = await getShippingMap(env.DB);
 
@@ -183,6 +202,7 @@ async function handleAdminDashboard(env, CORS) {
       stock: inv?.stock ?? 0,
       sold_out: inv?.sold_out === 1,
       unit_price: inv?.unit_price ?? 0,
+      tax_rate: inv?.tax_rate ?? 10,
     },
     shipping,
     sold: sold?.sold ?? 0,
@@ -192,7 +212,7 @@ async function handleAdminDashboard(env, CORS) {
 
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
-  quantity, unit_price, shipping_fee, total_amount, status, admin_note, created_at`;
+  quantity, unit_price, shipping_fee, tax_amount, total_amount, status, admin_note, created_at`;
 
 async function handleAdminOrders(env, CORS, url) {
   const filter = url.searchParams.get('filter') === 'cancelled' ? 'cancelled' : 'active';
@@ -276,20 +296,24 @@ async function handleAdminInventoryUpdate(request, env, CORS) {
 
   const stock = parseInt(body.stock, 10);
   const unitPrice = parseInt(body.unit_price, 10);
+  const taxRate = parseInt(body.tax_rate, 10);
   if (isNaN(stock) || stock < 0) {
     return json({ error: '在庫数の値が不正です' }, 400, CORS);
   }
   if (isNaN(unitPrice) || unitPrice < 0) {
     return json({ error: '単価の値が不正です' }, 400, CORS);
   }
+  if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
+    return json({ error: '税率の値が不正です' }, 400, CORS);
+  }
 
   const soldOut = body.sold_out ? 1 : (stock <= 0 ? 1 : 0);
 
   await env.DB.prepare(
-    `UPDATE inventory SET stock = ?, sold_out = ?, unit_price = ? WHERE product_id = ?`
-  ).bind(stock, soldOut, unitPrice, PRODUCT_ID).run();
+    `UPDATE inventory SET stock = ?, sold_out = ?, unit_price = ?, tax_rate = ? WHERE product_id = ?`
+  ).bind(stock, soldOut, unitPrice, taxRate, PRODUCT_ID).run();
 
-  return json({ stock, sold_out: soldOut === 1, unit_price: unitPrice }, 200, CORS);
+  return json({ stock, sold_out: soldOut === 1, unit_price: unitPrice, tax_rate: taxRate }, 200, CORS);
 }
 
 async function handleAdminShippingUpdate(request, env, CORS) {

@@ -623,15 +623,19 @@
               <span class="val" id="summary-qty">1本</span>
             </div>
             <div class="order-row">
-              <span class="key">単価</span>
+              <span class="key">単価（税抜）</span>
               <span class="val" id="summary-unit-price">—</span>
             </div>
             <div class="order-row">
-              <span class="key">小計</span>
+              <span class="key">小計（税抜）</span>
               <span class="val" id="summary-subtotal">—</span>
             </div>
             <div class="order-row">
-              <span class="key">送料</span>
+              <span class="key" id="summary-tax-label">消費税</span>
+              <span class="val" id="summary-tax">—</span>
+            </div>
+            <div class="order-row">
+              <span class="key">送料（税込）</span>
               <span class="val" id="summary-shipping">都道府県を選択してください</span>
             </div>
             <div class="order-row order-row-total">
@@ -687,6 +691,7 @@
       let maxStock = MAX_QTY;
       let soldOut = false;
       let unitPrice = 0;
+      let taxRate = 10;
       let shippingMap = {};
 
       function formatYen(n) {
@@ -699,14 +704,23 @@
         return shippingMap[pref] ?? 0;
       }
 
+      function calcTax(subtotal) {
+        return Math.floor(subtotal * taxRate / 100);
+      }
+
       function updatePricingSummary() {
         const subtotal = unitPrice * qty;
+        const tax = calcTax(subtotal);
         const shipping = getShippingFee();
 
         document.getElementById('summary-unit-price').textContent =
           unitPrice ? `${formatYen(unitPrice)} / 本` : '—';
         document.getElementById('summary-subtotal').textContent =
           unitPrice ? formatYen(subtotal) : '—';
+        document.getElementById('summary-tax-label').textContent =
+          unitPrice ? `消費税（${taxRate}％）` : '消費税';
+        document.getElementById('summary-tax').textContent =
+          unitPrice ? formatYen(tax) : '—';
 
         const shipEl = document.getElementById('summary-shipping');
         if (shipping === null) {
@@ -716,7 +730,7 @@
         }
 
         document.getElementById('summary-total').textContent =
-          (unitPrice && shipping !== null) ? formatYen(subtotal + shipping) : '—';
+          (unitPrice && shipping !== null) ? formatYen(subtotal + tax + shipping) : '—';
       }
 
       function changeQty(delta) {
@@ -751,6 +765,7 @@
 
           setSoldOut(false);
           unitPrice = data.unit_price ?? 0;
+          taxRate = data.tax_rate ?? 10;
           shippingMap = data.shipping ?? {};
           maxStock = Math.min(MAX_QTY, data.stock);
           if (qty > maxStock) {

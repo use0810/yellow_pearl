@@ -259,7 +259,7 @@
               btn.removeAttribute('href');
             });
           } else {
-            display.textContent = `残り ${data.stock.toLocaleString()} 本`;
+            display.textContent = `残り ${Number(data.stock ?? 0).toLocaleString()} 本`;
             display.style.color = '';
             remaining.style.display = 'block';
           }
