@@ -14,6 +14,18 @@ const PREFECTURES = [
   '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
 ];
 
+const SHIPPING_REGIONS = [
+  { id: 'hokkaido', name: '北海道', prefectures: ['北海道'] },
+  { id: 'okinawa', name: '沖縄', prefectures: ['沖縄県'] },
+  { id: 'tohoku', name: '東北地方', prefectures: ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'] },
+  { id: 'kanto', name: '関東地方', prefectures: ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'] },
+  { id: 'chubu', name: '中部地方', prefectures: ['新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県'] },
+  { id: 'kinki', name: '近畿地方', prefectures: ['三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県'] },
+  { id: 'chugoku', name: '中国地方', prefectures: ['鳥取県', '島根県', '岡山県', '広島県', '山口県'] },
+  { id: 'shikoku', name: '四国地方', prefectures: ['徳島県', '香川県', '愛媛県', '高知県'] },
+  { id: 'kyushu', name: '九州地方', prefectures: ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県'] },
+];
+
 function buildCors(env, request, { credentials = false } = {}) {
   const allowed = env.ALLOWED_ORIGIN ?? DEFAULT_ORIGIN;
   const origin = request?.headers?.get('Origin');
@@ -78,6 +90,19 @@ async function getShippingMap(db) {
     if (PREFECTURES.includes(r.prefecture)) map[r.prefecture] = r.fee;
   }
   return map;
+}
+
+function getShippingRegionsFromMap(prefectureMap) {
+  return SHIPPING_REGIONS.map((region) => ({
+    id: region.id,
+    name: region.name,
+    prefectures: region.prefectures,
+    fee: prefectureMap[region.prefectures[0]] ?? 0,
+  }));
+}
+
+function findShippingRegion(id) {
+  return SHIPPING_REGIONS.find((r) => r.id === id);
 }
 
 async function handleStock(env, CORS) {
@@ -195,7 +220,7 @@ async function handleAdminDashboard(env, CORS) {
     ).first() ?? { cnt: 0 };
   }
 
-  const shipping = await getShippingMap(env.DB);
+  const shippingMap = await getShippingMap(env.DB);
 
   return json({
     inventory: {
@@ -204,7 +229,7 @@ async function handleAdminDashboard(env, CORS) {
       unit_price: inv?.unit_price ?? 0,
       tax_rate: inv?.tax_rate ?? 10,
     },
-    shipping,
+    shipping_regions: getShippingRegionsFromMap(shippingMap),
     sold: sold?.sold ?? 0,
     order_count: orderCount?.cnt ?? 0,
   }, 200, CORS);
@@ -324,14 +349,17 @@ async function handleAdminShippingUpdate(request, env, CORS) {
 
   const updates = [];
   for (const item of body.rates) {
-    if (!PREFECTURES.includes(item.prefecture)) {
-      return json({ error: `不正な都道府県: ${item.prefecture}` }, 400, CORS);
+    const region = findShippingRegion(item.region);
+    if (!region) {
+      return json({ error: `不正な地域: ${item.region}` }, 400, CORS);
     }
     const fee = parseInt(item.fee, 10);
     if (isNaN(fee) || fee < 0) {
-      return json({ error: `${item.prefecture} の送料が不正です` }, 400, CORS);
+      return json({ error: `${region.name} の送料が不正です` }, 400, CORS);
     }
-    updates.push({ prefecture: item.prefecture, fee });
+    for (const prefecture of region.prefectures) {
+      updates.push({ prefecture, fee });
+    }
   }
 
   const stmts = updates.map(({ prefecture, fee }) =>
@@ -343,8 +371,8 @@ async function handleAdminShippingUpdate(request, env, CORS) {
 
   if (stmts.length) await env.DB.batch(stmts);
 
-  const shipping = await getShippingMap(env.DB);
-  return json({ shipping }, 200, CORS);
+  const shippingMap = await getShippingMap(env.DB);
+  return json({ shipping_regions: getShippingRegionsFromMap(shippingMap) }, 200, CORS);
 }
 
 async function handleAdminStats(env, CORS) {

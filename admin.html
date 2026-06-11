@@ -408,30 +408,47 @@
 
       .shipping-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-        gap: 0.5rem 0.75rem;
-        max-height: 360px;
-        overflow-y: auto;
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
         margin-bottom: 1rem;
-        padding-right: 0.25rem;
       }
 
       .shipping-item {
         display: flex;
         align-items: center;
-        gap: 0.4rem;
-        font-size: 0.8rem;
+        gap: 0.75rem;
+        font-size: 0.85rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f0f0f0;
+      }
+
+      .shipping-item:last-child {
+        border-bottom: none;
       }
 
       .shipping-item label {
         flex: 1;
-        color: #555;
-        white-space: nowrap;
+        color: #333;
+        min-width: 0;
+      }
+
+      .shipping-region-name {
+        display: block;
+        font-weight: 600;
+      }
+
+      .shipping-region-prefs {
+        display: block;
+        margin-top: 0.15rem;
+        font-size: 0.72rem;
+        color: #888;
+        line-height: 1.35;
       }
 
       .shipping-item input {
-        width: 72px;
-        padding: 0.35rem 0.45rem;
+        width: 88px;
+        flex-shrink: 0;
+        padding: 0.4rem 0.5rem;
         border: 1px solid #ccc;
         border-radius: 4px;
         font-size: 0.85rem;
@@ -559,7 +576,7 @@
           </div>
 
           <div class="card">
-            <div class="card-title">送料（都道府県別）</div>
+            <div class="card-title">送料（地域別）</div>
             <p class="card-note">金額は税込みで入力。カートの都道府県選択と連動します。</p>
             <form id="shipping-form">
               <div class="shipping-grid" id="shipping-grid"></div>
@@ -639,14 +656,16 @@
       const SCREEN_TITLES = { products: '商品管理', orders: '予約管理', stats: '統計' };
       const ORDER_STATUSES = ['予約', '済み', 'キャンセル'];
       let orderFilter = 'active';
-      const PREFECTURES = [
-        '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
-        '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
-        '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
-        '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
-        '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
-        '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
-        '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+      const SHIPPING_REGIONS = [
+        { id: 'hokkaido', name: '北海道', prefectures: ['北海道'] },
+        { id: 'okinawa', name: '沖縄', prefectures: ['沖縄県'] },
+        { id: 'tohoku', name: '東北地方', prefectures: ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'] },
+        { id: 'kanto', name: '関東地方', prefectures: ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'] },
+        { id: 'chubu', name: '中部地方', prefectures: ['新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県'] },
+        { id: 'kinki', name: '近畿地方', prefectures: ['三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県'] },
+        { id: 'chugoku', name: '中国地方', prefectures: ['鳥取県', '島根県', '岡山県', '広島県', '山口県'] },
+        { id: 'shikoku', name: '四国地方', prefectures: ['徳島県', '香川県', '愛媛県', '高知県'] },
+        { id: 'kyushu', name: '九州地方', prefectures: ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県'] },
       ];
       let activeScreen = 'products';
 
@@ -734,12 +753,20 @@
         </tr>`).join('');
       }
 
-      function renderShippingGrid(shipping) {
+      function formatRegionPrefs(prefectures) {
+        return prefectures.map((p) => p.replace(/[都道府県]$/, '')).join('・');
+      }
+
+      function renderShippingGrid(regions) {
+        const feeById = Object.fromEntries((regions || []).map((r) => [r.id, r.fee]));
         const grid = document.getElementById('shipping-grid');
-        grid.innerHTML = PREFECTURES.map((p) => `
+        grid.innerHTML = SHIPPING_REGIONS.map((r) => `
           <div class="shipping-item">
-            <label>${p}</label>
-            <input type="number" min="0" data-pref="${p}" value="${shipping[p] ?? 0}" />
+            <label>
+              <span class="shipping-region-name">${esc(r.name)}</span>
+              <span class="shipping-region-prefs">${esc(formatRegionPrefs(r.prefectures))}</span>
+            </label>
+            <input type="number" min="0" data-region="${r.id}" value="${feeById[r.id] ?? 0}" />
           </div>
         `).join('');
       }
@@ -884,7 +911,7 @@
           badge.classList.remove('sold-out');
         }
 
-        renderShippingGrid(data.shipping ?? {});
+        renderShippingGrid(data.shipping_regions ?? []);
         if (activeScreen === 'orders') loadOrders().catch(() => {});
       }
 
@@ -942,7 +969,7 @@
         btn.disabled = true;
 
         const rates = [...document.querySelectorAll('#shipping-grid input')].map((el) => ({
-          prefecture: el.dataset.pref,
+          region: el.dataset.region,
           fee: parseInt(el.value, 10) || 0,
         }));
 
@@ -951,7 +978,7 @@
             method: 'PUT',
             body: JSON.stringify({ rates }),
           });
-          renderShippingGrid(data.shipping ?? {});
+          renderShippingGrid(data.shipping_regions ?? []);
           okEl.textContent = '送料を保存しました';
         } catch (err) {
           errEl.textContent = err.message;
