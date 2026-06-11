@@ -160,6 +160,14 @@
 
       .btn-primary:hover:not(:disabled) { background: #1e40af; }
 
+      .btn-danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
+      }
+
+      .btn-danger:hover:not(:disabled) { background: #fecaca; }
+
       .screen { display: none; }
       .screen.active { display: block; }
 
@@ -495,6 +503,17 @@
         padding: 0.3rem 0.65rem;
       }
 
+      .ops-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .ops-actions .btn {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.75rem;
+      }
+
       .status-pill {
         display: inline-block;
         font-size: 0.7rem;
@@ -800,6 +819,17 @@
 
       function renderOpsCell(o) {
         const status = o.status || '予約';
+        if (status === 'キャンセル') {
+          return `<div class="ops-cell ops-cell-cancelled" data-order-id="${esc(o.order_id)}">
+            <div class="ops-actions">
+              <button type="button" class="btn btn-primary ops-restore-btn"
+                data-order-id="${esc(o.order_id)}"
+                data-admin-note="${esc(o.admin_note || '')}">再予約</button>
+              <button type="button" class="btn btn-danger ops-delete-btn"
+                data-order-id="${esc(o.order_id)}">削除</button>
+            </div>
+          </div>`;
+        }
         const options = ORDER_STATUSES.map((s) =>
           `<option value="${s}"${s === status ? ' selected' : ''}>${s}</option>`
         ).join('');
@@ -889,6 +919,62 @@
         });
         await loadOrders();
         await loadDashboard();
+      }
+
+      async function restoreOrder(btn) {
+        const orderId = btn.dataset.orderId;
+        if (!confirm('この予約を再予約（予約）に戻しますか？在庫が減ります。')) return;
+        btn.disabled = true;
+        try {
+          await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              status: '予約',
+              admin_note: btn.dataset.adminNote || '',
+            }),
+          });
+          orderFilter = 'active';
+          await loadOrders();
+          await loadDashboard();
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      async function deleteOrder(btn) {
+        const orderId = btn.dataset.orderId;
+        if (!confirm('このキャンセル予約を完全に削除しますか？この操作は取り消せません。')) return;
+        btn.disabled = true;
+        try {
+          await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
+            method: 'DELETE',
+          });
+          await loadOrders();
+          await loadDashboard();
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      function handleOrdersClick(e) {
+        const restoreBtn = e.target.closest('.ops-restore-btn');
+        if (restoreBtn) {
+          restoreOrder(restoreBtn).catch((err) => alert(err.message));
+          return;
+        }
+        const deleteBtn = e.target.closest('.ops-delete-btn');
+        if (deleteBtn) {
+          deleteOrder(deleteBtn).catch((err) => alert(err.message));
+          return;
+        }
+        const saveBtn = e.target.closest('.ops-save-btn');
+        if (!saveBtn) return;
+        const container = saveBtn.closest('.ops-cell');
+        if (!container) return;
+        saveBtn.disabled = true;
+        saveOrder(saveBtn.dataset.orderId, container)
+          .catch((err) => alert(err.message))
+          .finally(() => { saveBtn.disabled = false; });
       }
 
       function renderDashboard(data) {
@@ -992,29 +1078,8 @@
         loadOrders().catch((err) => alert(err.message));
       });
 
-      document.getElementById('orders-table-body').addEventListener('click', (e) => {
-        if (!e.target.classList.contains('ops-save-btn')) return;
-        const row = e.target.closest('tr');
-        const container = row?.querySelector('.ops-cell');
-        if (!container) return;
-        const btn = e.target;
-        btn.disabled = true;
-        saveOrder(e.target.dataset.orderId, container)
-          .catch((err) => alert(err.message))
-          .finally(() => { btn.disabled = false; });
-      });
-
-      document.getElementById('orders-cards').addEventListener('click', (e) => {
-        if (!e.target.classList.contains('ops-save-btn')) return;
-        const card = e.target.closest('.order-card');
-        const container = card?.querySelector('.ops-cell');
-        if (!container) return;
-        const btn = e.target;
-        btn.disabled = true;
-        saveOrder(e.target.dataset.orderId, container)
-          .catch((err) => alert(err.message))
-          .finally(() => { btn.disabled = false; });
-      });
+      document.getElementById('orders-table-body').addEventListener('click', handleOrdersClick);
+      document.getElementById('orders-cards').addEventListener('click', handleOrdersClick);
 
       loadDashboard().catch((err) => showAuthError(err.message));
     </script>

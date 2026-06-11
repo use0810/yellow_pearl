@@ -32,7 +32,7 @@ function buildCors(env, request, { credentials = false } = {}) {
   const allowOrigin = allowed === '*' && origin ? origin : allowed;
   const headers = {
     'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
   if (credentials) headers['Access-Control-Allow-Credentials'] = 'true';
@@ -315,6 +315,20 @@ async function handleAdminOrderUpdate(request, env, CORS, orderId) {
   return json({ order: updated }, 200, CORS);
 }
 
+async function handleAdminOrderDelete(env, CORS, orderId) {
+  const order = await env.DB.prepare(
+    'SELECT status FROM orders WHERE order_id = ?'
+  ).bind(orderId).first();
+
+  if (!order) return json({ error: '予約が見つかりません' }, 404, CORS);
+  if (order.status !== 'キャンセル') {
+    return json({ error: 'キャンセル済みの予約のみ削除できます' }, 400, CORS);
+  }
+
+  await env.DB.prepare('DELETE FROM orders WHERE order_id = ?').bind(orderId).run();
+  return json({ ok: true }, 200, CORS);
+}
+
 async function handleAdminInventoryUpdate(request, env, CORS) {
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: 'Invalid JSON' }, 400, CORS);
@@ -448,6 +462,9 @@ export default {
       const orderMatch = url.pathname.match(/^\/api\/admin\/orders\/([^/]+)$/);
       if (orderMatch && request.method === 'PUT') {
         return handleAdminOrderUpdate(request, env, CORS, orderMatch[1]);
+      }
+      if (orderMatch && request.method === 'DELETE') {
+        return handleAdminOrderDelete(env, CORS, orderMatch[1]);
       }
     }
 
