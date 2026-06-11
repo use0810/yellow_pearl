@@ -188,7 +188,7 @@
       }
 
       @media (min-width: 600px) {
-        .stats-grid { grid-template-columns: repeat(4, 1fr); }
+        .stats-grid { grid-template-columns: repeat(3, 1fr); }
       }
 
       .stat-card {
@@ -526,10 +526,6 @@
               <div class="stat-label">残り在庫</div>
             </div>
             <div class="stat-card">
-              <div class="stat-num" id="stat-total">—</div>
-              <div class="stat-label">年間総数</div>
-            </div>
-            <div class="stat-card">
               <div class="stat-num" id="stat-orders">—</div>
               <div class="stat-label">予約件数</div>
             </div>
@@ -538,15 +534,9 @@
           <div class="card">
             <div class="card-title">在庫の更新</div>
             <form id="inventory-form">
-              <div class="form-row">
-                <div class="field">
-                  <label for="edit-stock">残り在庫（本）</label>
-                  <input type="number" id="edit-stock" min="0" required />
-                </div>
-                <div class="field">
-                  <label for="edit-total">年間総数（本）</label>
-                  <input type="number" id="edit-total" min="1" required />
-                </div>
+              <div class="field" style="max-width:240px">
+                <label for="edit-stock">残り在庫（本）</label>
+                <input type="number" id="edit-stock" min="0" required />
               </div>
               <div class="field" style="max-width:240px">
                 <label for="edit-unit-price">単価（円／本）</label>
@@ -868,11 +858,9 @@
         const inv = data.inventory;
         document.getElementById('stat-sold').textContent = data.sold.toLocaleString();
         document.getElementById('stat-stock').textContent = inv.stock.toLocaleString();
-        document.getElementById('stat-total').textContent = inv.total.toLocaleString();
         document.getElementById('stat-orders').textContent = data.order_count.toLocaleString();
 
         document.getElementById('edit-stock').value = inv.stock;
-        document.getElementById('edit-total').value = inv.total;
         document.getElementById('edit-unit-price').value = inv.unit_price ?? 0;
         document.getElementById('edit-sold-out').checked = inv.sold_out;
 
@@ -919,7 +907,6 @@
             method: 'PUT',
             body: JSON.stringify({
               stock: parseInt(document.getElementById('edit-stock').value, 10),
-              total: parseInt(document.getElementById('edit-total').value, 10),
               unit_price: parseInt(document.getElementById('edit-unit-price').value, 10),
               sold_out: document.getElementById('edit-sold-out').checked,
             }),

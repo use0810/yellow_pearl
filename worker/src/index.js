@@ -75,7 +75,7 @@ async function getShippingMap(db) {
 
 async function handleStock(env, CORS) {
   const row = await env.DB.prepare(
-    'SELECT stock, total, sold_out, unit_price FROM inventory WHERE product_id = ?'
+    'SELECT stock, sold_out, unit_price FROM inventory WHERE product_id = ?'
   ).bind(PRODUCT_ID).first();
 
   if (!row) return json({ error: 'Not found' }, 404, CORS);
@@ -84,11 +84,9 @@ async function handleStock(env, CORS) {
 
   return json({
     stock: row.stock,
-    total: row.total,
     sold_out: row.sold_out === 1,
     unit_price: row.unit_price ?? 0,
     shipping,
-    remaining_pct: Math.round((row.stock / row.total) * 100),
   }, 200, CORS);
 }
 
@@ -167,7 +165,7 @@ async function handleReserve(request, env, CORS) {
 
 async function handleAdminDashboard(env, CORS) {
   const inv = await env.DB.prepare(
-    'SELECT stock, total, sold_out, unit_price FROM inventory WHERE product_id = ?'
+    'SELECT stock, sold_out, unit_price FROM inventory WHERE product_id = ?'
   ).bind(PRODUCT_ID).first();
 
   const sold = await env.DB.prepare(
@@ -183,7 +181,6 @@ async function handleAdminDashboard(env, CORS) {
   return json({
     inventory: {
       stock: inv?.stock ?? 0,
-      total: inv?.total ?? 0,
       sold_out: inv?.sold_out === 1,
       unit_price: inv?.unit_price ?? 0,
     },
@@ -278,10 +275,9 @@ async function handleAdminInventoryUpdate(request, env, CORS) {
   if (!body) return json({ error: 'Invalid JSON' }, 400, CORS);
 
   const stock = parseInt(body.stock, 10);
-  const total = parseInt(body.total, 10);
   const unitPrice = parseInt(body.unit_price, 10);
-  if (isNaN(stock) || isNaN(total) || stock < 0 || total < 1 || stock > total) {
-    return json({ error: '在庫数・総数の値が不正です' }, 400, CORS);
+  if (isNaN(stock) || stock < 0) {
+    return json({ error: '在庫数の値が不正です' }, 400, CORS);
   }
   if (isNaN(unitPrice) || unitPrice < 0) {
     return json({ error: '単価の値が不正です' }, 400, CORS);
@@ -290,10 +286,10 @@ async function handleAdminInventoryUpdate(request, env, CORS) {
   const soldOut = body.sold_out ? 1 : (stock <= 0 ? 1 : 0);
 
   await env.DB.prepare(
-    `UPDATE inventory SET stock = ?, total = ?, sold_out = ?, unit_price = ? WHERE product_id = ?`
-  ).bind(stock, total, soldOut, unitPrice, PRODUCT_ID).run();
+    `UPDATE inventory SET stock = ?, sold_out = ?, unit_price = ? WHERE product_id = ?`
+  ).bind(stock, soldOut, unitPrice, PRODUCT_ID).run();
 
-  return json({ stock, total, sold_out: soldOut === 1, unit_price: unitPrice }, 200, CORS);
+  return json({ stock, sold_out: soldOut === 1, unit_price: unitPrice }, 200, CORS);
 }
 
 async function handleAdminShippingUpdate(request, env, CORS) {

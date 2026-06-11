@@ -114,8 +114,7 @@
                 font-size: 0.8rem;
                 color: rgba(232,217,176,0.6);
                 letter-spacing: 0.1em;
-                display: none;
-              "></span>
+              ">（年間限定・数量は選果により変動します）</span>
             </div>
 
             <div class="product-specs">
@@ -248,10 +247,10 @@
             document.getElementById('reserve-btn-2'),
           ];
 
-          if (data.sold_out) {
-            // 在庫なし
+          if (data.sold_out || data.stock <= 0) {
             display.textContent = '受付終了';
             display.style.color = 'rgba(232,217,176,0.4)';
+            remaining.style.display = 'none';
             btns.forEach((btn) => {
               if (!btn) return;
               btn.textContent = '受付終了';
@@ -260,15 +259,9 @@
               btn.removeAttribute('href');
             });
           } else {
-            // 在庫あり
             display.textContent = `残り ${data.stock.toLocaleString()} 本`;
-            remaining.textContent = `（年間 ${data.total.toLocaleString()} 本限定）`;
+            display.style.color = '';
             remaining.style.display = 'block';
-
-            // 残り10%以下なら警告色
-            if (data.remaining_pct <= 10) {
-              display.style.color = '#ff9955';
-            }
           }
         } catch (e) {
           // Worker未設定時はデフォルト表示のまま
