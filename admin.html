@@ -361,6 +361,51 @@
 
       #auth-error .msg-error { margin-top: 0; font-size: 1rem; }
 
+      #login-screen {
+        display: none;
+        max-width: 400px;
+        margin: 4rem auto;
+        padding: 2rem;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+      }
+
+      #login-screen h1 {
+        font-size: 1.25rem;
+        margin: 0 0 1.25rem;
+        text-align: center;
+      }
+
+      #login-screen .field { margin-bottom: 1rem; }
+
+      #login-screen label {
+        display: block;
+        font-size: 0.85rem;
+        color: #555;
+        margin-bottom: 0.35rem;
+      }
+
+      #login-screen input {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 1rem;
+      }
+
+      #login-screen .btn-primary {
+        width: 100%;
+        margin-top: 0.5rem;
+      }
+
+      #login-error {
+        color: #b91c1c;
+        font-size: 0.9rem;
+        min-height: 1.25rem;
+        margin: 0.5rem 0 0;
+      }
+
       .card-note {
         font-size: 0.8rem;
         color: #888;
@@ -529,6 +574,22 @@
     </style>
   </head>
   <body>
+    <div id="login-screen">
+      <h1>管理者ログイン</h1>
+      <form id="login-form">
+        <div class="field">
+          <label for="login-username">ユーザー名</label>
+          <input type="text" id="login-username" name="username" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="login-password">パスワード</label>
+          <input type="password" id="login-password" name="password" autocomplete="current-password" required />
+        </div>
+        <p id="login-error" role="alert"></p>
+        <button type="submit" class="btn btn-primary" id="login-btn">ログイン</button>
+      </form>
+    </div>
+
     <div id="auth-error">
       <p class="msg-error" id="auth-error-msg"></p>
     </div>
@@ -547,6 +608,7 @@
           <div class="topbar-actions">
             <span class="badge" id="status-badge">受付中</span>
             <button type="button" class="btn" id="refresh-btn">更新</button>
+            <button type="button" class="btn" id="logout-btn">ログアウト</button>
           </div>
         </div>
 
@@ -712,10 +774,53 @@
         return data;
       }
 
+      function showLogin() {
+        document.getElementById('login-screen').style.display = 'block';
+        document.getElementById('auth-error').style.display = 'none';
+        document.getElementById('app').hidden = true;
+      }
+
+      function showApp() {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('auth-error').style.display = 'none';
+        document.getElementById('app').hidden = false;
+      }
+
       function showAuthError(msg) {
+        document.getElementById('login-screen').style.display = 'none';
         document.getElementById('auth-error').style.display = 'block';
         document.getElementById('auth-error-msg').textContent = msg;
         document.getElementById('app').hidden = true;
+      }
+
+      async function checkAdminSession() {
+        const res = await fetch(`${WORKER_URL}/api/admin/session`, { credentials: 'include' });
+        if (res.ok) return true;
+        return false;
+      }
+
+      async function loginAdmin(username, password) {
+        const res = await fetch(`${WORKER_URL}/api/admin/login`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const err = new Error(data.error || 'ログインに失敗しました');
+          err.locked = !!data.locked;
+          throw err;
+        }
+        return data;
+      }
+
+      async function logoutAdmin() {
+        await fetch(`${WORKER_URL}/api/admin/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        }).catch(() => {});
+        showLogin();
       }
 
       function formatYen(n) {
@@ -1081,7 +1186,43 @@
       document.getElementById('orders-table-body').addEventListener('click', handleOrdersClick);
       document.getElementById('orders-cards').addEventListener('click', handleOrdersClick);
 
-      loadDashboard().catch((err) => showAuthError(err.message));
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        logoutAdmin();
+      });
+
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('login-error');
+        const btn = document.getElementById('login-btn');
+        errEl.textContent = '';
+        btn.disabled = true;
+        try {
+          await loginAdmin(
+            document.getElementById('login-username').value.trim(),
+            document.getElementById('login-password').value,
+          );
+          document.getElementById('login-password').value = '';
+          showApp();
+          await loadDashboard();
+        } catch (err) {
+          errEl.textContent = err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      (async function initAdmin() {
+        try {
+          if (await checkAdminSession()) {
+            showApp();
+            await loadDashboard();
+          } else {
+            showLogin();
+          }
+        } catch (err) {
+          showAuthError(err.message || '認証の確認に失敗しました');
+        }
+      })();
     </script>
   </body>
 </html>

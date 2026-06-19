@@ -7,9 +7,9 @@ account_id = "e1b3f72b4806b9ee6db348e090df9590"
 [vars]
 ALLOWED_ORIGIN = "*"
 
-# KOMOJU（ホストページ）:
-#   wrangler secret put KOMOJU_SECRET_KEY
-#   wrangler secret put KOMOJU_WEBHOOK_SECRET
+# Stripe Checkout:
+#   wrangler secret put STRIPE_SECRET_KEY
+#   wrangler secret put STRIPE_WEBHOOK_SECRET
 # Webhook URL: https://yellow-pearl.com/api/reserve
 #   wrangler secret put SITE_PASSWORD
 # 未設定なら認証なし。ユーザー名は任意、パスワードのみ照合。
@@ -23,7 +23,10 @@ zone_name = "yellow-pearl.com"
 pattern = "www.yellow-pearl.com/*"
 zone_name = "yellow-pearl.com"
 
-# 管理者API: Cloudflare Zero Trust Access（/api/admin/*）
+# 管理者ログイン（10回失敗で30分ロック）:
+#   wrangler secret put ADMIN_PASSWORD
+#   wrangler secret put ADMIN_USER   # 省略時は admin
+# 管理者API: Cloudflare Zero Trust Access（任意・併用可）
 # [vars] ACCESS_AUD = "<Access Application の AUD tag>"
 
 [[d1_databases]]

@@ -42,3 +42,14 @@ CREATE TABLE IF NOT EXISTS orders (
   admin_note TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
 );
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token TEXT PRIMARY KEY,
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_login_attempts (
+  username TEXT PRIMARY KEY,
+  failures INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT
+);

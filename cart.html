@@ -648,7 +648,7 @@
             </div>
             <div class="order-row">
               <span class="key">お支払い</span>
-              <span class="val" id="summary-payment">クレジットカード等（KOMOJU）</span>
+              <span class="val" id="summary-payment">クレジットカード（Stripe）</span>
             </div>
           </div>
 
@@ -656,7 +656,7 @@
           <div class="caution reveal">
             ※ 日付指定は行えません（選果基準が厳しく、収穫タイミングが限定されます）。<br />
             ※ 在庫数に達し次第、受付を終了いたします。<br />
-            ※ 決済完了後、KOMOJUより確認メールが届きます。
+            ※ 決済完了後、Stripeより確認メールが届きます。
           </div>
 
           <p id="sold-out-notice" class="field-error" style="display:none;text-align:center;margin-bottom:1rem;font-size:0.8rem;">
@@ -676,7 +676,7 @@
         <p class="complete-text">
           ご予約ありがとうございます。<br />
           お支払いが完了しました。<br />
-          確認メールは KOMOJU よりお送りします。発送は2026年9月1日より順次行います。
+          確認メールは Stripe よりお送りします。発送は2026年9月1日より順次行います。
         </p>
         <p class="complete-order-id" id="complete-order-id"></p>
         <a href="index.html" class="back-link">← トップページへ戻る</a>
@@ -708,7 +708,7 @@
       let unitPrice = 0;
       let taxRate = 10;
       let shippingMap = {};
-      let komojuEnabled = false;
+      let checkoutEnabled = false;
 
       function formatYen(n) {
         return `¥${Number(n).toLocaleString('ja-JP')}`;
@@ -763,7 +763,7 @@
         const btn = document.getElementById('submit-btn');
         const notice = document.getElementById('sold-out-notice');
         btn.disabled = closed;
-        btn.textContent = closed ? '受付終了 — Closed' : (komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve');
+        btn.textContent = closed ? '受付終了 — Closed' : (checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve');
         notice.style.display = closed ? 'block' : 'none';
         document.getElementById('qty-minus').disabled = closed || qty <= 1;
         document.getElementById('qty-plus').disabled = closed || qty >= maxStock;
@@ -783,13 +783,13 @@
           unitPrice = data.unit_price ?? 0;
           taxRate = data.tax_rate ?? 10;
           shippingMap = data.shipping ?? {};
-          komojuEnabled = !!data.komoju_enabled;
+          checkoutEnabled = !!(data.checkout_enabled || data.stripe_enabled);
           const payEl = document.getElementById('summary-payment');
           if (payEl) {
-            payEl.textContent = komojuEnabled ? 'クレジットカード等（KOMOJU）' : '受取時現金払い / 後日請求書';
+            payEl.textContent = checkoutEnabled ? 'クレジットカード（Stripe）' : '受取時現金払い / 後日請求書';
           }
           document.getElementById('submit-btn').textContent =
-            komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
+            checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
           maxStock = Math.min(MAX_QTY, data.stock);
           if (qty > maxStock) {
             qty = maxStock;
@@ -904,7 +904,7 @@
           });
           const data = await res.json();
 
-          if (res.ok && komojuEnabled && data.session_url) {
+          if (res.ok && checkoutEnabled && data.session_url) {
             window.location.href = data.session_url;
             return;
           }
@@ -914,12 +914,12 @@
           } else {
             alert(data.error || '送信に失敗しました。もう一度お試しください。');
             btn.disabled = false;
-            btn.textContent = komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
+            btn.textContent = checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
           }
         } catch {
           alert('通信エラーが発生しました。もう一度お試しください。');
           btn.disabled = false;
-          btn.textContent = komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
+          btn.textContent = checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
         }
       });
 

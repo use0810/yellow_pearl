@@ -53,6 +53,10 @@ function generateOrderId() {
 }
 
 const SITE_AUTH_REALM = 'Yellow Pearl';
+const ADMIN_SESSION_COOKIE = 'yp_admin_session';
+const MAX_ADMIN_LOGIN_FAILURES = 10;
+const ADMIN_LOCK_MINUTES = 30;
+const ADMIN_SESSION_HOURS = 12;
 
 function isSitePasswordSet(env) {
   return typeof env.SITE_PASSWORD === 'string' && env.SITE_PASSWORD.length > 0;
@@ -81,7 +85,7 @@ function basicAuthChallenge() {
   });
 }
 
-/** 管理画面・KOMOJU Webhook は Basic 認証スキップ */
+/** 管理画面・Stripe Webhook は Basic 認証スキップ */
 function skipsSiteBasicAuth(pathname) {
   return pathname === '/admin.html'
     || pathname.startsWith('/admin')
@@ -89,7 +93,7 @@ function skipsSiteBasicAuth(pathname) {
 }
 
 function skipsSiteBasicAuthRequest(request) {
-  if (request.headers.get('X-Komoju-Signature')) return true;
+  if (request.headers.get('Stripe-Signature')) return true;
   return skipsSiteBasicAuth(new URL(request.url).pathname);
 }
 
@@ -101,27 +105,196 @@ function requireSiteBasicAuth(request, env) {
 }
 
 /** Cloudflare Access が付与する JWT を検証（Access 保護が前提） */
-function verifyAccess(request, env) {
+function verifyAccessJwt(request, env) {
   const jwt = request.headers.get('Cf-Access-Jwt-Assertion');
-  if (!jwt) return { error: '認証が必要です', status: 401 };
+  if (!jwt) return null;
 
   try {
     const b64 = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
     const pad = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
     const payload = JSON.parse(atob(pad));
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      return { error: '認証が切れました', status: 401 };
-    }
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
     if (env.ACCESS_AUD && payload.aud) {
       const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-      if (!aud.includes(env.ACCESS_AUD)) {
-        return { error: '認証が無効です', status: 403 };
-      }
+      if (!aud.includes(env.ACCESS_AUD)) return null;
     }
-    return { ok: true };
+    return { ok: true, via: 'access' };
   } catch {
-    return { error: '認証が必要です', status: 401 };
+    return null;
   }
+}
+
+function adminPasswordConfigured(env) {
+  return typeof env.ADMIN_PASSWORD === 'string' && env.ADMIN_PASSWORD.length > 0;
+}
+
+function adminUsername(env) {
+  const user = env.ADMIN_USER?.trim();
+  return user || 'admin';
+}
+
+function parseCookie(request, name) {
+  const raw = request.headers.get('Cookie') || '';
+  for (const part of raw.split(';')) {
+    const [k, ...rest] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
+function sessionCookie(token, maxAgeSec) {
+  return `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=${maxAgeSec}`;
+}
+
+function clearSessionCookie() {
+  return `${ADMIN_SESSION_COOKIE}=; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=0`;
+}
+
+function passwordsEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function addMinutesIso(minutes) {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
+}
+
+async function getLoginAttempt(env, username) {
+  return env.DB.prepare(
+    'SELECT username, failures, locked_until FROM admin_login_attempts WHERE username = ?'
+  ).bind(username).first();
+}
+
+async function isAdminAccountLocked(env, username) {
+  const row = await getLoginAttempt(env, username);
+  if (!row?.locked_until) return false;
+  if (row.locked_until > nowIso()) return true;
+  await env.DB.prepare(
+    'UPDATE admin_login_attempts SET failures = 0, locked_until = NULL WHERE username = ?'
+  ).bind(username).run();
+  return false;
+}
+
+async function recordAdminLoginFailure(env, username) {
+  const row = await getLoginAttempt(env, username);
+  const failures = (row?.failures ?? 0) + 1;
+  if (failures >= MAX_ADMIN_LOGIN_FAILURES) {
+    const lockedUntil = addMinutesIso(ADMIN_LOCK_MINUTES);
+    await env.DB.prepare(
+      `INSERT INTO admin_login_attempts (username, failures, locked_until)
+       VALUES (?, ?, ?)
+       ON CONFLICT(username) DO UPDATE SET failures = excluded.failures, locked_until = excluded.locked_until`
+    ).bind(username, failures, lockedUntil).run();
+    return { locked: true, failures };
+  }
+  await env.DB.prepare(
+    `INSERT INTO admin_login_attempts (username, failures, locked_until)
+     VALUES (?, ?, NULL)
+     ON CONFLICT(username) DO UPDATE SET failures = excluded.failures`
+  ).bind(username, failures).run();
+  return { locked: false, failures };
+}
+
+async function clearAdminLoginFailures(env, username) {
+  await env.DB.prepare(
+    'DELETE FROM admin_login_attempts WHERE username = ?'
+  ).bind(username).run();
+}
+
+async function createAdminSession(env) {
+  const token = crypto.randomUUID();
+  const expiresAt = addMinutesIso(ADMIN_SESSION_HOURS * 60);
+  await env.DB.prepare(
+    'INSERT INTO admin_sessions (token, expires_at) VALUES (?, ?)'
+  ).bind(token, expiresAt).run();
+  return { token, maxAgeSec: ADMIN_SESSION_HOURS * 3600 };
+}
+
+async function verifyAdminSession(request, env) {
+  const token = parseCookie(request, ADMIN_SESSION_COOKIE);
+  if (!token) return null;
+  const row = await env.DB.prepare(
+    'SELECT token, expires_at FROM admin_sessions WHERE token = ?'
+  ).bind(token).first();
+  if (!row || row.expires_at <= nowIso()) {
+    if (row) {
+      await env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run();
+    }
+    return null;
+  }
+  return { ok: true, via: 'session' };
+}
+
+async function verifyAdminAuth(request, env) {
+  const access = verifyAccessJwt(request, env);
+  if (access) return access;
+  const session = await verifyAdminSession(request, env);
+  if (session) return session;
+  return { error: '認証が必要です', status: 401 };
+}
+
+async function handleAdminLogin(request, env, CORS) {
+  if (!adminPasswordConfigured(env)) {
+    return json({ error: '管理者ログインは設定されていません' }, 503, CORS);
+  }
+
+  const body = await request.json().catch(() => null);
+  const username = (body?.username || '').trim();
+  const password = body?.password || '';
+  const expectedUser = adminUsername(env);
+
+  if (!username || !password) {
+    return json({ error: 'ユーザー名とパスワードを入力してください' }, 400, CORS);
+  }
+
+  if (await isAdminAccountLocked(env, expectedUser)) {
+    return json({
+      error: 'ログイン試行回数の上限に達しました。しばらくしてからお試しください。',
+      locked: true,
+    }, 423, CORS);
+  }
+
+  const valid = username === expectedUser && passwordsEqual(password, env.ADMIN_PASSWORD);
+  if (!valid) {
+    const result = await recordAdminLoginFailure(env, expectedUser);
+    if (result.locked) {
+      return json({
+        error: 'ログイン試行回数の上限に達しました。しばらくしてからお試しください。',
+        locked: true,
+      }, 423, CORS);
+    }
+    return json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401, CORS);
+  }
+
+  await clearAdminLoginFailures(env, expectedUser);
+  const session = await createAdminSession(env);
+  return json({ ok: true }, 200, {
+    ...CORS,
+    'Set-Cookie': sessionCookie(session.token, session.maxAgeSec),
+  });
+}
+
+async function handleAdminLogout(request, env, CORS) {
+  const token = parseCookie(request, ADMIN_SESSION_COOKIE);
+  if (token) {
+    await env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run();
+  }
+  return json({ ok: true }, 200, { ...CORS, 'Set-Cookie': clearSessionCookie() });
+}
+
+async function handleAdminSessionCheck(request, env, CORS) {
+  const auth = await verifyAdminAuth(request, env);
+  if (auth.error) return json({ authenticated: false }, 401, CORS);
+  return json({ authenticated: true, via: auth.via }, 200, CORS);
 }
 
 function calcOrderAmount(unitPrice, qty, taxRate, shippingFee) {
@@ -153,33 +326,115 @@ function findShippingRegion(id) {
   return SHIPPING_REGIONS.find((r) => r.id === id);
 }
 
-const KOMOJU_API = 'https://komoju.com/api/v1';
-const PAYMENT_CAPTURED = new Set(['captured']);
-const SESSION_PAID = new Set(['completed', 'complete']);
+const STRIPE_API = 'https://api.stripe.com/v1';
 
-function komojuAuthHeader(secretKey) {
-  return `Basic ${btoa(`${secretKey}:`)}`;
+function isStripeEnabled(env) {
+  return typeof env.STRIPE_SECRET_KEY === 'string' && env.STRIPE_SECRET_KEY.length > 0;
 }
 
-function isKomojuEnabled(env) {
-  return typeof env.KOMOJU_SECRET_KEY === 'string' && env.KOMOJU_SECRET_KEY.length > 0;
-}
-
-async function komojuFetch(env, path, options = {}) {
-  const res = await fetch(`${KOMOJU_API}${path}`, {
+async function stripeFetch(env, path, options = {}) {
+  const res = await fetch(`${STRIPE_API}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: komojuAuthHeader(env.KOMOJU_SECRET_KEY),
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
       ...options.headers,
     },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = data?.error?.message || data?.message || `KOMOJU API error (${res.status})`;
+    const msg = data?.error?.message || `Stripe API error (${res.status})`;
     throw new Error(msg);
   }
   return data;
+}
+
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function verifyStripeWebhook(rawBody, signatureHeader, secret) {
+  if (!secret || !signatureHeader) return null;
+
+  let timestamp = null;
+  const signatures = [];
+  for (const part of signatureHeader.split(',')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    const key = part.slice(0, eq);
+    const val = part.slice(eq + 1);
+    if (key === 't') timestamp = val;
+    if (key === 'v1') signatures.push(val);
+  }
+
+  if (!timestamp || signatures.length === 0) return null;
+
+  const age = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
+  if (Number.isNaN(age) || age > 300) return null;
+
+  const expected = await hmacSha256Hex(secret, `${timestamp}.${rawBody}`);
+  if (!signatures.some((sig) => timingSafeEqual(sig, expected))) return null;
+
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+}
+
+function buildStripeCheckoutParams({
+  origin, orderId, email, qty, unitPrice, taxAmount, shippingFee,
+}) {
+  const params = new URLSearchParams();
+  params.append('mode', 'payment');
+  params.append('success_url', `${origin}/cart.html?session_id={CHECKOUT_SESSION_ID}`);
+  params.append('cancel_url', `${origin}/cart.html?cancelled=1`);
+  params.append('customer_email', email);
+  params.append('client_reference_id', orderId);
+  params.append('metadata[order_id]', orderId);
+  params.append('locale', 'ja');
+  params.append('customer_creation', 'always');
+
+  params.append('line_items[0][quantity]', String(qty));
+  params.append('line_items[0][price_data][currency]', 'jpy');
+  params.append('line_items[0][price_data][unit_amount]', String(unitPrice));
+  params.append('line_items[0][price_data][product_data][name]', 'Yellow Pearl（イエローパール）');
+
+  let idx = 1;
+  if (taxAmount > 0) {
+    params.append(`line_items[${idx}][quantity]`, '1');
+    params.append(`line_items[${idx}][price_data][currency]`, 'jpy');
+    params.append(`line_items[${idx}][price_data][unit_amount]`, String(taxAmount));
+    params.append(`line_items[${idx}][price_data][product_data][name]`, '消費税');
+    idx += 1;
+  }
+  if (shippingFee > 0) {
+    params.append(`line_items[${idx}][quantity]`, '1');
+    params.append(`line_items[${idx}][price_data][currency]`, 'jpy');
+    params.append(`line_items[${idx}][price_data][unit_amount]`, String(shippingFee));
+    params.append(`line_items[${idx}][price_data][product_data][name]`, '送料');
+  }
+
+  return params;
+}
+
+async function createStripeCheckoutSession(env, opts) {
+  const body = buildStripeCheckoutParams(opts);
+  return stripeFetch(env, '/checkout/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+}
+
+function stripeOrderId(session) {
+  return session?.metadata?.order_id || session?.client_reference_id || null;
+}
+
+function isStripeSessionPaid(session) {
+  return session?.payment_status === 'paid' || session?.status === 'complete';
 }
 
 async function hmacSha256Hex(secret, message) {
@@ -262,10 +517,154 @@ async function loadPricing(env, prefecture, qty) {
   return { unitPrice, taxRate, shippingFee, taxAmount, totalAmount };
 }
 
-function isSessionPaid(session) {
-  const status = session?.status;
-  const paymentStatus = session?.payment?.status;
-  return SESSION_PAID.has(status) && PAYMENT_CAPTURED.has(paymentStatus);
+async function handleCheckout(request, env, CORS) {
+  if (!isStripeEnabled(env)) {
+    return json({ error: '決済は現在利用できません' }, 503, CORS);
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = parseReserveBody(body);
+  if (parsed.error) return json({ error: parsed.error }, 400, CORS);
+
+  const {
+    last_name, first_name, email, phone, postal, prefecture, address1,
+    address2, note, last_name_kana, first_name_kana, qty,
+  } = parsed.data;
+
+  const pricing = await loadPricing(env, prefecture, qty);
+  if (pricing.error) return json({ error: pricing.error }, pricing.status, CORS);
+
+  const { unitPrice, shippingFee, taxAmount, totalAmount } = pricing;
+  const order_id = generateOrderId();
+  const origin = new URL(request.url).origin;
+
+  let session;
+  try {
+    session = await createStripeCheckoutSession(env, {
+      origin,
+      orderId: order_id,
+      email,
+      qty,
+      unitPrice,
+      taxAmount,
+      shippingFee,
+    });
+  } catch (e) {
+    return json({ error: e.message || '決済セッションの作成に失敗しました' }, 502, CORS);
+  }
+
+  if (!session?.url || !session?.id) {
+    return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO orders (
+      order_id, last_name, first_name, last_name_kana, first_name_kana,
+      email, phone, postal, prefecture, address1, address2, note,
+      quantity, unit_price, shipping_fee, tax_amount, total_amount,
+      payment_status, komoju_session_id, status, admin_note
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', ?, '予約', '')`
+  ).bind(
+    order_id,
+    last_name, first_name, last_name_kana, first_name_kana,
+    email, phone, postal, prefecture, address1, address2, note,
+    qty, unitPrice, shippingFee, taxAmount, totalAmount,
+    session.id,
+  ).run();
+
+  return json({
+    order_id,
+    session_url: session.url,
+    total_amount: totalAmount,
+  }, 200, CORS);
+}
+
+async function handleCheckoutReturn(env, CORS, sessionId) {
+  if (!sessionId) return json({ error: 'session_id が必要です' }, 400, CORS);
+  if (!isStripeEnabled(env)) return json({ error: '決済は現在利用できません' }, 503, CORS);
+
+  let session;
+  try {
+    session = await stripeFetch(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'GET',
+    });
+  } catch (e) {
+    return json({ error: e.message || '決済情報の取得に失敗しました' }, 502, CORS);
+  }
+
+  const orderId = stripeOrderId(session);
+  if (!orderId) return json({ error: '注文情報が見つかりません' }, 404, CORS);
+
+  if (isStripeSessionPaid(session)) {
+    const paymentId = typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id ?? null;
+    const result = await confirmOrderPayment(env, orderId, {
+      sessionId: session.id,
+      paymentId,
+    });
+    if (result.error) return json({ error: result.error }, result.status, CORS);
+    return json({
+      ok: true,
+      order_id: orderId,
+      payment_status: '決済済',
+      session_status: session.status,
+    }, 200, CORS);
+  }
+
+  if (session.status === 'expired') {
+    return json({ ok: false, order_id: orderId, payment_status: '失敗', session_status: session.status }, 200, CORS);
+  }
+
+  return json({
+    ok: false,
+    order_id: orderId,
+    payment_status: '未決済',
+    session_status: session.status,
+    message: '決済が完了していません。もう一度お試しください。',
+  }, 200, CORS);
+}
+
+async function handleStripeWebhook(request, env) {
+  const rawBody = await request.text();
+  const signature = request.headers.get('Stripe-Signature');
+
+  const event = await verifyStripeWebhook(
+    rawBody,
+    signature,
+    env.STRIPE_WEBHOOK_SECRET,
+  );
+  if (!event) return new Response('Invalid signature', { status: 401 });
+
+  const type = event.type;
+  const session = event.data?.object;
+
+  if (type === 'checkout.session.completed' && session) {
+    const orderId = stripeOrderId(session);
+    if (orderId && isStripeSessionPaid(session)) {
+      const paymentId = typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : session.payment_intent?.id ?? null;
+      await confirmOrderPayment(env, orderId, {
+        sessionId: session.id,
+        paymentId,
+      });
+    }
+  }
+
+  if (type === 'checkout.session.expired' && session) {
+    const orderId = stripeOrderId(session);
+    if (orderId) {
+      await env.DB.prepare(
+        `UPDATE orders SET payment_status = '失敗' WHERE order_id = ? AND payment_status = '未決済'`
+      ).bind(orderId).run();
+    }
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId = null } = {}) {
@@ -309,251 +708,6 @@ async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId =
   return { ok: true, order_id: orderId };
 }
 
-function komojuExternalCustomerId(email) {
-  return email.trim().toLowerCase();
-}
-
-function komojuCustomerAddress({
-  last_name, first_name, postal, prefecture, address1, address2,
-}) {
-  return {
-    name: `${last_name} ${first_name}`,
-    street_address1: address1,
-    ...(address2 ? { street_address2: address2 } : {}),
-    state: prefecture,
-    zipcode: postal,
-    country: 'JP',
-  };
-}
-
-function clientIp(request) {
-  return request.headers.get('CF-Connecting-IP')
-    || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
-    || null;
-}
-
-async function createKomojuSession(env, {
-  totalAmount,
-  returnUrl,
-  email,
-  orderId,
-  qty,
-  unitPrice,
-  last_name,
-  first_name,
-  last_name_kana,
-  first_name_kana,
-  phone,
-  postal,
-  prefecture,
-  address1,
-  address2,
-  customerIp,
-}) {
-  const fullName = `${last_name} ${first_name}`;
-  const fullNameKana = [last_name_kana, first_name_kana].filter(Boolean).join(' ') || undefined;
-  const address = komojuCustomerAddress({
-    last_name, first_name, postal, prefecture, address1, address2,
-  });
-
-  return komojuFetch(env, '/sessions', {
-    method: 'POST',
-    body: JSON.stringify({
-      mode: 'customer_payment',
-      amount: totalAmount,
-      currency: 'JPY',
-      return_url: returnUrl,
-      email,
-      external_customer_id: komojuExternalCustomerId(email),
-      default_locale: 'ja',
-      payment_data: {
-        external_order_num: orderId,
-        name: fullName,
-        ...(fullNameKana ? { name_kana: fullNameKana } : {}),
-        shipping_address: address,
-        billing_address: address,
-      },
-      fraud_details: {
-        customer_email: email,
-        customer_id: komojuExternalCustomerId(email),
-        phone,
-        ...(customerIp ? { customer_ip: customerIp } : {}),
-      },
-      metadata: {
-        order_id: orderId,
-        customer_name: fullName,
-        phone,
-        postal,
-        prefecture,
-      },
-      line_items: [
-        {
-          name: 'Yellow Pearl（イエローパール）',
-          quantity: qty,
-          unit_price: unitPrice,
-        },
-      ],
-    }),
-  });
-}
-
-async function handleCheckout(request, env, CORS) {
-  if (!isKomojuEnabled(env)) {
-    return json({ error: '決済は現在利用できません' }, 503, CORS);
-  }
-
-  const body = await request.json().catch(() => null);
-  const parsed = parseReserveBody(body);
-  if (parsed.error) return json({ error: parsed.error }, 400, CORS);
-
-  const {
-    last_name, first_name, email, phone, postal, prefecture, address1,
-    address2, note, last_name_kana, first_name_kana, qty,
-  } = parsed.data;
-
-  const pricing = await loadPricing(env, prefecture, qty);
-  if (pricing.error) return json({ error: pricing.error }, pricing.status, CORS);
-
-  const { unitPrice, shippingFee, taxAmount, totalAmount } = pricing;
-  const order_id = generateOrderId();
-  const origin = new URL(request.url).origin;
-  const returnUrl = `${origin}/cart.html`;
-
-  let session;
-  try {
-    session = await createKomojuSession(env, {
-      totalAmount,
-      returnUrl,
-      email,
-      orderId: order_id,
-      qty,
-      unitPrice,
-      last_name,
-      first_name,
-      last_name_kana,
-      first_name_kana,
-      phone,
-      postal,
-      prefecture,
-      address1,
-      address2,
-      customerIp: clientIp(request),
-    });
-  } catch (e) {
-    return json({ error: e.message || '決済セッションの作成に失敗しました' }, 502, CORS);
-  }
-
-  if (!session?.session_url || !session?.id) {
-    return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
-  }
-
-  await env.DB.prepare(
-    `INSERT INTO orders (
-      order_id, last_name, first_name, last_name_kana, first_name_kana,
-      email, phone, postal, prefecture, address1, address2, note,
-      quantity, unit_price, shipping_fee, tax_amount, total_amount,
-      payment_status, komoju_session_id, status, admin_note
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', ?, '予約', '')`
-  ).bind(
-    order_id,
-    last_name, first_name, last_name_kana, first_name_kana,
-    email, phone, postal, prefecture, address1, address2, note,
-    qty, unitPrice, shippingFee, taxAmount, totalAmount,
-    session.id,
-  ).run();
-
-  return json({
-    order_id,
-    session_url: session.session_url,
-    total_amount: totalAmount,
-  }, 200, CORS);
-}
-
-async function handleCheckoutReturn(env, CORS, sessionId) {
-  if (!sessionId) return json({ error: 'session_id が必要です' }, 400, CORS);
-  if (!isKomojuEnabled(env)) return json({ error: '決済は現在利用できません' }, 503, CORS);
-
-  const session = await komojuFetch(env, `/sessions/${sessionId}`, { method: 'GET' });
-  const orderId = session?.metadata?.order_id || session?.payment_data?.external_order_num;
-
-  if (!orderId) return json({ error: '注文情報が見つかりません' }, 404, CORS);
-
-  if (isSessionPaid(session)) {
-    const result = await confirmOrderPayment(env, orderId, {
-      sessionId: session.id,
-      paymentId: session.payment?.id ?? null,
-    });
-    if (result.error) return json({ error: result.error }, result.status, CORS);
-    return json({
-      ok: true,
-      order_id: orderId,
-      payment_status: '決済済',
-      session_status: session.status,
-    }, 200, CORS);
-  }
-
-  if (session.status === 'cancelled') {
-    return json({ ok: false, order_id: orderId, payment_status: 'キャンセル', session_status: session.status }, 200, CORS);
-  }
-
-  const paymentStatus = session.payment?.status;
-  if (paymentStatus === 'authorized') {
-    return json({
-      ok: false,
-      pending: true,
-      order_id: orderId,
-      payment_status: '入金待ち',
-      session_status: session.status,
-      message: 'お支払い手続きを完了してください。入金確認後にご予約が確定します。',
-    }, 200, CORS);
-  }
-
-  return json({
-    ok: false,
-    order_id: orderId,
-    payment_status: '未決済',
-    session_status: session.status,
-    message: '決済が完了していません。もう一度お試しください。',
-  }, 200, CORS);
-}
-
-async function handleKomojuWebhook(request, env) {
-  const rawBody = await request.text();
-
-  if (env.KOMOJU_WEBHOOK_SECRET) {
-    const signature = request.headers.get('X-Komoju-Signature');
-    const expected = await hmacSha256Hex(env.KOMOJU_WEBHOOK_SECRET, rawBody);
-    if (!signature || signature !== expected) {
-      return new Response('Invalid signature', { status: 401 });
-    }
-  }
-
-  const event = JSON.parse(rawBody);
-  const type = event?.type;
-  const data = event?.data ?? {};
-
-  if (type === 'payment.captured') {
-    const orderId = data.external_order_num || data.metadata?.order_id;
-    if (orderId) {
-      await confirmOrderPayment(env, orderId, {
-        sessionId: data.session ?? null,
-        paymentId: data.id ?? null,
-      });
-    }
-  }
-
-  if (type === 'payment.expired' || type === 'payment.cancelled') {
-    const orderId = data.external_order_num || data.metadata?.order_id;
-    if (orderId) {
-      await env.DB.prepare(
-        `UPDATE orders SET payment_status = '失敗' WHERE order_id = ? AND payment_status = '未決済'`
-      ).bind(orderId).run();
-    }
-  }
-
-  return new Response('ok', { status: 200 });
-}
-
 async function handleStock(env, CORS) {
   const row = await env.DB.prepare(
     'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
@@ -569,7 +723,8 @@ async function handleStock(env, CORS) {
     unit_price: row.unit_price ?? 0,
     tax_rate: row.tax_rate ?? 10,
     shipping,
-    komoju_enabled: isKomojuEnabled(env),
+    checkout_enabled: isStripeEnabled(env),
+    stripe_enabled: isStripeEnabled(env),
   }, 200, CORS);
 }
 
@@ -857,15 +1012,25 @@ async function handleApi(request, env) {
   }
 
   if (url.pathname === '/api/reserve' && request.method === 'POST') {
-    if (request.headers.get('X-Komoju-Signature')) {
-      return handleKomojuWebhook(request, env);
+    if (request.headers.get('Stripe-Signature')) {
+      return handleStripeWebhook(request, env);
     }
-    if (isKomojuEnabled(env)) return handleCheckout(request, env, CORS);
+    if (isStripeEnabled(env)) return handleCheckout(request, env, CORS);
     return handleReserve(request, env, CORS);
   }
 
   if (isAdmin) {
-    const auth = verifyAccess(request, env);
+    if (url.pathname === '/api/admin/login' && request.method === 'POST') {
+      return handleAdminLogin(request, env, CORS);
+    }
+    if (url.pathname === '/api/admin/logout' && request.method === 'POST') {
+      return handleAdminLogout(request, env, CORS);
+    }
+    if (url.pathname === '/api/admin/session' && request.method === 'GET') {
+      return handleAdminSessionCheck(request, env, CORS);
+    }
+
+    const auth = await verifyAdminAuth(request, env);
     if (auth.error) return json({ error: auth.error }, auth.status, CORS);
 
     if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
