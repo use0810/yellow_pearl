@@ -81,17 +81,21 @@ function basicAuthChallenge() {
   });
 }
 
-/** 管理画面・管理API・KOMOJU Webhook は Basic 認証スキップ */
+/** 管理画面・KOMOJU Webhook は Basic 認証スキップ */
 function skipsSiteBasicAuth(pathname) {
   return pathname === '/admin.html'
     || pathname.startsWith('/admin')
-    || pathname.startsWith('/api/admin/')
-    || pathname.startsWith('/api/komoju/');
+    || pathname.startsWith('/api/admin/');
+}
+
+function skipsSiteBasicAuthRequest(request) {
+  if (request.headers.get('X-Komoju-Signature')) return true;
+  return skipsSiteBasicAuth(new URL(request.url).pathname);
 }
 
 function requireSiteBasicAuth(request, env) {
   if (!isSitePasswordSet(env)) return null;
-  if (skipsSiteBasicAuth(new URL(request.url).pathname)) return null;
+  if (skipsSiteBasicAuthRequest(request)) return null;
   if (isBasicAuthorized(request, env.SITE_PASSWORD)) return null;
   return basicAuthChallenge();
 }
@@ -368,15 +372,20 @@ async function handleCheckout(request, env, CORS) {
   const origin = new URL(request.url).origin;
   const returnUrl = `${origin}/cart.html`;
 
-  const session = await createKomojuSession(env, {
-    totalAmount,
-    returnUrl,
-    email,
-    customerName: `${last_name} ${first_name}`,
-    orderId: order_id,
-    qty,
-    unitPrice,
-  });
+  let session;
+  try {
+    session = await createKomojuSession(env, {
+      totalAmount,
+      returnUrl,
+      email,
+      customerName: `${last_name} ${first_name}`,
+      orderId: order_id,
+      qty,
+      unitPrice,
+    });
+  } catch (e) {
+    return json({ error: e.message || '決済セッションの作成に失敗しました' }, 502, CORS);
+  }
 
   if (!session?.session_url || !session?.id) {
     return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
@@ -786,22 +795,16 @@ async function handleApi(request, env) {
   }
 
   if (url.pathname === '/api/stock' && request.method === 'GET') {
+    const sessionId = url.searchParams.get('session_id');
+    if (sessionId) return handleCheckoutReturn(env, CORS, sessionId);
     return handleStock(env, CORS);
   }
 
-  if (url.pathname === '/api/checkout' && request.method === 'POST') {
-    return handleCheckout(request, env, CORS);
-  }
-
-  if (url.pathname === '/api/checkout/return' && request.method === 'GET') {
-    return handleCheckoutReturn(env, CORS, url.searchParams.get('session_id'));
-  }
-
-  if (url.pathname === '/api/komoju/webhook' && request.method === 'POST') {
-    return handleKomojuWebhook(request, env);
-  }
-
   if (url.pathname === '/api/reserve' && request.method === 'POST') {
+    if (request.headers.get('X-Komoju-Signature')) {
+      return handleKomojuWebhook(request, env);
+    }
+    if (isKomojuEnabled(env)) return handleCheckout(request, env, CORS);
     return handleReserve(request, env, CORS);
   }
 

@@ -10,7 +10,7 @@ ALLOWED_ORIGIN = "*"
 # KOMOJU（ホストページ）:
 #   wrangler secret put KOMOJU_SECRET_KEY
 #   wrangler secret put KOMOJU_WEBHOOK_SECRET
-# Webhook URL: https://yellow-pearl.com/api/komoju/webhook
+# Webhook URL: https://yellow-pearl.com/api/reserve
 #   wrangler secret put SITE_PASSWORD
 # 未設定なら認証なし。ユーザー名は任意、パスワードのみ照合。
 # Pages 側も同じ変数名 SITE_PASSWORD を環境変数で設定すること。
