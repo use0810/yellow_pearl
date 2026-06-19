@@ -624,12 +624,165 @@ footer {
   color: rgba(232, 217, 176, 0.4);
 }
 
+.footer-org {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  color: rgba(232, 217, 176, 0.55);
+}
+
 .footer-note {
   font-size: 0.72rem;
   color: rgba(232, 217, 176, 0.3);
   line-height: 1.8;
   max-width: 500px;
   letter-spacing: 0.08em;
+}
+
+.footer-legal {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: rgba(232, 217, 176, 0.45);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footer-legal:hover {
+  color: var(--gold);
+}
+
+.footer-legal-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+.footer-legal-sep {
+  font-size: 0.72rem;
+  color: rgba(232, 217, 176, 0.25);
+}
+
+.footer-copy {
+  font-size: 0.65rem;
+  color: rgba(232, 217, 176, 0.2);
+  letter-spacing: 0.1em;
+}
+
+/* LEGAL PAGE */
+
+.legal-page {
+  min-height: 100vh;
+  padding: clamp(3rem, 8vw, 5rem) clamp(1.5rem, 6vw, 4rem) 4rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.legal-eyebrow {
+  font-family: "Cinzel", serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.4em;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.legal-page h1 {
+  font-family: "Cinzel", serif;
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  color: var(--text-light);
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.legal-page h2 {
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--gold-light);
+  margin: 2rem 0 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.legal-page p,
+.legal-page li {
+  font-size: 0.85rem;
+  line-height: 2;
+  color: rgba(232, 217, 176, 0.65);
+  letter-spacing: 0.04em;
+}
+
+.legal-page ul,
+.legal-page ol {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.legal-page li {
+  margin-bottom: 0.35rem;
+}
+
+.legal-intro {
+  margin-bottom: 2rem;
+}
+
+.legal-back {
+  display: inline-block;
+  margin-top: 3rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  color: rgba(232, 217, 176, 0.45);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.legal-back:hover {
+  color: var(--gold);
+}
+
+.tokusho-list {
+  border-top: 1px solid rgba(201, 168, 76, 0.15);
+}
+
+.tokusho-item {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 9.5rem) 1fr;
+  gap: 0.5rem 1.5rem;
+  padding: 1.15rem 0;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+}
+
+.tokusho-term {
+  font-size: 0.8rem;
+  color: var(--gold-light);
+  letter-spacing: 0.06em;
+  line-height: 1.8;
+}
+
+.tokusho-desc {
+  font-size: 0.85rem;
+  line-height: 2;
+  color: rgba(232, 217, 176, 0.65);
+  letter-spacing: 0.04em;
+}
+
+.tokusho-desc a {
+  color: rgba(232, 217, 176, 0.75);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.tokusho-desc a:hover {
+  color: var(--gold);
+}
+
+@media (max-width: 600px) {
+  .tokusho-item {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
 }
 
 /* REVEAL */
