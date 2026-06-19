@@ -638,7 +638,9 @@ footer {
   letter-spacing: 0.08em;
 }
 
-.footer-legal {
+footer a.footer-legal,
+footer a.footer-legal:link,
+footer a.footer-legal:visited {
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   color: rgba(232, 217, 176, 0.45);
@@ -646,7 +648,8 @@ footer {
   transition: color 0.2s ease;
 }
 
-.footer-legal:hover {
+footer a.footer-legal:hover,
+footer a.footer-legal:focus-visible {
   color: var(--gold);
 }
 
@@ -768,13 +771,27 @@ footer {
   letter-spacing: 0.04em;
 }
 
-.tokusho-desc a {
+.legal-page a:link,
+.legal-page a:visited {
   color: rgba(232, 217, 176, 0.75);
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 
-.tokusho-desc a:hover {
+.legal-page a:hover,
+.legal-page a:focus-visible {
+  color: var(--gold);
+}
+
+.tokusho-desc a:link,
+.tokusho-desc a:visited {
+  color: rgba(232, 217, 176, 0.75);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.tokusho-desc a:hover,
+.tokusho-desc a:focus-visible {
   color: var(--gold);
 }
 

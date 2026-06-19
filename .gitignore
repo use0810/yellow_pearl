@@ -10,6 +10,8 @@
 !admin.html
 !privacy.html
 !tokusho.html
+!functions/
+!functions/**
 !assets/
 !assets/**
 !worker/

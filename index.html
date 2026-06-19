@@ -231,11 +231,11 @@
 
     <script>
       // ── 在庫取得・ボタン制御 ──
-      const WORKER_URL = 'https://yellow-pearl-api.shingo-satokimi2021.workers.dev';
+      const WORKER_URL = window.location.origin;
 
       async function loadStock() {
         try {
-          const res = await fetch(`${WORKER_URL}/api/stock`);
+          const res = await fetch(`${WORKER_URL}/api/stock`, { credentials: 'same-origin' });
           const data = await res.json();
 
           const display = document.getElementById('stock-display');

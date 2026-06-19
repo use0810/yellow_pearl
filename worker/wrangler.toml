@@ -7,8 +7,23 @@ account_id = "e1b3f72b4806b9ee6db348e090df9590"
 [vars]
 ALLOWED_ORIGIN = "*"
 
-# 管理者認証: Cloudflare Zero Trust Access を使用（自前 ID/パスワード不要）
-# Worker の Application AUD タグを設定する場合:
+# KOMOJU（ホストページ）:
+#   wrangler secret put KOMOJU_SECRET_KEY
+#   wrangler secret put KOMOJU_WEBHOOK_SECRET
+# Webhook URL: https://yellow-pearl.com/api/komoju/webhook
+#   wrangler secret put SITE_PASSWORD
+# 未設定なら認証なし。ユーザー名は任意、パスワードのみ照合。
+# Pages 側も同じ変数名 SITE_PASSWORD を環境変数で設定すること。
+
+[[routes]]
+pattern = "yellow-pearl.com/*"
+zone_name = "yellow-pearl.com"
+
+[[routes]]
+pattern = "www.yellow-pearl.com/*"
+zone_name = "yellow-pearl.com"
+
+# 管理者API: Cloudflare Zero Trust Access（/api/admin/*）
 # [vars] ACCESS_AUD = "<Access Application の AUD tag>"
 
 [[d1_databases]]

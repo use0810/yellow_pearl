@@ -73,3 +73,8 @@ ALTER TABLE orders ADD COLUMN admin_note TEXT NOT NULL DEFAULT '';
 -- 税率・消費税額（既存DB向け。エラーなら追加済み）
 ALTER TABLE inventory ADD COLUMN tax_rate INTEGER NOT NULL DEFAULT 10;
 ALTER TABLE orders ADD COLUMN tax_amount INTEGER NOT NULL DEFAULT 0;
+
+-- KOMOJU 決済（既存DB向け。エラーなら追加済み）
+ALTER TABLE orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT '未決済';
+ALTER TABLE orders ADD COLUMN komoju_session_id TEXT;
+ALTER TABLE orders ADD COLUMN komoju_payment_id TEXT;

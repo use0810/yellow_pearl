@@ -52,6 +52,50 @@ function generateOrderId() {
   return `YP-${ts}-${rand}`;
 }
 
+const SITE_AUTH_REALM = 'Yellow Pearl';
+
+function isSitePasswordSet(env) {
+  return typeof env.SITE_PASSWORD === 'string' && env.SITE_PASSWORD.length > 0;
+}
+
+function isBasicAuthorized(request, password) {
+  const auth = request.headers.get('Authorization');
+  if (!auth?.startsWith('Basic ')) return false;
+  try {
+    const decoded = atob(auth.slice(6));
+    const idx = decoded.indexOf(':');
+    const pass = idx >= 0 ? decoded.slice(idx + 1) : decoded;
+    return pass === password;
+  } catch {
+    return false;
+  }
+}
+
+function basicAuthChallenge() {
+  return new Response('認証が必要です', {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': `Basic realm="${SITE_AUTH_REALM}", charset="UTF-8"`,
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
+/** 管理画面・管理API・KOMOJU Webhook は Basic 認証スキップ */
+function skipsSiteBasicAuth(pathname) {
+  return pathname === '/admin.html'
+    || pathname.startsWith('/admin')
+    || pathname.startsWith('/api/admin/')
+    || pathname.startsWith('/api/komoju/');
+}
+
+function requireSiteBasicAuth(request, env) {
+  if (!isSitePasswordSet(env)) return null;
+  if (skipsSiteBasicAuth(new URL(request.url).pathname)) return null;
+  if (isBasicAuthorized(request, env.SITE_PASSWORD)) return null;
+  return basicAuthChallenge();
+}
+
 /** Cloudflare Access が付与する JWT を検証（Access 保護が前提） */
 function verifyAccess(request, env) {
   const jwt = request.headers.get('Cf-Access-Jwt-Assertion');
@@ -105,6 +149,346 @@ function findShippingRegion(id) {
   return SHIPPING_REGIONS.find((r) => r.id === id);
 }
 
+const KOMOJU_API = 'https://komoju.com/api/v1';
+const PAYMENT_CAPTURED = new Set(['captured']);
+const SESSION_PAID = new Set(['completed', 'complete']);
+
+function komojuAuthHeader(secretKey) {
+  return `Basic ${btoa(`${secretKey}:`)}`;
+}
+
+function isKomojuEnabled(env) {
+  return typeof env.KOMOJU_SECRET_KEY === 'string' && env.KOMOJU_SECRET_KEY.length > 0;
+}
+
+async function komojuFetch(env, path, options = {}) {
+  const res = await fetch(`${KOMOJU_API}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: komojuAuthHeader(env.KOMOJU_SECRET_KEY),
+      ...options.headers,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error?.message || data?.message || `KOMOJU API error (${res.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function hmacSha256Hex(secret, message) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function parseReserveBody(body) {
+  if (!body) return { error: 'Invalid JSON' };
+
+  const { last_name, first_name, email, phone, postal, prefecture, address1, quantity = 1 } = body;
+  if (!last_name || !first_name || !email || !phone || !postal || !prefecture || !address1) {
+    return { error: '必須項目が不足しています' };
+  }
+  if (!PREFECTURES.includes(prefecture)) {
+    return { error: '都道府県が不正です' };
+  }
+  if (
+    last_name.length > MAX_LEN.name || first_name.length > MAX_LEN.name ||
+    email.length > MAX_LEN.email || phone.length > MAX_LEN.phone ||
+    postal.length > MAX_LEN.postal || address1.length > MAX_LEN.address ||
+    (body.address2 || '').length > MAX_LEN.address ||
+    (body.note || '').length > MAX_LEN.note
+  ) {
+    return { error: '入力が長すぎます' };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'メールアドレスの形式が正しくありません' };
+  }
+
+  const qty = parseInt(quantity, 10);
+  if (isNaN(qty) || qty < 1 || qty > 5) {
+    return { error: '数量が不正です' };
+  }
+
+  return {
+    data: {
+      last_name,
+      first_name,
+      email,
+      phone,
+      postal,
+      prefecture,
+      address1,
+      address2: body.address2 || '',
+      note: body.note || '',
+      last_name_kana: body.last_name_kana || '',
+      first_name_kana: body.first_name_kana || '',
+      qty,
+    },
+  };
+}
+
+async function loadPricing(env, prefecture, qty) {
+  const inv = await env.DB.prepare(
+    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
+  ).bind(PRODUCT_ID).first();
+
+  if (!inv || inv.sold_out || inv.stock < qty) {
+    return { error: '在庫が不足しています', status: 409 };
+  }
+
+  const rate = await env.DB.prepare(
+    'SELECT fee FROM shipping_rates WHERE prefecture = ?'
+  ).bind(prefecture).first();
+
+  const unitPrice = inv.unit_price ?? 0;
+  const taxRate = inv.tax_rate ?? 10;
+  const shippingFee = rate?.fee ?? 0;
+  const { taxAmount, totalAmount } = calcOrderAmount(unitPrice, qty, taxRate, shippingFee);
+
+  return { unitPrice, taxRate, shippingFee, taxAmount, totalAmount };
+}
+
+function isSessionPaid(session) {
+  const status = session?.status;
+  const paymentStatus = session?.payment?.status;
+  return SESSION_PAID.has(status) && PAYMENT_CAPTURED.has(paymentStatus);
+}
+
+async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId = null } = {}) {
+  const order = await env.DB.prepare(
+    `SELECT order_id, quantity, payment_status, status FROM orders WHERE order_id = ?`
+  ).bind(orderId).first();
+
+  if (!order) return { error: '予約が見つかりません', status: 404 };
+  if (order.payment_status === '決済済') {
+    return { ok: true, order_id: orderId, already: true };
+  }
+  if (order.status === 'キャンセル') {
+    return { error: 'キャンセル済みの予約です', status: 409 };
+  }
+
+  const inv = await env.DB.prepare(
+    'SELECT stock, sold_out FROM inventory WHERE product_id = ?'
+  ).bind(PRODUCT_ID).first();
+
+  if (!inv || inv.sold_out || inv.stock < order.quantity) {
+    return { error: '在庫が不足しているため決済を確定できません', status: 409 };
+  }
+
+  const qty = order.quantity;
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE orders SET
+        payment_status = '決済済',
+        komoju_session_id = COALESCE(?, komoju_session_id),
+        komoju_payment_id = COALESCE(?, komoju_payment_id)
+       WHERE order_id = ? AND payment_status != '決済済'`
+    ).bind(sessionId, paymentId, orderId),
+    env.DB.prepare(
+      `UPDATE inventory SET
+        stock = stock - ?,
+        sold_out = CASE WHEN stock - ? <= 0 THEN 1 ELSE 0 END
+       WHERE product_id = ?`
+    ).bind(qty, qty, PRODUCT_ID),
+  ]);
+
+  return { ok: true, order_id: orderId };
+}
+
+function komojuExternalCustomerId(email) {
+  return email.trim().toLowerCase();
+}
+
+async function createKomojuSession(env, {
+  totalAmount,
+  returnUrl,
+  email,
+  customerName,
+  orderId,
+  qty,
+  unitPrice,
+}) {
+  return komojuFetch(env, '/sessions', {
+    method: 'POST',
+    body: JSON.stringify({
+      mode: 'payment',
+      amount: totalAmount,
+      currency: 'JPY',
+      return_url: returnUrl,
+      email,
+      external_customer_id: komojuExternalCustomerId(email),
+      default_locale: 'ja',
+      payment_data: {
+        external_order_num: orderId,
+      },
+      metadata: {
+        order_id: orderId,
+        customer_name: customerName,
+      },
+      line_items: [
+        {
+          name: 'Yellow Pearl（イエローパール）',
+          quantity: qty,
+          unit_price: unitPrice,
+        },
+      ],
+    }),
+  });
+}
+
+async function handleCheckout(request, env, CORS) {
+  if (!isKomojuEnabled(env)) {
+    return json({ error: '決済は現在利用できません' }, 503, CORS);
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = parseReserveBody(body);
+  if (parsed.error) return json({ error: parsed.error }, 400, CORS);
+
+  const {
+    last_name, first_name, email, phone, postal, prefecture, address1,
+    address2, note, last_name_kana, first_name_kana, qty,
+  } = parsed.data;
+
+  const pricing = await loadPricing(env, prefecture, qty);
+  if (pricing.error) return json({ error: pricing.error }, pricing.status, CORS);
+
+  const { unitPrice, shippingFee, taxAmount, totalAmount } = pricing;
+  const order_id = generateOrderId();
+  const origin = new URL(request.url).origin;
+  const returnUrl = `${origin}/cart.html`;
+
+  const session = await createKomojuSession(env, {
+    totalAmount,
+    returnUrl,
+    email,
+    customerName: `${last_name} ${first_name}`,
+    orderId: order_id,
+    qty,
+    unitPrice,
+  });
+
+  if (!session?.session_url || !session?.id) {
+    return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO orders (
+      order_id, last_name, first_name, last_name_kana, first_name_kana,
+      email, phone, postal, prefecture, address1, address2, note,
+      quantity, unit_price, shipping_fee, tax_amount, total_amount,
+      payment_status, komoju_session_id, status, admin_note
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', ?, '予約', '')`
+  ).bind(
+    order_id,
+    last_name, first_name, last_name_kana, first_name_kana,
+    email, phone, postal, prefecture, address1, address2, note,
+    qty, unitPrice, shippingFee, taxAmount, totalAmount,
+    session.id,
+  ).run();
+
+  return json({
+    order_id,
+    session_url: session.session_url,
+    total_amount: totalAmount,
+  }, 200, CORS);
+}
+
+async function handleCheckoutReturn(env, CORS, sessionId) {
+  if (!sessionId) return json({ error: 'session_id が必要です' }, 400, CORS);
+  if (!isKomojuEnabled(env)) return json({ error: '決済は現在利用できません' }, 503, CORS);
+
+  const session = await komojuFetch(env, `/sessions/${sessionId}`, { method: 'GET' });
+  const orderId = session?.metadata?.order_id || session?.payment_data?.external_order_num;
+
+  if (!orderId) return json({ error: '注文情報が見つかりません' }, 404, CORS);
+
+  if (isSessionPaid(session)) {
+    const result = await confirmOrderPayment(env, orderId, {
+      sessionId: session.id,
+      paymentId: session.payment?.id ?? null,
+    });
+    if (result.error) return json({ error: result.error }, result.status, CORS);
+    return json({
+      ok: true,
+      order_id: orderId,
+      payment_status: '決済済',
+      session_status: session.status,
+    }, 200, CORS);
+  }
+
+  if (session.status === 'cancelled') {
+    return json({ ok: false, order_id: orderId, payment_status: 'キャンセル', session_status: session.status }, 200, CORS);
+  }
+
+  const paymentStatus = session.payment?.status;
+  if (paymentStatus === 'authorized') {
+    return json({
+      ok: false,
+      pending: true,
+      order_id: orderId,
+      payment_status: '入金待ち',
+      session_status: session.status,
+      message: 'お支払い手続きを完了してください。入金確認後にご予約が確定します。',
+    }, 200, CORS);
+  }
+
+  return json({
+    ok: false,
+    order_id: orderId,
+    payment_status: '未決済',
+    session_status: session.status,
+    message: '決済が完了していません。もう一度お試しください。',
+  }, 200, CORS);
+}
+
+async function handleKomojuWebhook(request, env) {
+  const rawBody = await request.text();
+
+  if (env.KOMOJU_WEBHOOK_SECRET) {
+    const signature = request.headers.get('X-Komoju-Signature');
+    const expected = await hmacSha256Hex(env.KOMOJU_WEBHOOK_SECRET, rawBody);
+    if (!signature || signature !== expected) {
+      return new Response('Invalid signature', { status: 401 });
+    }
+  }
+
+  const event = JSON.parse(rawBody);
+  const type = event?.type;
+  const data = event?.data ?? {};
+
+  if (type === 'payment.captured') {
+    const orderId = data.external_order_num || data.metadata?.order_id;
+    if (orderId) {
+      await confirmOrderPayment(env, orderId, {
+        sessionId: data.session ?? null,
+        paymentId: data.id ?? null,
+      });
+    }
+  }
+
+  if (type === 'payment.expired' || type === 'payment.cancelled') {
+    const orderId = data.external_order_num || data.metadata?.order_id;
+    if (orderId) {
+      await env.DB.prepare(
+        `UPDATE orders SET payment_status = '失敗' WHERE order_id = ? AND payment_status = '未決済'`
+      ).bind(orderId).run();
+    }
+  }
+
+  return new Response('ok', { status: 200 });
+}
+
 async function handleStock(env, CORS) {
   const row = await env.DB.prepare(
     'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
@@ -120,71 +504,39 @@ async function handleStock(env, CORS) {
     unit_price: row.unit_price ?? 0,
     tax_rate: row.tax_rate ?? 10,
     shipping,
+    komoju_enabled: isKomojuEnabled(env),
   }, 200, CORS);
 }
 
 async function handleReserve(request, env, CORS) {
   const body = await request.json().catch(() => null);
-  if (!body) return json({ error: 'Invalid JSON' }, 400, CORS);
+  const parsed = parseReserveBody(body);
+  if (parsed.error) return json({ error: parsed.error }, 400, CORS);
 
-  const { last_name, first_name, email, phone, postal, prefecture, address1, quantity = 1 } = body;
-  if (!last_name || !first_name || !email || !phone || !postal || !prefecture || !address1) {
-    return json({ error: '必須項目が不足しています' }, 400, CORS);
-  }
+  const {
+    last_name, first_name, email, phone, postal, prefecture, address1,
+    address2, note, last_name_kana, first_name_kana, qty,
+  } = parsed.data;
 
-  if (!PREFECTURES.includes(prefecture)) {
-    return json({ error: '都道府県が不正です' }, 400, CORS);
-  }
+  const pricing = await loadPricing(env, prefecture, qty);
+  if (pricing.error) return json({ error: pricing.error }, pricing.status, CORS);
 
-  if (
-    last_name.length > MAX_LEN.name || first_name.length > MAX_LEN.name ||
-    email.length > MAX_LEN.email || phone.length > MAX_LEN.phone ||
-    postal.length > MAX_LEN.postal || address1.length > MAX_LEN.address ||
-    (body.address2 || '').length > MAX_LEN.address ||
-    (body.note || '').length > MAX_LEN.note
-  ) {
-    return json({ error: '入力が長すぎます' }, 400, CORS);
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return json({ error: 'メールアドレスの形式が正しくありません' }, 400, CORS);
-  }
-
-  const qty = parseInt(quantity, 10);
-  if (isNaN(qty) || qty < 1 || qty > 5) {
-    return json({ error: '数量が不正です' }, 400, CORS);
-  }
-
-  const inv = await env.DB.prepare(
-    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
-  ).bind(PRODUCT_ID).first();
-
-  if (!inv || inv.sold_out || inv.stock < qty) {
-    return json({ error: '在庫が不足しています' }, 409, CORS);
-  }
-
-  const rate = await env.DB.prepare(
-    'SELECT fee FROM shipping_rates WHERE prefecture = ?'
-  ).bind(prefecture).first();
-
-  const unitPrice = inv.unit_price ?? 0;
-  const taxRate = inv.tax_rate ?? 10;
-  const shippingFee = rate?.fee ?? 0;
-  const { taxAmount, totalAmount } = calcOrderAmount(unitPrice, qty, taxRate, shippingFee);
+  const { unitPrice, shippingFee, taxAmount, totalAmount } = pricing;
   const order_id = generateOrderId();
 
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO orders (order_id, last_name, first_name, last_name_kana, first_name_kana, email, phone, postal, prefecture, address1, address2, note, quantity, unit_price, shipping_fee, tax_amount, total_amount, status, admin_note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '予約', '')`
+      `INSERT INTO orders (
+        order_id, last_name, first_name, last_name_kana, first_name_kana,
+        email, phone, postal, prefecture, address1, address2, note,
+        quantity, unit_price, shipping_fee, tax_amount, total_amount,
+        payment_status, status, admin_note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', '予約', '')`
     ).bind(
       order_id,
-      last_name, first_name,
-      body.last_name_kana || '', body.first_name_kana || '',
-      email, phone, postal, prefecture,
-      address1,
-      body.address2 || '', body.note || '',
-      qty, unitPrice, shippingFee, taxAmount, totalAmount
+      last_name, first_name, last_name_kana, first_name_kana,
+      email, phone, postal, prefecture, address1, address2, note,
+      qty, unitPrice, shippingFee, taxAmount, totalAmount,
     ),
     env.DB.prepare(
       `UPDATE inventory SET
@@ -262,26 +614,33 @@ async function handleAdminOrderUpdate(request, env, CORS, orderId) {
   }
 
   const order = await env.DB.prepare(
-    'SELECT quantity, status FROM orders WHERE order_id = ?'
+    'SELECT quantity, status, payment_status, komoju_session_id FROM orders WHERE order_id = ?'
   ).bind(orderId).first();
 
   if (!order) return json({ error: '予約が見つかりません' }, 404, CORS);
 
   const oldStatus = order.status || '予約';
   const qty = order.quantity;
+  const stockWasAllocated = order.payment_status === '決済済'
+    || (order.payment_status === '未決済' && !order.komoju_session_id);
 
   if (oldStatus !== 'キャンセル' && status === 'キャンセル') {
-    await env.DB.batch([
+    const stmts = [
       env.DB.prepare(
         `UPDATE orders SET status = ?, admin_note = ? WHERE order_id = ?`
       ).bind(status, adminNote, orderId),
-      env.DB.prepare(
-        `UPDATE inventory SET
-          stock = stock + ?,
-          sold_out = CASE WHEN stock + ? > 0 THEN 0 ELSE sold_out END
-         WHERE product_id = ?`
-      ).bind(qty, qty, PRODUCT_ID),
-    ]);
+    ];
+    if (stockWasAllocated) {
+      stmts.push(
+        env.DB.prepare(
+          `UPDATE inventory SET
+            stock = stock + ?,
+            sold_out = CASE WHEN stock + ? > 0 THEN 0 ELSE sold_out END
+           WHERE product_id = ?`
+        ).bind(qty, qty, PRODUCT_ID),
+      );
+    }
+    await env.DB.batch(stmts);
   } else if (oldStatus === 'キャンセル' && status !== 'キャンセル') {
     const inv = await env.DB.prepare(
       'SELECT stock, sold_out FROM inventory WHERE product_id = ?'
@@ -413,61 +772,87 @@ async function handleAdminStats(env, CORS) {
   return json({ yearly }, 200, CORS);
 }
 
+async function handleApi(request, env) {
+  const url = new URL(request.url);
+  const isAdmin = url.pathname.startsWith('/api/admin/');
+  const CORS = buildCors(env, request, { credentials: isAdmin });
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: CORS });
+  }
+
+  if (!env.DB) {
+    return json({ error: 'DB binding が設定されていません' }, 500, CORS);
+  }
+
+  if (url.pathname === '/api/stock' && request.method === 'GET') {
+    return handleStock(env, CORS);
+  }
+
+  if (url.pathname === '/api/checkout' && request.method === 'POST') {
+    return handleCheckout(request, env, CORS);
+  }
+
+  if (url.pathname === '/api/checkout/return' && request.method === 'GET') {
+    return handleCheckoutReturn(env, CORS, url.searchParams.get('session_id'));
+  }
+
+  if (url.pathname === '/api/komoju/webhook' && request.method === 'POST') {
+    return handleKomojuWebhook(request, env);
+  }
+
+  if (url.pathname === '/api/reserve' && request.method === 'POST') {
+    return handleReserve(request, env, CORS);
+  }
+
+  if (isAdmin) {
+    const auth = verifyAccess(request, env);
+    if (auth.error) return json({ error: auth.error }, auth.status, CORS);
+
+    if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
+      return handleAdminDashboard(env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/inventory' && request.method === 'PUT') {
+      return handleAdminInventoryUpdate(request, env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/shipping' && request.method === 'PUT') {
+      return handleAdminShippingUpdate(request, env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/stats' && request.method === 'GET') {
+      return handleAdminStats(env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/orders' && request.method === 'GET') {
+      return handleAdminOrders(env, CORS, url);
+    }
+
+    const orderMatch = url.pathname.match(/^\/api\/admin\/orders\/([^/]+)$/);
+    if (orderMatch && request.method === 'PUT') {
+      return handleAdminOrderUpdate(request, env, CORS, orderMatch[1]);
+    }
+    if (orderMatch && request.method === 'DELETE') {
+      return handleAdminOrderDelete(env, CORS, orderMatch[1]);
+    }
+  }
+
+  return json({ error: 'Not found' }, 404, CORS);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const isAdmin = url.pathname.startsWith('/api/admin/');
-    const CORS = buildCors(env, request, { credentials: isAdmin });
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS });
+    const authFail = requireSiteBasicAuth(request, env);
+    if (authFail) return authFail;
+
+    if (url.pathname.startsWith('/api/')) {
+      return handleApi(request, env);
     }
 
-    if (!env.DB) {
-      return json({ error: 'DB binding が設定されていません' }, 500, CORS);
-    }
-
-    if (url.pathname === '/api/stock' && request.method === 'GET') {
-      return handleStock(env, CORS);
-    }
-
-    if (url.pathname === '/api/reserve' && request.method === 'POST') {
-      return handleReserve(request, env, CORS);
-    }
-
-    if (isAdmin) {
-      const auth = verifyAccess(request, env);
-      if (auth.error) return json({ error: auth.error }, auth.status, CORS);
-
-      if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
-        return handleAdminDashboard(env, CORS);
-      }
-
-      if (url.pathname === '/api/admin/inventory' && request.method === 'PUT') {
-        return handleAdminInventoryUpdate(request, env, CORS);
-      }
-
-      if (url.pathname === '/api/admin/shipping' && request.method === 'PUT') {
-        return handleAdminShippingUpdate(request, env, CORS);
-      }
-
-      if (url.pathname === '/api/admin/stats' && request.method === 'GET') {
-        return handleAdminStats(env, CORS);
-      }
-
-      if (url.pathname === '/api/admin/orders' && request.method === 'GET') {
-        return handleAdminOrders(env, CORS, url);
-      }
-
-      const orderMatch = url.pathname.match(/^\/api\/admin\/orders\/([^/]+)$/);
-      if (orderMatch && request.method === 'PUT') {
-        return handleAdminOrderUpdate(request, env, CORS, orderMatch[1]);
-      }
-      if (orderMatch && request.method === 'DELETE') {
-        return handleAdminOrderDelete(env, CORS, orderMatch[1]);
-      }
-    }
-
-    return json({ error: 'Not found' }, 404, CORS);
+    // Worker が /* で受けた場合: Pages（HTML・CSS 等）へそのまま通す
+    return fetch(request);
   },
 };

@@ -648,7 +648,7 @@
             </div>
             <div class="order-row">
               <span class="key">お支払い</span>
-              <span class="val">受取時現金払い / 後日請求書</span>
+              <span class="val" id="summary-payment">クレジットカード等（KOMOJU）</span>
             </div>
           </div>
 
@@ -656,7 +656,7 @@
           <div class="caution reveal">
             ※ 日付指定は行えません（選果基準が厳しく、収穫タイミングが限定されます）。<br />
             ※ 在庫数に達し次第、受付を終了いたします。<br />
-            ※ ご予約確定後、メールにてご連絡いたします。
+            ※ 決済完了後、KOMOJUより確認メールが届きます。
           </div>
 
           <p id="sold-out-notice" class="field-error" style="display:none;text-align:center;margin-bottom:1rem;font-size:0.8rem;">
@@ -664,7 +664,7 @@
           </p>
 
           <button type="submit" class="submit-btn reveal" id="submit-btn">
-            予約する — Reserve
+            お支払いへ進む — Checkout
           </button>
         </form>
       </div>
@@ -675,8 +675,8 @@
         <h2 class="complete-title">Reservation Complete</h2>
         <p class="complete-text">
           ご予約ありがとうございます。<br />
-          ご登録のメールアドレスに確認メールをお送りしました。<br />
-          発送は2026年9月1日より順次行います。
+          お支払いが完了しました。<br />
+          確認メールは KOMOJU よりお送りします。発送は2026年9月1日より順次行います。
         </p>
         <p class="complete-order-id" id="complete-order-id"></p>
         <a href="index.html" class="back-link">← トップページへ戻る</a>
@@ -699,7 +699,7 @@
     </footer>
 
     <script>
-      const WORKER_URL = 'https://yellow-pearl-api.shingo-satokimi2021.workers.dev';
+      const WORKER_URL = window.location.origin;
 
       let qty = 1;
       const MAX_QTY = 5;
@@ -708,6 +708,7 @@
       let unitPrice = 0;
       let taxRate = 10;
       let shippingMap = {};
+      let komojuEnabled = false;
 
       function formatYen(n) {
         return `¥${Number(n).toLocaleString('ja-JP')}`;
@@ -762,7 +763,7 @@
         const btn = document.getElementById('submit-btn');
         const notice = document.getElementById('sold-out-notice');
         btn.disabled = closed;
-        btn.textContent = closed ? '受付終了 — Closed' : '予約する — Reserve';
+        btn.textContent = closed ? '受付終了 — Closed' : (komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve');
         notice.style.display = closed ? 'block' : 'none';
         document.getElementById('qty-minus').disabled = closed || qty <= 1;
         document.getElementById('qty-plus').disabled = closed || qty >= maxStock;
@@ -770,7 +771,7 @@
 
       async function loadStock() {
         try {
-          const res = await fetch(`${WORKER_URL}/api/stock`);
+          const res = await fetch(`${WORKER_URL}/api/stock`, { credentials: 'same-origin' });
           const data = await res.json();
 
           if (data.sold_out || data.stock <= 0) {
@@ -782,6 +783,13 @@
           unitPrice = data.unit_price ?? 0;
           taxRate = data.tax_rate ?? 10;
           shippingMap = data.shipping ?? {};
+          komojuEnabled = !!data.komoju_enabled;
+          const payEl = document.getElementById('summary-payment');
+          if (payEl) {
+            payEl.textContent = komojuEnabled ? 'クレジットカード等（KOMOJU）' : '受取時現金払い / 後日請求書';
+          }
+          document.getElementById('submit-btn').textContent =
+            komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
           maxStock = Math.min(MAX_QTY, data.stock);
           if (qty > maxStock) {
             qty = maxStock;
@@ -887,25 +895,67 @@
         };
 
         try {
-          const res = await fetch(`${WORKER_URL}/api/reserve`, {
+          const endpoint = komojuEnabled ? '/api/checkout' : '/api/reserve';
+          const res = await fetch(`${WORKER_URL}${endpoint}`, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
           const data = await res.json();
+
+          if (res.ok && komojuEnabled && data.session_url) {
+            window.location.href = data.session_url;
+            return;
+          }
 
           if (res.ok) {
             showComplete(data.order_id);
           } else {
             alert(data.error || '送信に失敗しました。もう一度お試しください。');
             btn.disabled = false;
-            btn.textContent = '予約する — Reserve';
+            btn.textContent = komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
           }
         } catch {
-          // Worker未設定時はデモ完了表示
-          showComplete('YP-DEMO-' + Date.now().toString(36).toUpperCase());
+          alert('通信エラーが発生しました。もう一度お試しください。');
+          btn.disabled = false;
+          btn.textContent = komojuEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
         }
       });
+
+      async function handleCheckoutReturn(sessionId) {
+        try {
+          const res = await fetch(
+            `${WORKER_URL}/api/checkout/return?session_id=${encodeURIComponent(sessionId)}`,
+            { credentials: 'same-origin' },
+          );
+          const data = await res.json();
+
+          if (res.ok && data.ok) {
+            showComplete(data.order_id);
+          } else if (data.pending) {
+            alert(data.message || 'お支払いの確認をお待ちしています。');
+            if (data.order_id) {
+              showComplete(data.order_id);
+              document.getElementById('complete-order-id').textContent =
+                `予約番号：${data.order_id}（入金確認待ち）`;
+            }
+          } else {
+            alert(data.message || data.error || '決済が完了していません。');
+          }
+        } catch {
+          alert('決済結果の確認に失敗しました。');
+        } finally {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('session_id');
+          history.replaceState(null, '', url.pathname + url.search);
+        }
+      }
+
+      (function initReturnHandler() {
+        const sessionId = new URLSearchParams(window.location.search).get('session_id');
+        if (sessionId) handleCheckoutReturn(sessionId);
+      })();
 
       function showComplete(orderId) {
         document.getElementById('step2').classList.add('done');

@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS orders (
   shipping_fee INTEGER NOT NULL DEFAULT 0,
   total_amount INTEGER NOT NULL DEFAULT 0,
   tax_amount INTEGER NOT NULL DEFAULT 0,
+  payment_status TEXT NOT NULL DEFAULT '未決済',
+  komoju_session_id TEXT,
+  komoju_payment_id TEXT,
   status TEXT NOT NULL DEFAULT '予約',
   admin_note TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
