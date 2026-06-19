@@ -313,19 +313,53 @@ function komojuExternalCustomerId(email) {
   return email.trim().toLowerCase();
 }
 
+function komojuCustomerAddress({
+  last_name, first_name, postal, prefecture, address1, address2,
+}) {
+  return {
+    name: `${last_name} ${first_name}`,
+    street_address1: address1,
+    ...(address2 ? { street_address2: address2 } : {}),
+    state: prefecture,
+    zipcode: postal,
+    country: 'JP',
+  };
+}
+
+function clientIp(request) {
+  return request.headers.get('CF-Connecting-IP')
+    || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
+    || null;
+}
+
 async function createKomojuSession(env, {
   totalAmount,
   returnUrl,
   email,
-  customerName,
   orderId,
   qty,
   unitPrice,
+  last_name,
+  first_name,
+  last_name_kana,
+  first_name_kana,
+  phone,
+  postal,
+  prefecture,
+  address1,
+  address2,
+  customerIp,
 }) {
+  const fullName = `${last_name} ${first_name}`;
+  const fullNameKana = [last_name_kana, first_name_kana].filter(Boolean).join(' ') || undefined;
+  const address = komojuCustomerAddress({
+    last_name, first_name, postal, prefecture, address1, address2,
+  });
+
   return komojuFetch(env, '/sessions', {
     method: 'POST',
     body: JSON.stringify({
-      mode: 'payment',
+      mode: 'customer_payment',
       amount: totalAmount,
       currency: 'JPY',
       return_url: returnUrl,
@@ -334,10 +368,23 @@ async function createKomojuSession(env, {
       default_locale: 'ja',
       payment_data: {
         external_order_num: orderId,
+        name: fullName,
+        ...(fullNameKana ? { name_kana: fullNameKana } : {}),
+        shipping_address: address,
+        billing_address: address,
+      },
+      fraud_details: {
+        customer_email: email,
+        customer_id: komojuExternalCustomerId(email),
+        phone,
+        ...(customerIp ? { customer_ip: customerIp } : {}),
       },
       metadata: {
         order_id: orderId,
-        customer_name: customerName,
+        customer_name: fullName,
+        phone,
+        postal,
+        prefecture,
       },
       line_items: [
         {
@@ -378,10 +425,19 @@ async function handleCheckout(request, env, CORS) {
       totalAmount,
       returnUrl,
       email,
-      customerName: `${last_name} ${first_name}`,
       orderId: order_id,
       qty,
       unitPrice,
+      last_name,
+      first_name,
+      last_name_kana,
+      first_name_kana,
+      phone,
+      postal,
+      prefecture,
+      address1,
+      address2,
+      customerIp: clientIp(request),
     });
   } catch (e) {
     return json({ error: e.message || '決済セッションの作成に失敗しました' }, 502, CORS);
