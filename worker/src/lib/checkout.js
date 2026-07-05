@@ -21,6 +21,7 @@ import {
   expireStripeCheckoutSession,
   isStripeEnabled,
   isStripeSessionPaid,
+  refundStripePayment,
   stripeFetch,
   stripeOrderId,
   stripePaymentIntentId,
@@ -42,6 +43,20 @@ export async function confirmOrderPayment(env, orderId, { sessionId = null, paym
     return { ok: true, order_id: orderId, skipped: true };
   }
   if (order.payment_status === PAYMENT_CANCELLED) {
+    if (sessionId || paymentId) {
+      const refund = await refundStripePayment(env, {
+        paymentIntentId: paymentId,
+        sessionId,
+      });
+      if (refund.error) {
+        return { error: 'キャンセル済み注文への入金返金に失敗しました', status: 503 };
+      }
+      await env.DB.prepare(
+        `UPDATE orders SET payment_status = ?, stripe_payment_id = COALESCE(?, stripe_payment_id)
+         WHERE order_id = ? AND payment_status = ?`
+      ).bind(PAYMENT_REFUNDED, refund.payment_intent_id ?? null, orderId, PAYMENT_CANCELLED).run();
+      return { ok: true, order_id: orderId, refunded: true };
+    }
     return { ok: true, order_id: orderId, skipped: true };
   }
   if (order.status === ORDER_STATUS_CANCELLED && order.payment_status === PAYMENT_UNPAID) {
@@ -262,8 +277,7 @@ export async function handleStripeWebhook(request, env) {
   ) {
     const result = await processPaidCheckoutSession(env, session);
     if (result.error && !result.already) {
-      const retry = result.status !== 400;
-      if (retry) {
+      if (result.status !== 400 && result.status !== 404) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },

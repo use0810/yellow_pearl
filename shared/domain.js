@@ -45,6 +45,8 @@ export function reserveValidationFieldId(error) {
     '電話番号が正しくありません': 'phone',
     '都道府県が不正です': 'prefecture',
     '必須項目が不足しています': 'last-name',
+    '入力が長すぎます': 'last-name',
+    '数量が不正です': 'quantity',
   };
   return map[error] ?? null;
 }

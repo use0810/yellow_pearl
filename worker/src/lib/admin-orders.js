@@ -3,6 +3,7 @@ import {
   MAX_LEN,
   ORDER_STATUSES,
   ORDER_STATUS_CANCELLED,
+  ORDER_STATUS_DONE,
   ORDER_STATUS_RESERVED,
   ORDER_NOT_ARCHIVED,
   PAYMENT_CANCELLED,
@@ -19,8 +20,9 @@ import {
   fetchInventoryRow,
   getShippingMap,
   incrementStock,
+  inventoryPublicFields,
 } from './inventory.js';
-import { expireStripeCheckoutSession, isStripeEnabled, refundStripePayment } from './stripe.js';
+import { expireStripeCheckoutSession, refundStripePayment } from './stripe.js';
 
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
@@ -46,14 +48,7 @@ export async function handleAdminDashboard(env, CORS) {
   const shippingMap = await getShippingMap(env.DB);
 
   return json({
-    inventory: {
-      stock: inv?.stock ?? 0,
-      sold_out: inv?.sold_out === 1,
-      unit_price: inv?.unit_price ?? 0,
-      tax_rate: inv?.tax_rate ?? 10,
-      shipping_tax_rate: inv?.shipping_tax_rate ?? 10,
-      checkout_enabled: isStripeEnabled(env),
-    },
+    inventory: inventoryPublicFields(inv, env),
     shipping_regions: getShippingRegionsFromMap(shippingMap),
     sold: sold?.sold ?? 0,
     order_count: orderCount?.cnt ?? 0,
@@ -103,8 +98,6 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
         return json({ error: 'キャンセルできません（決済状態が変更されています）' }, 409, CORS);
       }
 
-      await incrementStock(env.DB, qty);
-
       const refund = await refundStripePayment(env, {
         paymentIntentId: order.stripe_payment_id,
         sessionId: order.stripe_session_id,
@@ -113,14 +106,20 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
         await env.DB.prepare(
           `UPDATE orders SET status = ?, admin_note = ? WHERE order_id = ?`
         ).bind(oldStatus, '', orderId).run();
-        await decrementStock(env.DB, qty);
         return json({ error: refund.error }, refund.status, CORS);
       }
 
-      await env.DB.prepare(
+      await incrementStock(env.DB, qty);
+
+      const payUpdate = await env.DB.prepare(
         `UPDATE orders SET payment_status = ?, stripe_payment_id = COALESCE(?, stripe_payment_id)
-         WHERE order_id = ?`
-      ).bind(PAYMENT_REFUNDED, refund.payment_intent_id ?? null, orderId).run();
+         WHERE order_id = ? AND payment_status = ?`
+      ).bind(PAYMENT_REFUNDED, refund.payment_intent_id ?? null, orderId, PAYMENT_PAID).run();
+
+      if ((payUpdate.meta?.changes ?? 0) === 0) {
+        await logOrderEvent(env.DB, orderId, 'refund_db_sync_failed', refund.refund_id ?? '');
+        return json({ error: '返金は完了しましたが記録に失敗しました。管理者に連絡してください。' }, 500, CORS);
+      }
 
       await logOrderEvent(env.DB, orderId, 'cancelled', `refunded:${PAYMENT_PAID}`);
     } else if (order.payment_status === PAYMENT_UNPAID) {
@@ -143,24 +142,28 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
 
       await logOrderEvent(env.DB, orderId, 'cancelled', `admin:${PAYMENT_CANCELLED}`);
     } else {
-      if (orderHoldsStock(order.payment_status)) {
-        await incrementStock(env.DB, qty);
-      }
-
-      const paymentStatus = order.payment_status === PAYMENT_FAILED
+      const oldPaymentStatus = order.payment_status;
+      const paymentStatus = oldPaymentStatus === PAYMENT_FAILED
         ? PAYMENT_CANCELLED
-        : order.payment_status;
+        : oldPaymentStatus;
 
       const lock = await env.DB.prepare(
         `UPDATE orders SET status = ?, payment_status = ?, admin_note = ?
-         WHERE order_id = ? AND status != ? AND ${ORDER_NOT_ARCHIVED}`
-      ).bind(ORDER_STATUS_CANCELLED, paymentStatus, adminNote, orderId, ORDER_STATUS_CANCELLED).run();
+         WHERE order_id = ? AND status = ? AND payment_status = ? AND ${ORDER_NOT_ARCHIVED}`
+      ).bind(
+        ORDER_STATUS_CANCELLED, paymentStatus, adminNote,
+        orderId, oldStatus, oldPaymentStatus,
+      ).run();
 
       if ((lock.meta?.changes ?? 0) === 0) {
         return json({ error: 'キャンセルできません（状態が変更されています）' }, 409, CORS);
       }
 
-      await logOrderEvent(env.DB, orderId, 'cancelled', order.payment_status);
+      if (orderHoldsStock(oldPaymentStatus)) {
+        await incrementStock(env.DB, qty);
+      }
+
+      await logOrderEvent(env.DB, orderId, 'cancelled', oldPaymentStatus);
     }
   } else if (oldStatus === ORDER_STATUS_CANCELLED && status !== ORDER_STATUS_CANCELLED) {
     if (
@@ -191,6 +194,12 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
       return json({ error: '予約の更新に失敗しました' }, 500, CORS);
     }
   } else {
+    if (
+      status === ORDER_STATUS_DONE
+      && order.payment_status !== PAYMENT_PAID
+    ) {
+      return json({ error: '未決済の予約は発送済みにできません' }, 400, CORS);
+    }
     await env.DB.prepare(
       `UPDATE orders SET status = ?, admin_note = ? WHERE order_id = ? AND ${ORDER_NOT_ARCHIVED}`
     ).bind(status, adminNote, orderId).run();

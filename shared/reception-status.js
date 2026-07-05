@@ -35,6 +35,18 @@ export function resolveReceptionStatus(data) {
     };
   }
 
+  const unitPrice = Number(data?.unit_price ?? 0);
+  if (unitPrice <= 0) {
+    return {
+      key: 'preparing',
+      label: '準備中',
+      notice: '価格設定の準備中です。しばらくしてからお試しください。',
+      submitLabel: '準備中',
+      closed: true,
+      badgeClass: 'preparing',
+    };
+  }
+
   return {
     key: 'open',
     label: '受付中',

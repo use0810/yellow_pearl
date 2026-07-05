@@ -1,8 +1,6 @@
 import {
   ORDER_STATUS_CANCELLED,
   ORDER_STATUS_RESERVED,
-  LEGACY_ADMIN_CANCEL_PREDICATE,
-  PAYMENT_CANCELLED,
   PAYMENT_FAILED,
   PAYMENT_UNPAID,
   PRODUCT_ID,
@@ -71,6 +69,18 @@ export async function fetchInventoryRow(db) {
   ).bind(PRODUCT_ID).first();
 }
 
+/** /api/stock と管理ダッシュボードで共有する inventory 公開フィールド */
+export function inventoryPublicFields(row, env) {
+  return {
+    stock: row?.stock ?? 0,
+    sold_out: row?.sold_out === 1,
+    unit_price: row?.unit_price ?? 0,
+    tax_rate: row?.tax_rate ?? 10,
+    shipping_tax_rate: row?.shipping_tax_rate ?? 10,
+    checkout_enabled: isStripeEnabled(env),
+  };
+}
+
 export async function decrementStock(db, qty) {
   const result = await db.prepare(
     `UPDATE inventory SET
@@ -108,15 +118,6 @@ export async function markOrderFailedAndReleaseStock(db, orderId) {
     return true;
   }
   return false;
-}
-
-/** 旧管理者キャンセル（失敗）→ 取消。migrate-payment-cancelled.sql と同等・冪等（手動/一括用） */
-export async function healLegacyAdminCancelPayments(db) {
-  const result = await db.prepare(
-    `UPDATE orders SET payment_status = ?
-     WHERE ${LEGACY_ADMIN_CANCEL_PREDICATE}`
-  ).bind(PAYMENT_CANCELLED).run();
-  return result.meta?.changes ?? 0;
 }
 
 export async function cleanupStaleOrders(env) {
@@ -212,12 +213,7 @@ export async function handleStock(env, CORS) {
   const shipping = await getShippingMap(env.DB);
 
   return json({
-    stock: row.stock,
-    sold_out: row.sold_out === 1,
-    unit_price: row.unit_price ?? 0,
-    tax_rate: row.tax_rate ?? 10,
-    shipping_tax_rate: row.shipping_tax_rate ?? 10,
+    ...inventoryPublicFields(row, env),
     shipping,
-    checkout_enabled: isStripeEnabled(env),
   }, 200, CORS);
 }
