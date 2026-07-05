@@ -350,6 +350,14 @@
       .order-row .val {
         color: var(--cream);
         letter-spacing: 0.05em;
+        text-align: right;
+      }
+
+      .order-summary-note {
+        margin: 0.75rem 0 0.25rem;
+        font-size: 0.72rem;
+        color: rgba(232, 217, 176, 0.45);
+        line-height: 1.5;
       }
 
       /* 注意事項 */
@@ -616,33 +624,18 @@
           <!-- 注文サマリー -->
           <div class="order-summary reveal">
             <div class="order-row">
-              <span class="key">商品</span>
-              <span class="val">Yellow Pearl（郷のきみ プレミアムライン）</span>
-            </div>
-            <div class="order-row">
-              <span class="key">数量</span>
-              <span class="val" id="summary-qty">1本</span>
-            </div>
-            <div class="order-row">
-              <span class="key">単価（税抜）</span>
-              <span class="val" id="summary-unit-price">—</span>
-            </div>
-            <div class="order-row">
-              <span class="key">小計（税抜）</span>
-              <span class="val" id="summary-subtotal">—</span>
-            </div>
-            <div class="order-row">
-              <span class="key" id="summary-tax-label">消費税</span>
-              <span class="val" id="summary-tax">—</span>
+              <span class="key">商品（税込）</span>
+              <span class="val" id="summary-product">—</span>
             </div>
             <div class="order-row">
               <span class="key">送料（税込）</span>
               <span class="val" id="summary-shipping">都道府県を選択してください</span>
             </div>
             <div class="order-row order-row-total">
-              <span class="key">合計（税込）</span>
+              <span class="key">お支払い合計</span>
               <span class="val" id="summary-total">—</span>
             </div>
+            <p class="order-summary-note">※ 表示は税込価格です。詳細は決済画面（Stripe）でもご確認いただけます。</p>
             <div class="order-row">
               <span class="key">発送期間</span>
               <span class="val">2026年9月1日 〜 9月30日</span>
@@ -728,32 +721,30 @@
       function updatePricingSummary() {
         const subtotal = unitPrice * qty;
         const tax = calcTax(subtotal);
-        const shipping = getShippingFee();
+        const productIncl = subtotal + tax;
+        const shippingIncl = getShippingFee();
 
-        document.getElementById('summary-unit-price').textContent =
-          unitPrice ? `${formatYen(unitPrice)} / 本` : '—';
-        document.getElementById('summary-subtotal').textContent =
-          unitPrice ? formatYen(subtotal) : '—';
-        document.getElementById('summary-tax-label').textContent =
-          unitPrice ? `消費税（${taxRate}％）` : '消費税';
-        document.getElementById('summary-tax').textContent =
-          unitPrice ? formatYen(tax) : '—';
+        const productEl = document.getElementById('summary-product');
+        if (!unitPrice) {
+          productEl.textContent = '—';
+        } else {
+          productEl.textContent = `Yellow Pearl × ${qty}本　${formatYen(productIncl)}`;
+        }
 
         const shipEl = document.getElementById('summary-shipping');
-        if (shipping === null) {
+        if (shippingIncl === null) {
           shipEl.textContent = '都道府県を選択してください';
         } else {
-          shipEl.textContent = formatYen(shipping);
+          shipEl.textContent = formatYen(shippingIncl);
         }
 
         document.getElementById('summary-total').textContent =
-          (unitPrice && shipping !== null) ? formatYen(subtotal + tax + shipping) : '—';
+          (unitPrice && shippingIncl !== null) ? formatYen(productIncl + shippingIncl) : '—';
       }
 
       function changeQty(delta) {
         qty = Math.min(maxStock, Math.max(1, qty + delta));
         document.getElementById('qty-display').textContent = qty;
-        document.getElementById('summary-qty').textContent = `${qty}本`;
         document.getElementById('qty-minus').disabled = soldOut || qty <= 1;
         document.getElementById('qty-plus').disabled = soldOut || qty >= maxStock;
         updatePricingSummary();
@@ -797,7 +788,6 @@
           if (qty > maxStock) {
             qty = maxStock;
             document.getElementById('qty-display').textContent = qty;
-            document.getElementById('summary-qty').textContent = `${qty}本`;
           }
           changeQty(0);
         } catch (e) {

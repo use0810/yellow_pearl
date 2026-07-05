@@ -731,8 +731,9 @@
                     <input type="number" id="edit-unit-price" min="1" required />
                   </div>
                   <div class="field">
-                    <label for="edit-tax-rate">消費税率（％）</label>
+                    <label for="edit-tax-rate">商品の消費税率（％）</label>
                     <input type="number" id="edit-tax-rate" min="0" max="100" value="10" required />
+                    <span class="pricing-preview-note" style="margin-top:0.35rem">例: トウモロコシ等の軽減税率 8％</span>
                   </div>
                 </div>
                 <div class="pricing-preview" id="pricing-preview" aria-live="polite"></div>
@@ -758,8 +759,12 @@
 
           <div class="card">
             <div class="card-title">送料（地域別）</div>
-            <p class="card-note">金額は税込みで入力。カートの都道府県選択と連動します。</p>
+            <p class="card-note">金額は<strong>税込</strong>で入力。送料の消費税率は商品と別に設定できます（通常 10％）。</p>
             <form id="shipping-form">
+              <div class="field" style="max-width:200px;margin-bottom:1rem">
+                <label for="edit-shipping-tax-rate">送料の消費税率（％）</label>
+                <input type="number" id="edit-shipping-tax-rate" min="0" max="100" value="10" required />
+              </div>
               <div class="shipping-grid" id="shipping-grid"></div>
               <p class="msg-error" id="shipping-error"></p>
               <p class="msg-success" id="shipping-success"></p>
@@ -846,7 +851,8 @@
             <div class="bookkeeping-summary" id="bk-summary">
               <div class="bk-stat"><div class="bk-stat-label">商品売上（税抜）</div><div class="bk-stat-value" id="bk-sum-product">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">消費税（商品分）</div><div class="bk-stat-value" id="bk-sum-tax">—</div></div>
-              <div class="bk-stat"><div class="bk-stat-label">送料収入</div><div class="bk-stat-value" id="bk-sum-shipping-in">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">消費税（送料分）</div><div class="bk-stat-value" id="bk-sum-shipping-tax">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">送料収入（税込）</div><div class="bk-stat-value" id="bk-sum-shipping-in">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">売上合計</div><div class="bk-stat-value" id="bk-sum-total">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">実配送費（入力）</div><div class="bk-stat-value" id="bk-sum-shipping-out">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">送料差額（収入−実費）</div><div class="bk-stat-value" id="bk-sum-margin">—</div></div>
@@ -859,15 +865,16 @@
                     <th>月</th>
                     <th class="num">件数</th>
                     <th class="num">商品(税抜)</th>
-                    <th class="num">消費税</th>
-                    <th class="num">送料収入</th>
+                    <th class="num">消費税(商品)</th>
+                    <th class="num">消費税(送料)</th>
+                    <th class="num">送料(税込)</th>
                     <th class="num">合計</th>
                     <th class="num">実配送費</th>
                     <th>メモ</th>
                   </tr>
                 </thead>
                 <tbody id="bk-monthly-body">
-                  <tr><td colspan="8" class="empty-msg">読み込み中...</td></tr>
+                  <tr><td colspan="9" class="empty-msg">読み込み中...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -940,6 +947,7 @@
       function renderBookkeepingSummary(totals) {
         document.getElementById('bk-sum-product').textContent = yen(totals.product_subtotal);
         document.getElementById('bk-sum-tax').textContent = yen(totals.tax_amount);
+        document.getElementById('bk-sum-shipping-tax').textContent = yen(totals.shipping_tax_amount ?? 0);
         document.getElementById('bk-sum-shipping-in').textContent = yen(totals.shipping_income);
         document.getElementById('bk-sum-total').textContent = yen(totals.total_amount);
         document.getElementById('bk-sum-shipping-out').textContent = yen(totals.actual_shipping);
@@ -957,6 +965,7 @@
           <td class="num">${m.order_count}</td>
           <td class="num">${formatYen(m.product_subtotal)}</td>
           <td class="num">${formatYen(m.tax_amount)}</td>
+          <td class="num">${formatYen(m.shipping_tax_amount ?? 0)}</td>
           <td class="num">${formatYen(m.shipping_income)}</td>
           <td class="num">${formatYen(m.total_amount)}</td>
           <td class="num">
@@ -1040,6 +1049,7 @@
           order_count: acc.order_count + m.order_count,
           product_subtotal: acc.product_subtotal + m.product_subtotal,
           tax_amount: acc.tax_amount + m.tax_amount,
+          shipping_tax_amount: acc.shipping_tax_amount + (m.shipping_tax_amount ?? 0),
           shipping_income: acc.shipping_income + m.shipping_income,
           total_amount: acc.total_amount + m.total_amount,
           actual_shipping: acc.actual_shipping + m.actual_shipping,
@@ -1047,6 +1057,7 @@
           order_count: 0,
           product_subtotal: 0,
           tax_amount: 0,
+          shipping_tax_amount: 0,
           shipping_income: 0,
           total_amount: 0,
           actual_shipping: 0,
@@ -1064,6 +1075,7 @@
           <td style="text-align:right">${m.order_count}</td>
           <td style="text-align:right">${formatYen(m.product_subtotal)}</td>
           <td style="text-align:right">${formatYen(m.tax_amount)}</td>
+          <td style="text-align:right">${formatYen(m.shipping_tax_amount ?? 0)}</td>
           <td style="text-align:right">${formatYen(m.shipping_income)}</td>
           <td style="text-align:right">${formatYen(m.total_amount)}</td>
           <td style="text-align:right">${formatYen(m.actual_shipping)}</td>
@@ -1090,14 +1102,15 @@
           <div class="summary">
             <div><div class="label">商品売上（税抜）</div><div class="val">${yen(totals.product_subtotal)}</div></div>
             <div><div class="label">消費税（商品分）</div><div class="val">${yen(totals.tax_amount)}</div></div>
-            <div><div class="label">送料収入</div><div class="val">${yen(totals.shipping_income)}</div></div>
+            <div><div class="label">消費税（送料分）</div><div class="val">${yen(totals.shipping_tax_amount ?? 0)}</div></div>
+            <div><div class="label">送料収入（税込）</div><div class="val">${yen(totals.shipping_income)}</div></div>
             <div><div class="label">売上合計</div><div class="val">${yen(totals.total_amount)}</div></div>
             <div><div class="label">実配送費</div><div class="val">${yen(totals.actual_shipping)}</div></div>
             <div><div class="label">送料差額</div><div class="val">${yen(margin)}</div></div>
           </div>
           <table>
             <thead><tr>
-              <th>月</th><th>件数</th><th>商品(税抜)</th><th>消費税</th><th>送料収入</th><th>合計</th><th>実配送費</th><th>メモ</th>
+              <th>月</th><th>件数</th><th>商品(税抜)</th><th>消費税(商品)</th><th>消費税(送料)</th><th>送料(税込)</th><th>合計</th><th>実配送費</th><th>メモ</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -1190,7 +1203,7 @@
         el.innerHTML = `
           1本あたり　税抜 ${formatYen(unitPrice)} 円 ＋ 消費税（${taxRate}%） ${formatYen(taxPerUnit)} 円
           ＝ <strong>税込 ${formatYen(inclPerUnit)} 円</strong>（商品のみ・送料別）
-          <span class="pricing-preview-note">Stripe には「${esc('Yellow Pearl（イエローパール）')}」と「消費税（${taxRate}%）」の明細行として送信されます。</span>
+          <span class="pricing-preview-note">Stripe には「${esc('Yellow Pearl（イエローパール）')}」と「消費税（商品・${taxRate}%）」の明細行として送信されます。</span>
         `;
       }
 
@@ -1459,6 +1472,7 @@
         document.getElementById('edit-stock').value = inv.stock ?? 0;
         document.getElementById('edit-unit-price').value = inv.unit_price ?? 0;
         document.getElementById('edit-tax-rate').value = inv.tax_rate ?? 10;
+        document.getElementById('edit-shipping-tax-rate').value = inv.shipping_tax_rate ?? 10;
         document.getElementById('edit-sold-out').checked = !!inv.sold_out;
 
         const badge = document.getElementById('status-badge');
@@ -1529,7 +1543,7 @@
         okEl.textContent = '';
         btn.disabled = true;
 
-        const rates = [...document.querySelectorAll('#shipping-grid input')].map((el) => ({
+        const rates = [...document.querySelectorAll('#shipping-grid input[data-region]')].map((el) => ({
           region: el.dataset.region,
           fee: parseInt(el.value, 10) || 0,
         }));
@@ -1537,7 +1551,10 @@
         try {
           const data = await api('/api/admin/shipping', {
             method: 'PUT',
-            body: JSON.stringify({ rates }),
+            body: JSON.stringify({
+              rates,
+              shipping_tax_rate: parseInt(document.getElementById('edit-shipping-tax-rate').value, 10),
+            }),
           });
           renderShippingGrid(data.shipping_regions ?? []);
           okEl.textContent = '送料を保存しました';

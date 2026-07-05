@@ -196,11 +196,28 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function calcOrderAmount(unitPrice, qty, taxRate, shippingFee) {
+function splitTaxInclusive(amountIncl, taxRate) {
+  if (amountIncl <= 0 || taxRate <= 0) {
+    return { excl: amountIncl, tax: 0, incl: amountIncl };
+  }
+  const excl = Math.floor(amountIncl * 100 / (100 + taxRate));
+  const tax = amountIncl - excl;
+  return { excl, tax, incl: amountIncl };
+}
+
+function calcOrderAmount(unitPrice, qty, taxRate, shippingFeeIncl, shippingTaxRate) {
   const subtotal = unitPrice * qty;
   const taxAmount = Math.floor(subtotal * taxRate / 100);
-  const totalAmount = subtotal + taxAmount + shippingFee;
-  return { subtotal, taxAmount, totalAmount };
+  const shipping = splitTaxInclusive(shippingFeeIncl, shippingTaxRate);
+  const totalAmount = subtotal + taxAmount + shipping.incl;
+  return {
+    subtotal,
+    taxAmount,
+    shippingFeeIncl: shipping.incl,
+    shippingExcl: shipping.excl,
+    shippingTaxAmount: shipping.tax,
+    totalAmount,
+  };
 }
 
 /** 在庫が足りるときだけ減算（1クエリで原子的に判定） */
@@ -359,7 +376,8 @@ async function verifyStripeWebhook(rawBody, signatureHeader, secret) {
 }
 
 function buildStripeCheckoutParams({
-  origin, orderId, email, qty, unitPrice, taxRate, taxAmount, shippingFee,
+  origin, orderId, email, qty, unitPrice, taxRate, taxAmount,
+  shippingFeeIncl, shippingExcl, shippingTaxRate, shippingTaxAmount,
 }) {
   const params = new URLSearchParams();
   params.append('mode', 'payment');
@@ -370,6 +388,7 @@ function buildStripeCheckoutParams({
   params.append('metadata[order_id]', orderId);
   params.append('metadata[unit_price]', String(unitPrice));
   params.append('metadata[tax_rate]', String(taxRate));
+  params.append('metadata[shipping_tax_rate]', String(shippingTaxRate));
   params.append('locale', 'ja');
   params.append('customer_creation', 'always');
 
@@ -383,13 +402,25 @@ function buildStripeCheckoutParams({
     params.append(`line_items[${idx}][quantity]`, '1');
     params.append(`line_items[${idx}][price_data][currency]`, 'jpy');
     params.append(`line_items[${idx}][price_data][unit_amount]`, String(taxAmount));
-    params.append(`line_items[${idx}][price_data][product_data][name]`, `消費税（${taxRate}%）`);
+    params.append(`line_items[${idx}][price_data][product_data][name]`, `消費税（商品・${taxRate}%）`);
     idx += 1;
   }
-  if (shippingFee > 0) {
+  if (shippingExcl > 0) {
     params.append(`line_items[${idx}][quantity]`, '1');
     params.append(`line_items[${idx}][price_data][currency]`, 'jpy');
-    params.append(`line_items[${idx}][price_data][unit_amount]`, String(shippingFee));
+    params.append(`line_items[${idx}][price_data][unit_amount]`, String(shippingExcl));
+    params.append(`line_items[${idx}][price_data][product_data][name]`, '送料');
+    idx += 1;
+  }
+  if (shippingTaxAmount > 0) {
+    params.append(`line_items[${idx}][quantity]`, '1');
+    params.append(`line_items[${idx}][price_data][currency]`, 'jpy');
+    params.append(`line_items[${idx}][price_data][unit_amount]`, String(shippingTaxAmount));
+    params.append(`line_items[${idx}][price_data][product_data][name]`, `消費税（送料・${shippingTaxRate}%）`);
+  } else if (shippingFeeIncl > 0 && shippingExcl === 0) {
+    params.append(`line_items[${idx}][quantity]`, '1');
+    params.append(`line_items[${idx}][price_data][currency]`, 'jpy');
+    params.append(`line_items[${idx}][price_data][unit_amount]`, String(shippingFeeIncl));
     params.append(`line_items[${idx}][price_data][product_data][name]`, '送料');
   }
 
@@ -474,7 +505,8 @@ function parseReserveBody(body) {
 
 async function loadPricing(env, prefecture, qty) {
   const inv = await env.DB.prepare(
-    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
+    `SELECT stock, sold_out, unit_price, tax_rate, shipping_tax_rate
+     FROM inventory WHERE product_id = ?`
   ).bind(PRODUCT_ID).first();
 
   if (!inv || inv.sold_out || inv.stock < qty) {
@@ -487,10 +519,20 @@ async function loadPricing(env, prefecture, qty) {
 
   const unitPrice = inv.unit_price ?? 0;
   const taxRate = inv.tax_rate ?? 10;
-  const shippingFee = rate?.fee ?? 0;
-  const { taxAmount, totalAmount } = calcOrderAmount(unitPrice, qty, taxRate, shippingFee);
+  const shippingTaxRate = inv.shipping_tax_rate ?? 10;
+  const shippingFeeIncl = rate?.fee ?? 0;
+  const amounts = calcOrderAmount(unitPrice, qty, taxRate, shippingFeeIncl, shippingTaxRate);
 
-  return { unitPrice, taxRate, shippingFee, taxAmount, totalAmount };
+  return {
+    unitPrice,
+    taxRate,
+    shippingTaxRate,
+    shippingFeeIncl: amounts.shippingFeeIncl,
+    shippingExcl: amounts.shippingExcl,
+    shippingTaxAmount: amounts.shippingTaxAmount,
+    taxAmount: amounts.taxAmount,
+    totalAmount: amounts.totalAmount,
+  };
 }
 
 async function handleCheckout(request, env, CORS) {
@@ -510,7 +552,10 @@ async function handleCheckout(request, env, CORS) {
   const pricing = await loadPricing(env, prefecture, qty);
   if (pricing.error) return json({ error: pricing.error }, pricing.status, CORS);
 
-  const { unitPrice, taxRate, shippingFee, taxAmount, totalAmount } = pricing;
+  const {
+    unitPrice, taxRate, shippingTaxRate, shippingFeeIncl, shippingExcl,
+    shippingTaxAmount, taxAmount, totalAmount,
+  } = pricing;
   if (unitPrice <= 0) {
     return json({ error: '商品単価が設定されていません。管理画面で価格を設定してください。' }, 503, CORS);
   }
@@ -528,7 +573,10 @@ async function handleCheckout(request, env, CORS) {
       unitPrice,
       taxRate,
       taxAmount,
-      shippingFee,
+      shippingFeeIncl,
+      shippingExcl,
+      shippingTaxRate,
+      shippingTaxAmount,
     });
   } catch {
     return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
@@ -542,14 +590,16 @@ async function handleCheckout(request, env, CORS) {
     `INSERT INTO orders (
       order_id, last_name, first_name, last_name_kana, first_name_kana,
       email, phone, postal, prefecture, address1, address2, note,
-      quantity, unit_price, shipping_fee, tax_amount, total_amount,
+      quantity, unit_price, shipping_fee, shipping_tax_rate, shipping_tax_amount,
+      tax_amount, total_amount,
       payment_status, stripe_session_id, status, admin_note
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', ?, '予約', '')`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', ?, '予約', '')`
   ).bind(
     order_id,
     last_name, first_name, last_name_kana, first_name_kana,
     email, phone, postal, prefecture, address1, address2, note,
-    qty, unitPrice, shippingFee, taxAmount, totalAmount,
+    qty, unitPrice, shippingFeeIncl, shippingTaxRate, shippingTaxAmount,
+    taxAmount, totalAmount,
     session.id,
   ).run();
 
@@ -679,7 +729,8 @@ async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId =
 
 async function handleStock(env, CORS) {
   const row = await env.DB.prepare(
-    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
+    `SELECT stock, sold_out, unit_price, tax_rate, shipping_tax_rate
+     FROM inventory WHERE product_id = ?`
   ).bind(PRODUCT_ID).first();
 
   if (!row) return json({ error: 'Not found' }, 404, CORS);
@@ -691,6 +742,7 @@ async function handleStock(env, CORS) {
     sold_out: row.sold_out === 1,
     unit_price: row.unit_price ?? 0,
     tax_rate: row.tax_rate ?? 10,
+    shipping_tax_rate: row.shipping_tax_rate ?? 10,
     shipping,
     checkout_enabled: isStripeEnabled(env),
   }, 200, CORS);
@@ -698,7 +750,8 @@ async function handleStock(env, CORS) {
 
 async function handleAdminDashboard(env, CORS) {
   const inv = await env.DB.prepare(
-    'SELECT stock, sold_out, unit_price, tax_rate FROM inventory WHERE product_id = ?'
+    `SELECT stock, sold_out, unit_price, tax_rate, shipping_tax_rate
+     FROM inventory WHERE product_id = ?`
   ).bind(PRODUCT_ID).first();
 
   let sold = { sold: 0 };
@@ -727,6 +780,7 @@ async function handleAdminDashboard(env, CORS) {
       sold_out: inv?.sold_out === 1,
       unit_price: inv?.unit_price ?? 0,
       tax_rate: inv?.tax_rate ?? 10,
+      shipping_tax_rate: inv?.shipping_tax_rate ?? 10,
     },
     shipping_regions: getShippingRegionsFromMap(shippingMap),
     sold: sold?.sold ?? 0,
@@ -886,8 +940,27 @@ async function handleAdminShippingUpdate(request, env, CORS) {
 
   if (stmts.length) await env.DB.batch(stmts);
 
+  let shippingTaxRate = 10;
+  if (body.shipping_tax_rate !== undefined) {
+    shippingTaxRate = parseInt(body.shipping_tax_rate, 10);
+    if (Number.isNaN(shippingTaxRate) || shippingTaxRate < 0 || shippingTaxRate > 100) {
+      return json({ error: '送料の消費税率が不正です' }, 400, CORS);
+    }
+    await env.DB.prepare(
+      `UPDATE inventory SET shipping_tax_rate = ? WHERE product_id = ?`
+    ).bind(shippingTaxRate, PRODUCT_ID).run();
+  } else {
+    const inv = await env.DB.prepare(
+      'SELECT shipping_tax_rate FROM inventory WHERE product_id = ?'
+    ).bind(PRODUCT_ID).first();
+    shippingTaxRate = inv?.shipping_tax_rate ?? 10;
+  }
+
   const shippingMap = await getShippingMap(env.DB);
-  return json({ shipping_regions: getShippingRegionsFromMap(shippingMap) }, 200, CORS);
+  return json({
+    shipping_regions: getShippingRegionsFromMap(shippingMap),
+    shipping_tax_rate: shippingTaxRate,
+  }, 200, CORS);
 }
 
 const BOOKKEEPING_ORDER_FILTER = `status != 'キャンセル' AND payment_status = '決済済'`;
@@ -904,6 +977,7 @@ function sumBookkeepingMonths(months) {
     total_quantity: acc.total_quantity + m.total_quantity,
     product_subtotal: acc.product_subtotal + m.product_subtotal,
     tax_amount: acc.tax_amount + m.tax_amount,
+    shipping_tax_amount: acc.shipping_tax_amount + m.shipping_tax_amount,
     shipping_income: acc.shipping_income + m.shipping_income,
     total_amount: acc.total_amount + m.total_amount,
     actual_shipping: acc.actual_shipping + m.actual_shipping,
@@ -912,6 +986,7 @@ function sumBookkeepingMonths(months) {
     total_quantity: 0,
     product_subtotal: 0,
     tax_amount: 0,
+    shipping_tax_amount: 0,
     shipping_income: 0,
     total_amount: 0,
     actual_shipping: 0,
@@ -925,6 +1000,7 @@ async function loadBookkeepingMonths(db, year) {
             COALESCE(SUM(quantity), 0) AS total_quantity,
             COALESCE(SUM(unit_price * quantity), 0) AS product_subtotal,
             COALESCE(SUM(tax_amount), 0) AS tax_amount,
+            COALESCE(SUM(shipping_tax_amount), 0) AS shipping_tax_amount,
             COALESCE(SUM(shipping_fee), 0) AS shipping_income,
             COALESCE(SUM(total_amount), 0) AS total_amount
      FROM orders
@@ -959,6 +1035,7 @@ async function loadBookkeepingMonths(db, year) {
       total_quantity: sales.total_quantity ?? 0,
       product_subtotal: sales.product_subtotal ?? 0,
       tax_amount: sales.tax_amount ?? 0,
+      shipping_tax_amount: sales.shipping_tax_amount ?? 0,
       shipping_income: shippingIncome,
       total_amount: sales.total_amount ?? 0,
       actual_shipping: actualShipping,
@@ -1041,13 +1118,14 @@ function buildBookkeepingCsv(year, months, totals, orders) {
     `\uFEFFYellow Pearl 帳簿データ,${year}年`,
     '',
     '【月次サマリー】',
-    '年月,件数,本数,商品売上(税抜),消費税(商品),送料収入,売上合計,実配送費,送料差額,メモ',
+    '年月,件数,本数,商品売上(税抜),消費税(商品),消費税(送料),送料収入(税込),売上合計,実配送費,送料差額,メモ',
     ...months.map((m) => [
       m.year_month,
       m.order_count,
       m.total_quantity,
       m.product_subtotal,
       m.tax_amount,
+      m.shipping_tax_amount,
       m.shipping_income,
       m.total_amount,
       m.actual_shipping,
@@ -1062,6 +1140,7 @@ function buildBookkeepingCsv(year, months, totals, orders) {
       totals.total_quantity,
       totals.product_subtotal,
       totals.tax_amount,
+      totals.shipping_tax_amount,
       totals.shipping_income,
       totals.total_amount,
       totals.actual_shipping,
@@ -1070,7 +1149,7 @@ function buildBookkeepingCsv(year, months, totals, orders) {
     ].map(csvEscape).join(','),
     '',
     '【注文明細（決済済み）】',
-    '予約番号,日時,数量,税抜単価,商品売上(税抜),消費税,送料収入,合計,都道府県',
+    '予約番号,日時,数量,税抜単価,商品売上(税抜),消費税(商品),送料(税込),消費税(送料),合計,都道府県',
     ...orders.map((o) => [
       o.order_id,
       o.created_at,
@@ -1079,6 +1158,7 @@ function buildBookkeepingCsv(year, months, totals, orders) {
       o.unit_price * o.quantity,
       o.tax_amount,
       o.shipping_fee,
+      o.shipping_tax_amount,
       o.total_amount,
       o.prefecture,
     ].map(csvEscape).join(',')),
@@ -1095,7 +1175,7 @@ async function handleAdminBookkeepingExport(env, CORS, url) {
 
   const orderRows = await env.DB.prepare(
     `SELECT order_id, created_at, quantity, unit_price, tax_amount,
-            shipping_fee, total_amount, prefecture
+            shipping_fee, shipping_tax_amount, total_amount, prefecture
      FROM orders
      WHERE ${BOOKKEEPING_ORDER_FILTER}
        AND strftime('%Y', created_at) = ?
