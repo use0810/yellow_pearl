@@ -20,7 +20,7 @@ export const PAYMENT_FAILED = '失敗';
 export const PAYMENT_CANCELLED = '取消';
 export const PAYMENT_REFUNDED = '返金済';
 
-export const MAX_ORDER_QTY = 5;
+export const MAX_ORDER_QTY = 50;
 
 /** フリガナ（カタカナ） */
 export const KANA_PATTERN = /^[ァ-ヴー・]+$/;
