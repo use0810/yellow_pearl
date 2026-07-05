@@ -199,7 +199,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
-          <p class="note">※ CSV 出力と同一データソース。課税事業者向けたたき台。送料の消費税区分・Stripe手数料等は税理士にご確認ください。</p>
+          <p class="note">※ CSV 出力と同一データソース。売上集計の参考資料です。Stripe 手数料は Stripe Dashboard から取得してください。不明点は税務署に相談してください。</p>
           </body></html>`;
         const w = window.open('about:blank', '_blank');
         if (!w) {
