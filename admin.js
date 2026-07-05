@@ -1,12 +1,20 @@
-      import {
+import {
   ORDER_STATUSES,
+  ORDER_STATUS_CANCELLED,
+  ORDER_STATUS_DONE,
+  ORDER_STATUS_RESERVED,
+  FULFILLMENT_LABELS,
+  PAYMENT_CANCELLED,
   PAYMENT_FAILED,
   PAYMENT_PAID,
+  PAYMENT_REFUNDED,
   PAYMENT_UNPAID,
   SHIPPING_REGIONS,
-  orderHoldsStock,
-  sumBookkeepingMonths,
+  calcOrderAmount,
+  calcShippingMargin,
+  summarizeOrderState,
 } from '/shared/domain.js';
+import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       const WORKER_URL = window.location.origin;
       const SCREEN_TITLES = {
@@ -48,7 +56,8 @@
         document.getElementById('bk-sum-total').textContent = yen(totals.total_amount);
         document.getElementById('bk-sum-shipping-out').textContent = yen(totals.actual_shipping);
         const marginEl = document.getElementById('bk-sum-margin');
-        const margin = totals.shipping_margin ?? (totals.shipping_income - totals.actual_shipping);
+        const margin = totals.shipping_margin
+          ?? calcShippingMargin(totals.shipping_income, totals.actual_shipping);
         marginEl.textContent = yen(margin);
         marginEl.classList.toggle('positive', margin >= 0);
         marginEl.classList.toggle('negative', margin < 0);
@@ -133,26 +142,18 @@
         URL.revokeObjectURL(a.href);
       }
 
-      function getBookkeepingViewData() {
-        const expenses = collectBookkeepingExpenses();
-        const months = (bookkeepingData?.months ?? []).map((m, i) => {
-          const actualShipping = expenses[i]?.actual_shipping ?? m.actual_shipping;
-          return {
-            ...m,
-            actual_shipping: actualShipping,
-            note: expenses[i]?.note ?? m.note,
-            shipping_margin: m.shipping_income - actualShipping,
-          };
-        });
-        const totals = sumBookkeepingMonths(months);
-        totals.shipping_margin = totals.shipping_income - totals.actual_shipping;
-        return { year: getBookkeepingYear(), months, totals };
-      }
-
-      function printBookkeepingPdf() {
-        if (!bookkeepingData) return;
-        const { year, months, totals } = getBookkeepingViewData();
-        const margin = totals.shipping_margin ?? (totals.shipping_income - totals.actual_shipping);
+      async function printBookkeepingPdf() {
+        const year = getBookkeepingYear();
+        let data;
+        try {
+          data = await api(`/api/admin/bookkeeping?year=${year}`);
+        } catch (err) {
+          alert(err.message);
+          return;
+        }
+        const { months, totals } = data;
+        const margin = totals.shipping_margin
+          ?? calcShippingMargin(totals.shipping_income, totals.actual_shipping);
         const rows = months.map((m) => `<tr>
           <td>${m.month}月</td>
           <td style="text-align:right">${m.order_count}</td>
@@ -181,7 +182,7 @@
             @media print { body { padding: 0; } }
           </style></head><body>
           <h1>Yellow Pearl 帳簿サマリー</h1>
-          <p class="meta">${year}年 · 決済済み注文ベース · 出力日 ${new Date().toLocaleDateString('ja-JP')}</p>
+          <p class="meta">${year}年 · 決済済み注文ベース（DB保存値） · 出力日 ${new Date().toLocaleDateString('ja-JP')}</p>
           <div class="summary">
             <div><div class="label">商品売上（税抜）</div><div class="val">${yen(totals.product_subtotal)}</div></div>
             <div><div class="label">消費税（商品分）</div><div class="val">${yen(totals.tax_amount)}</div></div>
@@ -197,7 +198,7 @@
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
-          <p class="note">※ 課税事業者向けたたき台。送料の消費税区分・Stripe手数料等は税理士にご確認ください。</p>
+          <p class="note">※ CSV 出力と同一データソース。課税事業者向けたたき台。送料の消費税区分・Stripe手数料等は税理士にご確認ください。</p>
           </body></html>`;
         const w = window.open('', '_blank', 'noopener,noreferrer');
         if (!w) {
@@ -239,10 +240,19 @@
         document.getElementById('app').style.display = 'flex';
       }
 
-      function showAuthError(msg) {
+      function populateAuthLoginEmails(emails) {
+        const el = document.getElementById('auth-login-email');
+        if (!el) return;
+        el.textContent = emails?.length
+          ? emails.join('、')
+          : '登録済みのメールアドレス';
+      }
+
+      function showAuthError(msg, loginEmails) {
         document.getElementById('auth-error').style.display = 'block';
         document.getElementById('auth-error-msg').textContent = msg;
         document.getElementById('app').style.display = 'none';
+        if (loginEmails) populateAuthLoginEmails(loginEmails);
       }
 
       async function checkAdminSession() {
@@ -253,8 +263,10 @@
           return true;
         }
         if (res.status === 503) {
+          populateAuthLoginEmails(data.login_emails);
           throw new Error(data.error || '管理者認証（Cloudflare Access）が設定されていません。');
         }
+        populateAuthLoginEmails(data.login_emails);
         throw new Error(
           data.error || 'メールでのワンタイム認証が必要です。ログイン画面を開いてください。',
         );
@@ -279,8 +291,9 @@
       function updatePricingPreview() {
         const unitPrice = parseInt(document.getElementById('edit-unit-price').value, 10) || 0;
         const taxRate = parseInt(document.getElementById('edit-tax-rate').value, 10) || 0;
-        const taxPerUnit = Math.floor(unitPrice * taxRate / 100);
-        const inclPerUnit = unitPrice + taxPerUnit;
+        const amounts = calcOrderAmount(unitPrice, 1, taxRate, 0, 0);
+        const taxPerUnit = amounts.taxAmount;
+        const inclPerUnit = amounts.subtotal + amounts.taxAmount;
         const el = document.getElementById('pricing-preview');
         if (!el) return;
         el.innerHTML = `
@@ -335,8 +348,8 @@
 
         tbody.innerHTML = yearly.map((y) => `<tr>
           <td>${y.year}年度</td>
-          <td class="num">${formatYen(y.order_count)}件</td>
-          <td class="num">${formatYen(y.total_quantity)}本</td>
+          <td class="num">${fmtNum(y.order_count)}件</td>
+          <td class="num">${fmtNum(y.total_quantity)}本</td>
           <td class="num">¥${formatYen(y.amount)}</td>
         </tr>`).join('');
       }
@@ -381,24 +394,44 @@
       }
 
       function statusPillClass(status) {
-        if (status === '済み') return 'done';
-        if (status === 'キャンセル') return 'cancelled';
+        if (status === ORDER_STATUS_DONE) return 'done';
+        if (status === ORDER_STATUS_CANCELLED) return 'cancelled';
         return 'reserved';
       }
 
-function paymentPillClass(paymentStatus) {
-  if (paymentStatus === PAYMENT_PAID) return 'payment-paid';
-  if (paymentStatus === PAYMENT_FAILED) return 'payment-failed';
-  return 'payment-unpaid';
-}
+      function paymentPillClass(paymentStatus) {
+        if (paymentStatus === PAYMENT_PAID) return 'payment-paid';
+        if (paymentStatus === PAYMENT_REFUNDED) return 'payment-refunded';
+        if (paymentStatus === PAYMENT_CANCELLED) return 'payment-cancelled';
+        if (paymentStatus === PAYMENT_FAILED) return 'payment-failed';
+        return 'payment-unpaid';
+      }
 
-function formatPaymentStatus(paymentStatus) {
-  return paymentStatus || PAYMENT_UNPAID;
-}
+      function formatPaymentStatus(paymentStatus) {
+        return paymentStatus || PAYMENT_UNPAID;
+      }
+
+      function renderOrderStatusCell(o) {
+        const status = o.status || ORDER_STATUS_RESERVED;
+        const paymentStatus = formatPaymentStatus(o.payment_status);
+        const summary = summarizeOrderState(o);
+        const fulfillLabel = FULFILLMENT_LABELS[status] || status;
+        return `<div class="order-status-cell">
+          <div class="order-status-summary ${esc(summary.className)}">${esc(summary.text)}</div>
+          <div class="status-badges">
+            <span class="status-pill ${paymentPillClass(paymentStatus)}" title="決済（自動）">
+              <span class="status-badge-label">決済</span> ${esc(paymentStatus)}
+            </span>
+            <span class="status-pill ${statusPillClass(status)}" title="予約ステータス（手動）">
+              <span class="status-badge-label">予約</span> ${esc(fulfillLabel)}
+            </span>
+          </div>
+        </div>`;
+      }
 
       function renderOpsCell(o) {
-        const status = o.status || '予約';
-        if (status === 'キャンセル') {
+        const status = o.status || ORDER_STATUS_RESERVED;
+        if (status === ORDER_STATUS_CANCELLED) {
           return `<div class="ops-cell ops-cell-cancelled" data-order-id="${esc(o.order_id)}">
             <div class="ops-actions">
               <button type="button" class="btn btn-primary ops-restore-btn"
@@ -406,15 +439,16 @@ function formatPaymentStatus(paymentStatus) {
                 data-payment-status="${esc(o.payment_status || PAYMENT_UNPAID)}"
                 data-admin-note="${esc(o.admin_note || '')}">再予約</button>
               <button type="button" class="btn btn-danger ops-delete-btn"
-                data-order-id="${esc(o.order_id)}">削除</button>
+                data-order-id="${esc(o.order_id)}">アーカイブ</button>
             </div>
           </div>`;
         }
         const options = ORDER_STATUSES.map((s) =>
-          `<option value="${s}"${s === status ? ' selected' : ''}>${s}</option>`
+          `<option value="${s}"${s === status ? ' selected' : ''}>${FULFILLMENT_LABELS[s] || s}</option>`
         ).join('');
-        return `<div class="ops-cell" data-order-id="${esc(o.order_id)}">
-          <select class="ops-status">${options}</select>
+        return `<div class="ops-cell" data-order-id="${esc(o.order_id)}" data-payment-status="${esc(o.payment_status || PAYMENT_UNPAID)}">
+          <p class="ops-status-hint">発送ステータス（手動）</p>
+          <select class="ops-status" aria-label="予約ステータス">${options}</select>
           <textarea class="ops-note" placeholder="特記事項（管理者用）">${esc(o.admin_note || '')}</textarea>
           <button type="button" class="btn ops-save ops-save-btn" data-order-id="${esc(o.order_id)}">保存</button>
         </div>`;
@@ -433,8 +467,6 @@ function formatPaymentStatus(paymentStatus) {
 
         tbody.innerHTML = orders.map((o) => {
           const note = o.note ? `<br><span style="color:#888">お客様備考: ${esc(o.note)}</span>` : '';
-          const status = o.status || '予約';
-          const paymentStatus = formatPaymentStatus(o.payment_status);
           return `<tr data-order-id="${esc(o.order_id)}">
             <td class="mono">${esc(o.order_id)}</td>
             <td>${esc(o.last_name)} ${esc(o.first_name)}</td>
@@ -442,22 +474,19 @@ function formatPaymentStatus(paymentStatus) {
             <td>${esc(formatAddress(o))}${note}</td>
             <td>${o.quantity}本</td>
             <td class="num">${o.total_amount ? `¥${formatYen(o.total_amount)}` : '—'}</td>
-            <td><span class="status-pill ${paymentPillClass(paymentStatus)}">${esc(paymentStatus)}</span></td>
+            <td>${renderOrderStatusCell(o)}</td>
             <td style="white-space:nowrap">${esc(o.created_at)}</td>
             <td>${renderOpsCell(o)}</td>
           </tr>`;
         }).join('');
 
         cards.innerHTML = orders.map((o) => {
-          const status = o.status || '予約';
-          const paymentStatus = formatPaymentStatus(o.payment_status);
           return `
           <article class="order-card" data-order-id="${esc(o.order_id)}">
             <div class="order-card-head">
               <div>
                 <div class="order-card-name">${esc(o.last_name)} ${esc(o.first_name)}</div>
-                <span class="status-pill ${statusPillClass(status)}">${esc(status)}</span>
-                <span class="status-pill ${paymentPillClass(paymentStatus)}">${esc(paymentStatus)}</span>
+                ${renderOrderStatusCell(o)}
                 ${(o.last_name_kana || o.first_name_kana)
                   ? `<div style="font-size:0.8rem;color:#888">${esc(o.last_name_kana)} ${esc(o.first_name_kana)}</div>`
                   : ''}
@@ -497,6 +526,13 @@ function formatPaymentStatus(paymentStatus) {
       async function saveOrder(orderId, container) {
         const status = container.querySelector('.ops-status').value;
         const adminNote = container.querySelector('.ops-note').value.trim();
+        const paymentStatus = container.dataset.paymentStatus || PAYMENT_UNPAID;
+        if (status === ORDER_STATUS_CANCELLED && paymentStatus === PAYMENT_PAID) {
+          const ok = confirm(
+            '決済済みの予約です。Stripe で全額返金したうえでキャンセルします。よろしいですか？',
+          );
+          if (!ok) return;
+        }
         await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
           method: 'PUT',
           body: JSON.stringify({ status, admin_note: adminNote }),
@@ -507,17 +543,19 @@ function formatPaymentStatus(paymentStatus) {
 
       async function restoreOrder(btn) {
         const orderId = btn.dataset.orderId;
-  const ps = btn.dataset.paymentStatus || PAYMENT_UNPAID;
-  const msg = orderHoldsStock(ps)
-    ? 'この予約を再予約（予約）に戻しますか？在庫が減ります。'
-    : 'この予約を再予約（予約）に戻しますか？（決済失敗のため在庫は変わりません）';
+        const ps = btn.dataset.paymentStatus || PAYMENT_UNPAID;
+        if (ps === PAYMENT_PAID || ps === PAYMENT_REFUNDED) {
+          alert('決済済み・返金済みの予約は再予約に戻せません。');
+          return;
+        }
+        const msg = 'この予約を再予約（未発送）に戻しますか？在庫が減り、決済リンクは無効です。お客様には新規予約を案内してください。';
         if (!confirm(msg)) return;
         btn.disabled = true;
         try {
           await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
             method: 'PUT',
             body: JSON.stringify({
-              status: '予約',
+              status: ORDER_STATUS_RESERVED,
               admin_note: btn.dataset.adminNote || '',
             }),
           });
@@ -529,9 +567,9 @@ function formatPaymentStatus(paymentStatus) {
         }
       }
 
-      async function deleteOrder(btn) {
+      async function archiveOrder(btn) {
         const orderId = btn.dataset.orderId;
-        if (!confirm('このキャンセル予約を完全に削除しますか？この操作は取り消せません。')) return;
+        if (!confirm('このキャンセル予約をアーカイブしますか？一覧から非表示になりますが、DBと監査ログは保持されます。')) return;
         btn.disabled = true;
         try {
           await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
@@ -552,7 +590,7 @@ function formatPaymentStatus(paymentStatus) {
         }
         const deleteBtn = e.target.closest('.ops-delete-btn');
         if (deleteBtn) {
-          deleteOrder(deleteBtn).catch((err) => alert(err.message));
+          archiveOrder(deleteBtn).catch((err) => alert(err.message));
           return;
         }
         const saveBtn = e.target.closest('.ops-save-btn');
@@ -578,13 +616,14 @@ function formatPaymentStatus(paymentStatus) {
         document.getElementById('edit-sold-out').checked = !!inv.sold_out;
 
         const badge = document.getElementById('status-badge');
-        if (inv.sold_out || inv.stock <= 0) {
-          badge.textContent = '受付終了';
-          badge.classList.add('sold-out');
-        } else {
-          badge.textContent = '受付中';
-          badge.classList.remove('sold-out');
-        }
+        const reception = resolveReceptionStatus({
+          sold_out: inv.sold_out,
+          stock: inv.stock,
+          checkout_enabled: inv.checkout_enabled,
+        });
+        badge.textContent = reception.label;
+        badge.classList.remove('sold-out', 'preparing', 'open', 'error');
+        badge.classList.add(reception.badgeClass);
 
         updatePricingPreview();
         renderShippingGrid(data.shipping_regions ?? []);
@@ -696,7 +735,9 @@ function formatPaymentStatus(paymentStatus) {
       document.getElementById('bk-csv-btn').addEventListener('click', () => {
         downloadBookkeepingCsv().catch((err) => alert(err.message));
       });
-      document.getElementById('bk-pdf-btn').addEventListener('click', printBookkeepingPdf);
+      document.getElementById('bk-pdf-btn').addEventListener('click', () => {
+        printBookkeepingPdf().catch((err) => alert(err.message));
+      });
 
       (async function initAdmin() {
         try {

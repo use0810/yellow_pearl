@@ -1,0 +1,463 @@
+.cart-wrap {
+  min-height: 100vh;
+  padding: clamp(6rem, 12vw, 10rem) clamp(1.5rem, 6vw, 4rem) 4rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.cart-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.cart-header h1 {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 400;
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.3em;
+  margin-bottom: 0.5rem;
+}
+
+.cart-header p {
+  font-size: 0.8rem;
+  color: rgba(232, 217, 176, 0.5);
+  letter-spacing: 0.15em;
+}
+
+/* ステップインジケーター */
+.steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 4rem;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  color: rgba(232, 217, 176, 0.4);
+}
+
+.step.active .step-num {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(201, 168, 76, 0.1);
+}
+
+.step.done .step-num {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--black);
+}
+
+.step-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  color: rgba(232, 217, 176, 0.4);
+}
+
+.step.active .step-label {
+  color: var(--gold);
+}
+
+.step-line {
+  width: clamp(3rem, 8vw, 6rem);
+  height: 1px;
+  background: rgba(201, 168, 76, 0.2);
+  margin-bottom: 1.2rem;
+}
+
+/* 商品サマリー */
+.product-summary {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  background: rgba(201, 168, 76, 0.03);
+  margin-bottom: 2.5rem;
+}
+
+.product-summary img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+}
+
+.summary-info {
+  flex: 1;
+}
+
+.summary-name {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 0.75rem;
+  color: rgba(232, 217, 176, 0.6);
+  letter-spacing: 0.15em;
+  margin-bottom: 0.3rem;
+}
+
+.summary-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.2em;
+}
+
+.summary-limit {
+  font-size: 0.72rem;
+  color: rgba(232, 217, 176, 0.45);
+  letter-spacing: 0.1em;
+  margin-top: 0.3rem;
+}
+
+/* 数量セレクター */
+.qty-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qty-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(201, 168, 76, 0.5);
+  background: transparent;
+  color: var(--gold);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.qty-btn:hover {
+  background: rgba(201, 168, 76, 0.15);
+}
+
+.qty-num {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  color: var(--cream);
+  min-width: 2rem;
+  text-align: center;
+}
+
+/* フォーム */
+.form-section {
+  margin-bottom: 2.5rem;
+}
+
+.form-sub-label {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: rgba(232, 217, 176, 0.5);
+  margin-bottom: 0.8rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid rgba(201, 168, 76, 0.4);
+}
+
+.form-section-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.4em;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group.full {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.25em;
+  color: rgba(232, 217, 176, 0.6);
+}
+
+.form-group label span {
+  color: var(--gold);
+  margin-left: 0.3rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  color: var(--cream);
+  font-family: 'Noto Serif JP', serif;
+  font-size: 0.9rem;
+  padding: 0.8rem 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  color-scheme: dark;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--gold);
+  outline: none;
+  box-shadow: none;
+}
+
+/* ブラウザのオートフィル色を上書き */
+.form-group input:-webkit-autofill,
+.form-group input:-webkit-autofill:hover,
+.form-group input:-webkit-autofill:focus,
+.form-group input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0f0d08 inset !important;
+  -webkit-text-fill-color: var(--cream) !important;
+  caret-color: var(--cream);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  transition: background-color 99999s ease-out;
+}
+
+.form-group input:-webkit-autofill:focus {
+  border-color: var(--gold);
+}
+
+.form-group input:autofill {
+  box-shadow: 0 0 0 1000px #0f0d08 inset !important;
+  -webkit-text-fill-color: var(--cream) !important;
+  caret-color: var(--cream);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: rgba(232, 217, 176, 0.2);
+}
+
+.form-group select {
+  cursor: pointer;
+  padding-right: 2.5rem;
+  accent-color: var(--gold);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23c9a84c' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.form-group select option {
+  background: #1a1400;
+  color: var(--cream);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* 注文確認ボックス */
+.order-summary {
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  background: rgba(201, 168, 76, 0.02);
+}
+
+.order-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+}
+
+.order-row:last-child {
+  border-bottom: none;
+}
+
+.order-row .key {
+  color: rgba(232, 217, 176, 0.55);
+  letter-spacing: 0.1em;
+}
+
+.order-row-total .key,
+.order-row-total .val {
+  font-weight: 600;
+  color: var(--gold-bright);
+}
+
+.order-row .val {
+  color: var(--cream);
+  letter-spacing: 0.05em;
+  text-align: right;
+}
+
+.order-summary-note {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.72rem;
+  color: rgba(232, 217, 176, 0.45);
+  line-height: 1.5;
+}
+
+/* 注意事項 */
+.caution {
+  font-size: 0.72rem;
+  color: rgba(232, 217, 176, 0.35);
+  line-height: 2;
+  letter-spacing: 0.05em;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border-left: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+/* 送信ボタン */
+.submit-btn {
+  width: 100%;
+  padding: 1.2rem;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+  color: var(--black);
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(201, 168, 76, 0.4);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* 完了画面 */
+#complete-screen {
+  display: none;
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.complete-icon {
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 2rem;
+  font-size: 1.5rem;
+}
+
+.complete-title {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.3em;
+  margin-bottom: 1rem;
+}
+
+.complete-text {
+  font-size: 0.9rem;
+  line-height: 2.2;
+  color: rgba(232, 217, 176, 0.65);
+  max-width: 480px;
+  margin: 0 auto 2rem;
+  letter-spacing: 0.05em;
+}
+
+.complete-order-id {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: rgba(232, 217, 176, 0.4);
+}
+
+.back-link {
+  display: inline-block;
+  margin-top: 2.5rem;
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  color: rgba(201, 168, 76, 0.6);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.3);
+  padding-bottom: 2px;
+  transition: color 0.3s;
+}
+
+.back-link:hover {
+  color: var(--gold);
+}
+
+/* エラー */
+.field-error {
+  font-size: 0.65rem;
+  color: #ff7755;
+  letter-spacing: 0.05em;
+  margin-top: 0.2rem;
+}
+
+.form-group input.invalid,
+.form-group select.invalid {
+  border-color: #ff7755;
+}

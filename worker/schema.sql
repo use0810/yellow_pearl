@@ -42,8 +42,20 @@ CREATE TABLE IF NOT EXISTS orders (
   stripe_payment_id TEXT,
   status TEXT NOT NULL DEFAULT '予約',
   admin_note TEXT NOT NULL DEFAULT '',
+  archived_at TEXT,
+  archived_by TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
 );
+
+CREATE TABLE IF NOT EXISTS order_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_events_order_id ON order_events(order_id);
 
 CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,

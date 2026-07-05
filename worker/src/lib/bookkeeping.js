@@ -1,4 +1,4 @@
-import { BOOKKEEPING_ORDER_FILTER, MAX_LEN, sumBookkeepingMonths } from '../../../shared/domain.js';
+import { BOOKKEEPING_ORDER_FILTER, MAX_LEN, calcShippingMargin, sumBookkeepingMonths } from '../../../shared/domain.js';
 import { json } from './http.js';
 
 function parseBookkeepingYear(url) {
@@ -67,7 +67,7 @@ async function loadBookkeepingMonths(db, year) {
       shipping_income: shippingIncome,
       total_amount: sales.total_amount ?? 0,
       actual_shipping: actualShipping,
-      shipping_margin: shippingIncome - actualShipping,
+      shipping_margin: calcShippingMargin(shippingIncome, actualShipping),
       note: exp.note ?? '',
     });
   }
@@ -86,7 +86,7 @@ export async function handleAdminBookkeeping(env, CORS, url) {
     months,
     totals: {
       ...totals,
-      shipping_margin: totals.shipping_income - totals.actual_shipping,
+      shipping_margin: calcShippingMargin(totals.shipping_income, totals.actual_shipping),
     },
   }, 200, CORS);
 }
@@ -130,7 +130,7 @@ export async function handleAdminBookkeepingExpensesUpdate(request, env, CORS) {
   return json({
     ok: true,
     months,
-    totals: { ...totals, shipping_margin: totals.shipping_income - totals.actual_shipping },
+    totals: { ...totals, shipping_margin: calcShippingMargin(totals.shipping_income, totals.actual_shipping) },
   }, 200, CORS);
 }
 
@@ -171,7 +171,7 @@ function buildBookkeepingCsv(year, months, totals, orders) {
       totals.shipping_income,
       totals.total_amount,
       totals.actual_shipping,
-      totals.shipping_income - totals.actual_shipping,
+      calcShippingMargin(totals.shipping_income, totals.actual_shipping),
       '',
     ].map(csvEscape).join(','),
     '',

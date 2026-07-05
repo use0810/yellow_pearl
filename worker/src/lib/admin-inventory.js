@@ -1,4 +1,4 @@
-import { findShippingRegion, getShippingRegionsFromMap, MAX_LEN, PRODUCT_ID } from '../../../shared/domain.js';
+import { findShippingRegion, getShippingRegionsFromMap, PRODUCT_ID } from '../../../shared/domain.js';
 import { json } from './http.js';
 import { getShippingMap } from './inventory.js';
 
@@ -52,6 +52,19 @@ export async function handleAdminShippingUpdate(request, env, CORS) {
     }
   }
 
+  let shippingTaxRate = 10;
+  if (body.shipping_tax_rate !== undefined) {
+    shippingTaxRate = parseInt(body.shipping_tax_rate, 10);
+    if (Number.isNaN(shippingTaxRate) || shippingTaxRate < 0 || shippingTaxRate > 100) {
+      return json({ error: '送料の消費税率が不正です' }, 400, CORS);
+    }
+  } else {
+    const inv = await env.DB.prepare(
+      'SELECT shipping_tax_rate FROM inventory WHERE product_id = ?'
+    ).bind(PRODUCT_ID).first();
+    shippingTaxRate = inv?.shipping_tax_rate ?? 10;
+  }
+
   const stmts = updates.map(({ prefecture, fee }) =>
     env.DB.prepare(
       `INSERT INTO shipping_rates (prefecture, fee) VALUES (?, ?)
@@ -61,20 +74,10 @@ export async function handleAdminShippingUpdate(request, env, CORS) {
 
   if (stmts.length) await env.DB.batch(stmts);
 
-  let shippingTaxRate = 10;
   if (body.shipping_tax_rate !== undefined) {
-    shippingTaxRate = parseInt(body.shipping_tax_rate, 10);
-    if (Number.isNaN(shippingTaxRate) || shippingTaxRate < 0 || shippingTaxRate > 100) {
-      return json({ error: '送料の消費税率が不正です' }, 400, CORS);
-    }
     await env.DB.prepare(
       `UPDATE inventory SET shipping_tax_rate = ? WHERE product_id = ?`
     ).bind(shippingTaxRate, PRODUCT_ID).run();
-  } else {
-    const inv = await env.DB.prepare(
-      'SELECT shipping_tax_rate FROM inventory WHERE product_id = ?'
-    ).bind(PRODUCT_ID).first();
-    shippingTaxRate = inv?.shipping_tax_rate ?? 10;
   }
 
   const shippingMap = await getShippingMap(env.DB);

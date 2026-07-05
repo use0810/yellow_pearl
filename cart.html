@@ -11,471 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="style.css" />
-    <style>
-      .cart-wrap {
-        min-height: 100vh;
-        padding: clamp(6rem, 12vw, 10rem) clamp(1.5rem, 6vw, 4rem) 4rem;
-        max-width: 860px;
-        margin: 0 auto;
-      }
-
-      .cart-header {
-        text-align: center;
-        margin-bottom: 4rem;
-      }
-
-      .cart-header h1 {
-        font-family: 'Cinzel', serif;
-        font-size: clamp(1.4rem, 3vw, 2rem);
-        font-weight: 400;
-        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        letter-spacing: 0.3em;
-        margin-bottom: 0.5rem;
-      }
-
-      .cart-header p {
-        font-size: 0.8rem;
-        color: rgba(232, 217, 176, 0.5);
-        letter-spacing: 0.15em;
-      }
-
-      /* ステップインジケーター */
-      .steps {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0;
-        margin-bottom: 4rem;
-      }
-
-      .step {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.4rem;
-      }
-
-      .step-num {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 1px solid rgba(201, 168, 76, 0.4);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Cinzel', serif;
-        font-size: 0.7rem;
-        color: rgba(232, 217, 176, 0.4);
-      }
-
-      .step.active .step-num {
-        border-color: var(--gold);
-        color: var(--gold);
-        background: rgba(201, 168, 76, 0.1);
-      }
-
-      .step.done .step-num {
-        border-color: var(--gold);
-        background: var(--gold);
-        color: var(--black);
-      }
-
-      .step-label {
-        font-family: 'Cinzel', serif;
-        font-size: 0.55rem;
-        letter-spacing: 0.2em;
-        color: rgba(232, 217, 176, 0.4);
-      }
-
-      .step.active .step-label {
-        color: var(--gold);
-      }
-
-      .step-line {
-        width: clamp(3rem, 8vw, 6rem);
-        height: 1px;
-        background: rgba(201, 168, 76, 0.2);
-        margin-bottom: 1.2rem;
-      }
-
-      /* 商品サマリー */
-      .product-summary {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
-        padding: 1.5rem;
-        border: 1px solid rgba(201, 168, 76, 0.2);
-        background: rgba(201, 168, 76, 0.03);
-        margin-bottom: 2.5rem;
-      }
-
-      .product-summary img {
-        width: 80px;
-        height: 80px;
-        object-fit: cover;
-        mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
-        -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
-      }
-
-      .summary-info {
-        flex: 1;
-      }
-
-      .summary-name {
-        font-family: 'Noto Serif JP', serif;
-        font-size: 0.75rem;
-        color: rgba(232, 217, 176, 0.6);
-        letter-spacing: 0.15em;
-        margin-bottom: 0.3rem;
-      }
-
-      .summary-title {
-        font-family: 'Cinzel', serif;
-        font-size: 1.1rem;
-        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        letter-spacing: 0.2em;
-      }
-
-      .summary-limit {
-        font-size: 0.72rem;
-        color: rgba(232, 217, 176, 0.45);
-        letter-spacing: 0.1em;
-        margin-top: 0.3rem;
-      }
-
-      /* 数量セレクター */
-      .qty-wrap {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-      }
-
-      .qty-btn {
-        width: 32px;
-        height: 32px;
-        border: 1px solid rgba(201, 168, 76, 0.5);
-        background: transparent;
-        color: var(--gold);
-        font-size: 1.1rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s;
-      }
-
-      .qty-btn:hover {
-        background: rgba(201, 168, 76, 0.15);
-      }
-
-      .qty-num {
-        font-family: 'Cinzel', serif;
-        font-size: 1.1rem;
-        color: var(--cream);
-        min-width: 2rem;
-        text-align: center;
-      }
-
-      /* フォーム */
-      .form-section {
-        margin-bottom: 2.5rem;
-      }
-
-      .form-sub-label {
-        font-family: 'Noto Serif JP', serif;
-        font-size: 0.75rem;
-        letter-spacing: 0.2em;
-        color: rgba(232, 217, 176, 0.5);
-        margin-bottom: 0.8rem;
-        padding-left: 0.5rem;
-        border-left: 2px solid rgba(201, 168, 76, 0.4);
-      }
-
-      .form-section-title {
-        font-family: 'Cinzel', serif;
-        font-size: 0.65rem;
-        letter-spacing: 0.4em;
-        color: var(--gold);
-        text-transform: uppercase;
-        margin-bottom: 1.5rem;
-        padding-bottom: 0.8rem;
-        border-bottom: 1px solid rgba(201, 168, 76, 0.2);
-      }
-
-      .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-      }
-
-      @media (max-width: 600px) {
-        .form-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-
-      .form-group.full {
-        grid-column: 1 / -1;
-      }
-
-      .form-group label {
-        font-family: 'Cinzel', serif;
-        font-size: 0.6rem;
-        letter-spacing: 0.25em;
-        color: rgba(232, 217, 176, 0.6);
-      }
-
-      .form-group label span {
-        color: var(--gold);
-        margin-left: 0.3rem;
-      }
-
-      .form-group input,
-      .form-group select,
-      .form-group textarea {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(201, 168, 76, 0.25);
-        color: var(--cream);
-        font-family: 'Noto Serif JP', serif;
-        font-size: 0.9rem;
-        padding: 0.8rem 1rem;
-        outline: none;
-        transition: border-color 0.2s;
-        width: 100%;
-        border-radius: 0;
-        -webkit-appearance: none;
-        appearance: none;
-        color-scheme: dark;
-      }
-
-      .form-group input:focus,
-      .form-group select:focus,
-      .form-group textarea:focus {
-        border-color: var(--gold);
-        outline: none;
-        box-shadow: none;
-      }
-
-      /* ブラウザのオートフィル色を上書き */
-      .form-group input:-webkit-autofill,
-      .form-group input:-webkit-autofill:hover,
-      .form-group input:-webkit-autofill:focus,
-      .form-group input:-webkit-autofill:active {
-        -webkit-box-shadow: 0 0 0 1000px #0f0d08 inset !important;
-        -webkit-text-fill-color: var(--cream) !important;
-        caret-color: var(--cream);
-        border: 1px solid rgba(201, 168, 76, 0.25);
-        transition: background-color 99999s ease-out;
-      }
-
-      .form-group input:-webkit-autofill:focus {
-        border-color: var(--gold);
-      }
-
-      .form-group input:autofill {
-        box-shadow: 0 0 0 1000px #0f0d08 inset !important;
-        -webkit-text-fill-color: var(--cream) !important;
-        caret-color: var(--cream);
-      }
-
-      .form-group input::placeholder,
-      .form-group textarea::placeholder {
-        color: rgba(232, 217, 176, 0.2);
-      }
-
-      .form-group select {
-        cursor: pointer;
-        padding-right: 2.5rem;
-        accent-color: var(--gold);
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23c9a84c' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 1rem center;
-        background-color: rgba(255, 255, 255, 0.03);
-      }
-
-      .form-group select option {
-        background: #1a1400;
-        color: var(--cream);
-      }
-
-      .form-group textarea {
-        resize: vertical;
-        min-height: 80px;
-      }
-
-      /* 注文確認ボックス */
-      .order-summary {
-        border: 1px solid rgba(201, 168, 76, 0.25);
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        background: rgba(201, 168, 76, 0.02);
-      }
-
-      .order-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.6rem 0;
-        font-size: 0.85rem;
-        border-bottom: 1px solid rgba(201, 168, 76, 0.1);
-      }
-
-      .order-row:last-child {
-        border-bottom: none;
-      }
-
-      .order-row .key {
-        color: rgba(232, 217, 176, 0.55);
-        letter-spacing: 0.1em;
-      }
-
-      .order-row-total .key,
-      .order-row-total .val {
-        font-weight: 600;
-        color: var(--gold-bright);
-      }
-
-      .order-row .val {
-        color: var(--cream);
-        letter-spacing: 0.05em;
-        text-align: right;
-      }
-
-      .order-summary-note {
-        margin: 0.75rem 0 0.25rem;
-        font-size: 0.72rem;
-        color: rgba(232, 217, 176, 0.45);
-        line-height: 1.5;
-      }
-
-      /* 注意事項 */
-      .caution {
-        font-size: 0.72rem;
-        color: rgba(232, 217, 176, 0.35);
-        line-height: 2;
-        letter-spacing: 0.05em;
-        margin-bottom: 2rem;
-        padding: 1rem;
-        border-left: 1px solid rgba(201, 168, 76, 0.2);
-      }
-
-      /* 送信ボタン */
-      .submit-btn {
-        width: 100%;
-        padding: 1.2rem;
-        background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
-        color: var(--black);
-        font-family: 'Cinzel', serif;
-        font-size: 0.85rem;
-        letter-spacing: 0.4em;
-        text-transform: uppercase;
-        border: none;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-        transition: transform 0.3s, box-shadow 0.3s;
-      }
-
-      .submit-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(201, 168, 76, 0.4);
-      }
-
-      .submit-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-      }
-
-      /* 完了画面 */
-      #complete-screen {
-        display: none;
-        text-align: center;
-        padding: 4rem 2rem;
-      }
-
-      .complete-icon {
-        width: 60px;
-        height: 60px;
-        border: 1px solid var(--gold);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 2rem;
-        font-size: 1.5rem;
-      }
-
-      .complete-title {
-        font-family: 'Cinzel', serif;
-        font-size: clamp(1.2rem, 3vw, 1.8rem);
-        background: linear-gradient(135deg, var(--gold), var(--gold-bright));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        letter-spacing: 0.3em;
-        margin-bottom: 1rem;
-      }
-
-      .complete-text {
-        font-size: 0.9rem;
-        line-height: 2.2;
-        color: rgba(232, 217, 176, 0.65);
-        max-width: 480px;
-        margin: 0 auto 2rem;
-        letter-spacing: 0.05em;
-      }
-
-      .complete-order-id {
-        font-family: 'Cinzel', serif;
-        font-size: 0.7rem;
-        letter-spacing: 0.3em;
-        color: rgba(232, 217, 176, 0.4);
-      }
-
-      .back-link {
-        display: inline-block;
-        margin-top: 2.5rem;
-        font-family: 'Cinzel', serif;
-        font-size: 0.65rem;
-        letter-spacing: 0.3em;
-        color: rgba(201, 168, 76, 0.6);
-        text-decoration: none;
-        border-bottom: 1px solid rgba(201, 168, 76, 0.3);
-        padding-bottom: 2px;
-        transition: color 0.3s;
-      }
-
-      .back-link:hover {
-        color: var(--gold);
-      }
-
-      /* エラー */
-      .field-error {
-        font-size: 0.65rem;
-        color: #ff7755;
-        letter-spacing: 0.05em;
-        margin-top: 0.2rem;
-      }
-
-      .form-group input.invalid,
-      .form-group select.invalid {
-        border-color: #ff7755;
-      }
-    </style>
+    <link rel="stylesheet" href="cart.css" />
   </head>
   <body>
     <nav>
@@ -506,7 +42,7 @@
           <div class="step-line"></div>
           <div class="step" id="step2">
             <div class="step-num">2</div>
-            <div class="step-label">確認</div>
+            <div class="step-label">お支払い</div>
           </div>
           <div class="step-line"></div>
           <div class="step" id="step3">
@@ -524,9 +60,9 @@
             <p class="summary-limit">年間1,000本限定 ／ 青森県新郷村</p>
           </div>
           <div class="qty-wrap">
-            <button class="qty-btn" id="qty-minus" onclick="changeQty(-1)">−</button>
+            <button type="button" class="qty-btn" id="qty-minus">−</button>
             <span class="qty-num" id="qty-display">1</span>
-            <button class="qty-btn" id="qty-plus" onclick="changeQty(1)">＋</button>
+            <button type="button" class="qty-btn" id="qty-plus">＋</button>
           </div>
         </div>
 
@@ -567,10 +103,12 @@
               <div class="form-group">
                 <label>メールアドレス<span>*</span></label>
                 <input type="email" id="email" placeholder="example@email.com" required />
+                <span class="field-error" id="err-email"></span>
               </div>
               <div class="form-group">
                 <label>電話番号<span>*</span></label>
                 <input type="tel" id="phone" placeholder="090-0000-0000" required />
+                <span class="field-error" id="err-phone"></span>
               </div>
             </div>
           </div>
@@ -588,22 +126,6 @@
                 <label>都道府県<span>*</span></label>
                 <select id="prefecture" required>
                   <option value="">選択してください</option>
-                  <option>北海道</option><option>青森県</option><option>岩手県</option>
-                  <option>宮城県</option><option>秋田県</option><option>山形県</option>
-                  <option>福島県</option><option>茨城県</option><option>栃木県</option>
-                  <option>群馬県</option><option>埼玉県</option><option>千葉県</option>
-                  <option>東京都</option><option>神奈川県</option><option>新潟県</option>
-                  <option>富山県</option><option>石川県</option><option>福井県</option>
-                  <option>山梨県</option><option>長野県</option><option>岐阜県</option>
-                  <option>静岡県</option><option>愛知県</option><option>三重県</option>
-                  <option>滋賀県</option><option>京都府</option><option>大阪府</option>
-                  <option>兵庫県</option><option>奈良県</option><option>和歌山県</option>
-                  <option>鳥取県</option><option>島根県</option><option>岡山県</option>
-                  <option>広島県</option><option>山口県</option><option>徳島県</option>
-                  <option>香川県</option><option>愛媛県</option><option>高知県</option>
-                  <option>福岡県</option><option>佐賀県</option><option>長崎県</option>
-                  <option>熊本県</option><option>大分県</option><option>宮崎県</option>
-                  <option>鹿児島県</option><option>沖縄県</option>
                 </select>
               </div>
               <div class="form-group full">
@@ -635,14 +157,14 @@
               <span class="key">お支払い合計</span>
               <span class="val" id="summary-total">—</span>
             </div>
-            <p class="order-summary-note">※ 表示は税込価格です。詳細は決済画面（Stripe）でもご確認いただけます。</p>
+            <p class="order-summary-note">※ 表示は税込価格です。詳細はお支払い画面でもご確認いただけます。</p>
             <div class="order-row">
               <span class="key">発送期間</span>
               <span class="val">2026年9月1日 〜 9月30日</span>
             </div>
             <div class="order-row">
               <span class="key">お支払い</span>
-              <span class="val" id="summary-payment">クレジットカード（Stripe）</span>
+              <span class="val" id="summary-payment">クレジットカード</span>
             </div>
           </div>
 
@@ -650,15 +172,15 @@
           <div class="caution reveal">
             ※ 日付指定は行えません（選果基準が厳しく、収穫タイミングが限定されます）。<br />
             ※ 在庫数に達し次第、受付を終了いたします。<br />
-            ※ 決済完了後、Stripeより確認メールが届きます。
+            ※ 決済完了後、確認メールが届きます。
           </div>
 
           <p id="sold-out-notice" class="field-error" style="display:none;text-align:center;margin-bottom:1rem;font-size:0.8rem;">
             現在、予約の受付を終了しております。
           </p>
 
-          <button type="submit" class="submit-btn reveal" id="submit-btn">
-            お支払いへ進む — Checkout
+          <button type="submit" class="submit-btn reveal" id="submit-btn" disabled>
+            お支払いへ進む
           </button>
         </form>
       </div>
@@ -670,32 +192,32 @@
         <p class="complete-text">
           ご予約ありがとうございます。<br />
           お支払いが完了しました。<br />
-          確認メールは Stripe よりお送りします。発送は2026年9月1日より順次行います。
+          確認メールをお送りします。発送は2026年9月1日より順次行います。
         </p>
         <p class="complete-order-id" id="complete-order-id"></p>
         <a href="index.html" class="back-link">← トップページへ戻る</a>
       </div>
     </div>
 
-    <footer>
-      <div class="footer-logo">YELLOW PEARL</div>
-      <div class="footer-org">郷のきみの会</div>
-      <div class="footer-sub">郷のきみ プレミアムライン ／ 青森県新郷村</div>
-      <div class="footer-legal-row">
-        <a href="privacy.html" class="footer-legal">プライバシーポリシー</a>
-        <span class="footer-legal-sep" aria-hidden="true">｜</span>
-        <a href="tokusho.html" class="footer-legal">特定商取引法に基づく表記</a>
-      </div>
-      <p class="footer-note">
-        本商品は当サイトでは年間1,000本限定のため、予定数に達し次第受付を終了いたします。
-      </p>
-      <p class="footer-copy">© 郷のきみの会 — Yellow Pearl, Shingo Village, Aomori</p>
-    </footer>
+    <footer id="site-footer"></footer>
+    <script type="module" src="/shared/site-footer.js"></script>
 
     <script type="module">
-      import { calcOrderAmount, MAX_ORDER_QTY } from '/shared/domain.js';
+      import { calcOrderAmount, KANA_PATTERN, MAX_LEN, MAX_ORDER_QTY, PREFECTURES, validateReserveFields } from '/shared/domain.js';
+      import { applyCartReceptionUI } from '/shared/reception-status.js';
 
       const WORKER_URL = window.location.origin;
+
+      function initPrefectureSelect() {
+        const sel = document.getElementById('prefecture');
+        for (const pref of PREFECTURES) {
+          const opt = document.createElement('option');
+          opt.value = pref;
+          opt.textContent = pref;
+          sel.appendChild(opt);
+        }
+      }
+      initPrefectureSelect();
 
       let qty = 1;
       const MAX_QTY = MAX_ORDER_QTY;
@@ -706,6 +228,7 @@
       let shippingMap = {};
       let shippingTaxRate = 10;
       let checkoutEnabled = true;
+      let submitting = false;
 
       function formatYen(n) {
         return `¥${Number(n).toLocaleString('ja-JP')}`;
@@ -750,52 +273,50 @@
         updatePricingSummary();
       }
 
-      function setSoldOut(closed) {
-        soldOut = closed;
-        const btn = document.getElementById('submit-btn');
-        const notice = document.getElementById('sold-out-notice');
-        btn.disabled = closed;
-        btn.textContent = closed ? '受付終了 — Closed' : 'お支払いへ進む — Checkout';
-        notice.style.display = closed ? 'block' : 'none';
-        document.getElementById('qty-minus').disabled = closed || qty <= 1;
-        document.getElementById('qty-plus').disabled = closed || qty >= maxStock;
+      function applyReceptionUI(data) {
+        const state = applyCartReceptionUI(data, {
+          submitBtn: document.getElementById('submit-btn'),
+          noticeEl: document.getElementById('sold-out-notice'),
+          qtyMinus: document.getElementById('qty-minus'),
+          qtyPlus: document.getElementById('qty-plus'),
+          qty,
+          maxStock,
+        });
+        soldOut = state.closed;
+        checkoutEnabled = state.key === 'open';
       }
 
       async function loadStock() {
         try {
           const res = await fetch(`${WORKER_URL}/api/stock`, { credentials: 'same-origin' });
           const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '在庫取得に失敗');
 
-          if (data.sold_out || data.stock <= 0) {
-            setSoldOut(true);
-            return;
-          }
-
-          setSoldOut(false);
           unitPrice = data.unit_price ?? 0;
           taxRate = data.tax_rate ?? 10;
           shippingTaxRate = data.shipping_tax_rate ?? 10;
           shippingMap = data.shipping ?? {};
-          checkoutEnabled = !!data.checkout_enabled;
-          if (!checkoutEnabled) {
-            setSoldOut(true);
-            document.getElementById('sold-out-notice').textContent =
-              '決済の準備中です。しばらくしてからお試しください。';
+
+          if (data.sold_out || data.stock <= 0 || !data.checkout_enabled) {
+            applyReceptionUI(data);
             return;
           }
-          document.getElementById('sold-out-notice').textContent =
-            '現在、予約の受付を終了しております。';
+
           maxStock = Math.min(MAX_QTY, data.stock);
           if (qty > maxStock) {
             qty = maxStock;
             document.getElementById('qty-display').textContent = qty;
           }
+          applyReceptionUI(data);
           changeQty(0);
         } catch (e) {
           console.warn('在庫APIに接続できませんでした:', e);
+          applyReceptionUI({ _error: true });
         }
       }
 
+      document.getElementById('qty-minus').addEventListener('click', () => changeQty(-1));
+      document.getElementById('qty-plus').addEventListener('click', () => changeQty(1));
       document.getElementById('prefecture').addEventListener('change', updatePricingSummary);
 
       function normalizePostal(raw) {
@@ -859,7 +380,22 @@
 
       loadStock();
 
-      const KANA_RE = /^[ァ-ヴー・]+$/;
+      function buildReservePayload() {
+        return {
+          last_name: document.getElementById('last-name').value.trim(),
+          first_name: document.getElementById('first-name').value.trim(),
+          last_name_kana: document.getElementById('last-name-kana').value.trim(),
+          first_name_kana: document.getElementById('first-name-kana').value.trim(),
+          email: document.getElementById('email').value.trim(),
+          phone: document.getElementById('phone').value.trim(),
+          postal: document.getElementById('postal').value.trim(),
+          prefecture: document.getElementById('prefecture').value,
+          address1: document.getElementById('address1').value.trim(),
+          address2: document.getElementById('address2').value.trim(),
+          note: document.getElementById('note').value.trim(),
+          quantity: qty,
+        };
+      }
 
       // バリデーション
       function validate() {
@@ -892,10 +428,54 @@
           }
         });
 
+        [
+          { id: 'last-name', max: MAX_LEN.name },
+          { id: 'first-name', max: MAX_LEN.name },
+          { id: 'last-name-kana', max: MAX_LEN.name },
+          { id: 'first-name-kana', max: MAX_LEN.name },
+          { id: 'email', max: MAX_LEN.email },
+          { id: 'phone', max: MAX_LEN.phone },
+          { id: 'postal', max: MAX_LEN.postal },
+          { id: 'address1', max: MAX_LEN.address },
+          { id: 'address2', max: MAX_LEN.address },
+          { id: 'note', max: MAX_LEN.note },
+        ].forEach(({ id, max }) => {
+          const el = document.getElementById(id);
+          if (!el || !el.value.trim()) return;
+          if (el.value.trim().length > max) {
+            el.classList.add('invalid');
+            const err = document.getElementById(`err-${id}`);
+            if (err) err.textContent = `${max}文字以内で入力してください`;
+            if (!firstInvalid) firstInvalid = el;
+            valid = false;
+          }
+        });
+
         const email = document.getElementById('email');
         if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
           email.classList.add('invalid');
+          const err = document.getElementById('err-email');
+          if (err) err.textContent = '形式が正しくありません';
           if (!firstInvalid) firstInvalid = email;
+          valid = false;
+        }
+
+        const postal = document.getElementById('postal');
+        if (postal.value.trim() && normalizePostal(postal.value).length !== 7) {
+          postal.classList.add('invalid');
+          const err = document.getElementById('err-postal');
+          if (err) err.textContent = '7桁の郵便番号を入力してください';
+          if (!firstInvalid) firstInvalid = postal;
+          valid = false;
+        }
+
+        const phone = document.getElementById('phone');
+        const phoneDigits = phone.value.replace(/\D/g, '');
+        if (phone.value.trim() && (phoneDigits.length < 10 || phoneDigits.length > 11)) {
+          phone.classList.add('invalid');
+          const err = document.getElementById('err-phone');
+          if (err) err.textContent = '10〜11桁で入力してください';
+          if (!firstInvalid) firstInvalid = phone;
           valid = false;
         }
 
@@ -906,7 +486,7 @@
           const el = document.getElementById(id);
           const err = document.getElementById(`err-${id}`);
           const val = el.value.trim();
-          if (val && !KANA_RE.test(val)) {
+          if (val && !KANA_PATTERN.test(val)) {
             el.classList.add('invalid');
             if (err) err.textContent = 'カタカナで入力してください';
             if (!firstInvalid) firstInvalid = el;
@@ -917,35 +497,30 @@
         if (firstInvalid) {
           firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
           firstInvalid.focus();
+          return false;
         }
 
-        return valid;
+        const serverCheck = validateReserveFields(buildReservePayload());
+        if (serverCheck.error) {
+          alert(serverCheck.error);
+          return false;
+        }
+
+        return true;
       }
 
       // フォーム送信
       document.getElementById('reserve-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (soldOut || !checkoutEnabled) return;
+        if (submitting || soldOut || !checkoutEnabled) return;
         if (!validate()) return;
 
         const btn = document.getElementById('submit-btn');
+        submitting = true;
         btn.disabled = true;
         btn.textContent = '送信中...';
 
-        const payload = {
-          last_name:        document.getElementById('last-name').value.trim(),
-          first_name:       document.getElementById('first-name').value.trim(),
-          last_name_kana:   document.getElementById('last-name-kana').value.trim(),
-          first_name_kana:  document.getElementById('first-name-kana').value.trim(),
-          email:            document.getElementById('email').value.trim(),
-          phone:       document.getElementById('phone').value.trim(),
-          postal:      document.getElementById('postal').value.trim(),
-          prefecture:  document.getElementById('prefecture').value,
-          address1:    document.getElementById('address1').value.trim(),
-          address2:    document.getElementById('address2').value.trim(),
-          note:        document.getElementById('note').value.trim(),
-          quantity:    qty,
-        };
+        const payload = buildReservePayload();
 
         try {
           const endpoint = '/api/reserve';
@@ -963,12 +538,14 @@
           }
 
           alert(data.error || '送信に失敗しました。もう一度お試しください。');
+          submitting = false;
           btn.disabled = false;
-          btn.textContent = 'お支払いへ進む — Checkout';
+          btn.textContent = 'お支払いへ進む';
         } catch {
           alert('通信エラーが発生しました。もう一度お試しください。');
+          submitting = false;
           btn.disabled = false;
-          btn.textContent = 'お支払いへ進む — Checkout';
+          btn.textContent = 'お支払いへ進む';
         }
       });
 
@@ -995,7 +572,17 @@
       }
 
       (function initReturnHandler() {
-        const sessionId = new URLSearchParams(window.location.search).get('session_id');
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('cancelled') === '1') {
+          const notice = document.getElementById('sold-out-notice');
+          if (notice) {
+            notice.style.display = 'block';
+            notice.textContent = 'お支払いは完了していません。必要であれば再度お申し込みください。';
+          }
+          params.delete('cancelled');
+          history.replaceState(null, '', `${window.location.pathname}${params.toString() ? `?${params}` : ''}`);
+        }
+        const sessionId = params.get('session_id');
         if (sessionId) handleCheckoutReturn(sessionId);
       })();
 

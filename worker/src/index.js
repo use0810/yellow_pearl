@@ -39,18 +39,22 @@ async function handleApi(request, env) {
   }
 
   const ip = clientIp(request);
-  const isStripeWebhook = !!request.headers.get('Stripe-Signature');
 
-  if (!isStripeWebhook) {
-    if (url.pathname === '/api/reserve' && request.method === 'POST') {
-      if (await isRateLimited(env, 'reserve', ip, 10, 1)) {
-        return json({ error: 'リクエストが多すぎます。しばらくしてからお試しください。' }, 429, CORS);
-      }
+  if (url.pathname === '/api/reserve' && request.method === 'POST' && request.headers.get('Stripe-Signature')) {
+    if (await isRateLimited(env, 'webhook', ip, 120, 1)) {
+      return new Response('Too many requests', { status: 429 });
     }
-    if (url.pathname === '/api/stock' && request.method === 'GET' && !url.searchParams.get('session_id')) {
-      if (await isRateLimited(env, 'stock', ip, 60, 1)) {
-        return json({ error: 'リクエストが多すぎます' }, 429, CORS);
-      }
+    return handleStripeWebhook(request, env);
+  }
+
+  if (url.pathname === '/api/reserve' && request.method === 'POST') {
+    if (await isRateLimited(env, 'reserve', ip, 10, 1)) {
+      return json({ error: 'リクエストが多すぎます。しばらくしてからお試しください。' }, 429, CORS);
+    }
+  }
+  if (url.pathname === '/api/stock' && request.method === 'GET' && !url.searchParams.get('session_id')) {
+    if (await isRateLimited(env, 'stock', ip, 60, 1)) {
+      return json({ error: 'リクエストが多すぎます' }, 429, CORS);
     }
   }
 
@@ -61,9 +65,6 @@ async function handleApi(request, env) {
   }
 
   if (url.pathname === '/api/reserve' && request.method === 'POST') {
-    if (request.headers.get('Stripe-Signature')) {
-      return handleStripeWebhook(request, env);
-    }
     if (isStripeEnabled(env)) return handleCheckout(request, env, CORS);
     return json({ error: '決済は現在利用できません' }, 503, CORS);
   }
@@ -75,6 +76,11 @@ async function handleApi(request, env) {
 
     const auth = await verifyAdminAuth(request, env);
     if (auth.error) return json({ error: auth.error }, auth.status, CORS);
+
+    const adminRateKey = auth.email ? `${ip}:${auth.email}` : ip;
+    if (await isRateLimited(env, 'admin', adminRateKey, 120, 1)) {
+      return json({ error: 'リクエストが多すぎます' }, 429, CORS);
+    }
 
     if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
       return handleAdminDashboard(env, CORS);
@@ -113,7 +119,7 @@ async function handleApi(request, env) {
       return handleAdminOrderUpdate(request, env, CORS, orderMatch[1]);
     }
     if (orderMatch && request.method === 'DELETE') {
-      return handleAdminOrderDelete(env, CORS, orderMatch[1]);
+      return handleAdminOrderDelete(env, CORS, orderMatch[1], auth.email ?? '');
     }
   }
 

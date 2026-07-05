@@ -1,20 +1,24 @@
 import {
-  MAX_LEN,
-  MAX_ORDER_QTY,
+  ORDER_STATUS_CANCELLED,
+  ORDER_STATUS_RESERVED,
+  PAYMENT_CANCELLED,
   PAYMENT_FAILED,
   PAYMENT_PAID,
+  PAYMENT_REFUNDED,
   PAYMENT_UNPAID,
-  PREFECTURES,
+  validateReserveFields,
 } from '../../../shared/domain.js';
 import { json, generateOrderId } from './http.js';
 import {
   decrementStock,
   incrementStock,
+  insertReservedOrder,
   loadPricing,
   markOrderFailedAndReleaseStock,
 } from './inventory.js';
 import {
   createStripeCheckoutSession,
+  expireStripeCheckoutSession,
   isStripeEnabled,
   isStripeSessionPaid,
   stripeFetch,
@@ -23,80 +27,66 @@ import {
   verifyStripeWebhook,
 } from './stripe.js';
 
-function parseReserveBody(body) {
-  if (!body) return { error: 'Invalid JSON' };
-
-  const { last_name, first_name, email, phone, postal, prefecture, address1, quantity = 1 } = body;
-  const lastNameKana = body.last_name_kana || '';
-  const firstNameKana = body.first_name_kana || '';
-
-  if (!last_name || !first_name || !email || !phone || !postal || !prefecture || !address1) {
-    return { error: '必須項目が不足しています' };
-  }
-  if (!PREFECTURES.includes(prefecture)) {
-    return { error: '都道府県が不正です' };
-  }
-  if (
-    last_name.length > MAX_LEN.name || first_name.length > MAX_LEN.name ||
-    lastNameKana.length > MAX_LEN.name || firstNameKana.length > MAX_LEN.name ||
-    email.length > MAX_LEN.email || phone.length > MAX_LEN.phone ||
-    postal.length > MAX_LEN.postal || address1.length > MAX_LEN.address ||
-    (body.address2 || '').length > MAX_LEN.address ||
-    (body.note || '').length > MAX_LEN.note
-  ) {
-    return { error: '入力が長すぎます' };
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: 'メールアドレスの形式が正しくありません' };
-  }
-
-  const qty = parseInt(quantity, 10);
-  if (isNaN(qty) || qty < 1 || qty > MAX_ORDER_QTY) {
-    return { error: '数量が不正です' };
-  }
-
-  return {
-    data: {
-      last_name,
-      first_name,
-      email,
-      phone,
-      postal,
-      prefecture,
-      address1,
-      address2: body.address2 || '',
-      note: body.note || '',
-      last_name_kana: lastNameKana,
-      first_name_kana: firstNameKana,
-      qty,
-    },
-  };
-}
-
 /** 決済確定: 在庫は Checkout 開始時に確保済み。payment_status のみ更新 */
 export async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId = null } = {}) {
   const order = await env.DB.prepare(
-    `SELECT order_id, payment_status, status FROM orders WHERE order_id = ?`
+    `SELECT order_id, payment_status, status, quantity FROM orders
+     WHERE order_id = ? AND archived_at IS NULL`
   ).bind(orderId).first();
 
   if (!order) return { error: '予約が見つかりません', status: 404 };
   if (order.payment_status === PAYMENT_PAID) {
     return { ok: true, order_id: orderId, already: true };
   }
-  if (order.status === 'キャンセル') {
+  if (order.payment_status === PAYMENT_REFUNDED) {
+    return { ok: true, order_id: orderId, skipped: true };
+  }
+  if (order.payment_status === PAYMENT_CANCELLED) {
+    return { ok: true, order_id: orderId, skipped: true };
+  }
+  if (order.status === ORDER_STATUS_CANCELLED && order.payment_status === PAYMENT_UNPAID) {
     return { error: 'キャンセル済みの予約です', status: 409 };
+  }
+  if (order.status === ORDER_STATUS_CANCELLED && order.payment_status !== PAYMENT_FAILED) {
+    return { ok: true, order_id: orderId, skipped: true };
+  }
+
+  const recoveringFromFailed = order.payment_status === PAYMENT_FAILED;
+
+  if (recoveringFromFailed) {
+    if (!(await decrementStock(env.DB, order.quantity))) {
+      return { error: '在庫が不足しています（決済は完了）', status: 503 };
+    }
   }
 
   const updateResult = await env.DB.prepare(
     `UPDATE orders SET
       payment_status = ?,
+      status = CASE WHEN status = ? THEN ? ELSE status END,
       stripe_session_id = COALESCE(?, stripe_session_id),
       stripe_payment_id = COALESCE(?, stripe_payment_id)
-     WHERE order_id = ? AND payment_status = ?`
-  ).bind(PAYMENT_PAID, sessionId, paymentId, orderId, PAYMENT_UNPAID).run();
+     WHERE order_id = ?
+       AND payment_status IN (?, ?)
+       AND archived_at IS NULL
+       AND (status != ? OR payment_status = ?)`
+  ).bind(
+    PAYMENT_PAID,
+    ORDER_STATUS_CANCELLED,
+    ORDER_STATUS_RESERVED,
+    sessionId,
+    paymentId,
+    orderId,
+    PAYMENT_UNPAID,
+    PAYMENT_FAILED,
+    ORDER_STATUS_CANCELLED,
+    PAYMENT_FAILED,
+  ).run();
 
   const changes = updateResult.meta?.changes ?? 0;
   if (changes === 0) {
+    if (recoveringFromFailed) {
+      await incrementStock(env.DB, order.quantity);
+    }
     const current = await env.DB.prepare(
       `SELECT payment_status FROM orders WHERE order_id = ?`
     ).bind(orderId).first();
@@ -115,7 +105,7 @@ export async function handleCheckout(request, env, CORS) {
   }
 
   const body = await request.json().catch(() => null);
-  const parsed = parseReserveBody(body);
+  const parsed = validateReserveFields(body);
   if (parsed.error) return json({ error: parsed.error }, 400, CORS);
 
   const {
@@ -134,33 +124,17 @@ export async function handleCheckout(request, env, CORS) {
     return json({ error: '商品単価が設定されていません。管理画面で価格を設定してください。' }, 503, CORS);
   }
 
-  if (!(await decrementStock(env.DB, qty))) {
-    return json({ error: '在庫が不足しています' }, 409, CORS);
-  }
-
   const order_id = generateOrderId();
   const origin = new URL(request.url).origin;
 
-  try {
-    await env.DB.prepare(
-      `INSERT INTO orders (
-        order_id, last_name, first_name, last_name_kana, first_name_kana,
-        email, phone, postal, prefecture, address1, address2, note,
-        quantity, unit_price, shipping_fee, shipping_tax_rate, shipping_tax_amount,
-        tax_amount, total_amount,
-        payment_status, stripe_session_id, status, admin_note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, '予約', '')`
-    ).bind(
-      order_id,
-      last_name, first_name, last_name_kana, first_name_kana,
-      email, phone, postal, prefecture, address1, address2, note,
-      qty, unitPrice, shippingFeeIncl, shippingTaxRate, shippingTaxAmount,
-      taxAmount, totalAmount,
-      PAYMENT_UNPAID,
-    ).run();
-  } catch {
-    await incrementStock(env.DB, qty);
-    return json({ error: '予約の保存に失敗しました' }, 500, CORS);
+  if (!(await insertReservedOrder(env.DB, {
+    order_id,
+    last_name, first_name, last_name_kana, first_name_kana,
+    email, phone, postal, prefecture, address1, address2, note,
+    qty, unitPrice, shippingFeeIncl, shippingTaxRate, shippingTaxAmount,
+    taxAmount, totalAmount,
+  }))) {
+    return json({ error: '在庫が不足しています' }, 409, CORS);
   }
 
   let session;
@@ -179,20 +153,27 @@ export async function handleCheckout(request, env, CORS) {
       shippingTaxAmount,
     });
   } catch {
-    await env.DB.prepare('DELETE FROM orders WHERE order_id = ?').bind(order_id).run();
-    await incrementStock(env.DB, qty);
+    await markOrderFailedAndReleaseStock(env.DB, order_id);
     return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
   }
 
   if (!session?.url || !session?.id) {
-    await env.DB.prepare('DELETE FROM orders WHERE order_id = ?').bind(order_id).run();
-    await incrementStock(env.DB, qty);
+    await markOrderFailedAndReleaseStock(env.DB, order_id);
     return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
   }
 
-  await env.DB.prepare(
-    `UPDATE orders SET stripe_session_id = ? WHERE order_id = ?`
-  ).bind(session.id, order_id).run();
+  try {
+    const linkResult = await env.DB.prepare(
+      `UPDATE orders SET stripe_session_id = ? WHERE order_id = ? AND archived_at IS NULL`
+    ).bind(session.id, order_id).run();
+    if ((linkResult.meta?.changes ?? 0) === 0) {
+      throw new Error('session link failed');
+    }
+  } catch {
+    await expireStripeCheckoutSession(env, session.id);
+    await markOrderFailedAndReleaseStock(env.DB, order_id);
+    return json({ error: '予約の更新に失敗しました' }, 500, CORS);
+  }
 
   return json({
     order_id,
@@ -280,14 +261,21 @@ export async function handleStripeWebhook(request, env) {
     && session
   ) {
     const result = await processPaidCheckoutSession(env, session);
-    if (result.error) {
-      const retry = result.status === 404 || result.status >= 500;
+    if (result.error && !result.already) {
+      const retry = result.status !== 400;
       if (retry) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
         });
       }
+    }
+  }
+
+  if (type === 'checkout.session.async_payment_failed' && session) {
+    const orderId = stripeOrderId(session);
+    if (orderId) {
+      await markOrderFailedAndReleaseStock(env.DB, orderId);
     }
   }
 

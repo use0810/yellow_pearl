@@ -33,11 +33,6 @@
         <p class="hero-subtitle-jp">イエローパール</p>
         <div class="hero-divider"></div>
       </div>
-
-      <!-- <div class="scroll-hint">
-        <span>SCROLL</span>
-        <div class="scroll-line"></div>
-      </div> -->
     </section>
 
     <!-- STORY -->
@@ -208,66 +203,23 @@
           <div class="sep-diamond"></div>
           <div class="sep-line right"></div>
         </div>
-        <!-- 
-          <a class="cta-btn reveal" href="#">今すぐ予約する</a> -->
       </div>
     </div>
 
-    <!-- FOOTER -->
-    <footer>
-      <div class="footer-logo">YELLOW PEARL</div>
-      <div class="footer-org">郷のきみの会</div>
-      <div class="footer-sub">郷のきみ プレミアムライン ／ 青森県新郷村</div>
-      <div class="footer-legal-row">
-        <a href="privacy.html" class="footer-legal">プライバシーポリシー</a>
-        <span class="footer-legal-sep" aria-hidden="true">｜</span>
-        <a href="tokusho.html" class="footer-legal">特定商取引法に基づく表記</a>
-      </div>
-      <p class="footer-note">
-        本商品は当サイトでは年間1,000本限定のため、予定数に達し次第受付を終了いたします。
-      </p>
-      <p class="footer-copy">© 郷のきみの会 — Yellow Pearl, Shingo Village, Aomori</p>
-    </footer>
+    <footer id="site-footer"></footer>
+    <script type="module" src="/shared/site-footer.js"></script>
 
-    <script>
-      // ── 在庫取得・ボタン制御 ──
-      const WORKER_URL = window.location.origin;
+    <script type="module">
+      import { loadLandingStock } from '/shared/stock-ui.js';
 
-      async function loadStock() {
-        try {
-          const res = await fetch(`${WORKER_URL}/api/stock`, { credentials: 'same-origin' });
-          const data = await res.json();
-
-          const display = document.getElementById('stock-display');
-          const remaining = document.getElementById('stock-remaining');
-          const btns = [
-            document.getElementById('reserve-btn'),
-            document.getElementById('reserve-btn-2'),
-          ];
-
-          if (data.sold_out || data.stock <= 0) {
-            display.textContent = '受付終了';
-            display.style.color = 'rgba(232,217,176,0.4)';
-            remaining.style.display = 'none';
-            btns.forEach((btn) => {
-              if (!btn) return;
-              btn.textContent = '受付終了';
-              btn.style.pointerEvents = 'none';
-              btn.style.opacity = '0.4';
-              btn.removeAttribute('href');
-            });
-          } else {
-            display.textContent = `残り ${Number(data.stock ?? 0).toLocaleString()} 本`;
-            display.style.color = '';
-            remaining.style.display = 'block';
-          }
-        } catch (e) {
-          // Worker未設定時はデフォルト表示のまま
-          console.warn('在庫APIに接続できませんでした:', e);
-        }
-      }
-
-      loadStock();
+      loadLandingStock(window.location.origin, {
+        displayEl: document.getElementById('stock-display'),
+        remainingEl: document.getElementById('stock-remaining'),
+        buttons: [
+          document.getElementById('reserve-btn'),
+          document.getElementById('reserve-btn-2'),
+        ],
+      });
 
       // Particle system
       const container = document.getElementById("particles");

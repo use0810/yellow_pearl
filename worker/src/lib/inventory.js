@@ -1,5 +1,8 @@
 import {
+  ORDER_STATUS_CANCELLED,
+  ORDER_STATUS_RESERVED,
   PAYMENT_FAILED,
+  PAYMENT_PAID,
   PAYMENT_UNPAID,
   PRODUCT_ID,
   PREFECTURES,
@@ -12,6 +15,54 @@ import { ensureRateLimitTable } from './rate-limit.js';
 const STALE_STRIPE_ORDER_HOURS = 48;
 
 const INVENTORY_SELECT = `stock, sold_out, unit_price, tax_rate, shipping_tax_rate`;
+
+const ORDER_INSERT_COLUMNS = `order_id, last_name, first_name, last_name_kana, first_name_kana,
+  email, phone, postal, prefecture, address1, address2, note,
+  quantity, unit_price, shipping_fee, shipping_tax_rate, shipping_tax_amount,
+  tax_amount, total_amount,
+  payment_status, stripe_session_id, status, admin_note`;
+
+/** 在庫確保と INSERT を D1 batch（単一トランザクション）で実行 */
+export async function insertReservedOrder(db, order) {
+  const {
+    order_id, last_name, first_name, last_name_kana, first_name_kana,
+    email, phone, postal, prefecture, address1, address2, note,
+    qty, unitPrice, shippingFeeIncl, shippingTaxRate, shippingTaxAmount,
+    taxAmount, totalAmount,
+  } = order;
+
+  const insertStmt = db.prepare(
+    `INSERT INTO orders (${ORDER_INSERT_COLUMNS})
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?
+     FROM inventory
+     WHERE product_id = ? AND sold_out = 0 AND stock >= ?`
+  ).bind(
+    order_id,
+    last_name, first_name, last_name_kana, first_name_kana,
+    email, phone, postal, prefecture, address1, address2, note,
+    qty, unitPrice, shippingFeeIncl, shippingTaxRate, shippingTaxAmount,
+    taxAmount, totalAmount,
+    PAYMENT_UNPAID,
+    ORDER_STATUS_RESERVED,
+    '',
+    PRODUCT_ID,
+    qty,
+  );
+
+  const decrementStmt = db.prepare(
+    `UPDATE inventory SET
+      stock = stock - ?,
+      sold_out = CASE WHEN stock - ? <= 0 THEN 1 ELSE 0 END
+     WHERE product_id = ?
+       AND sold_out = 0
+       AND stock >= ?`
+  ).bind(qty, qty, PRODUCT_ID, qty);
+
+  const results = await db.batch([insertStmt, decrementStmt]);
+  const inserted = (results[0].meta?.changes ?? 0) > 0;
+  const decremented = (results[1].meta?.changes ?? 0) > 0;
+  return inserted && decremented;
+}
 
 export async function fetchInventoryRow(db) {
   return db.prepare(
@@ -43,13 +94,13 @@ export async function incrementStock(db, qty) {
 /** 未決済 → 失敗 にし、Checkout 時確保した在庫を戻す */
 export async function markOrderFailedAndReleaseStock(db, orderId) {
   const order = await db.prepare(
-    'SELECT quantity, payment_status FROM orders WHERE order_id = ?'
+    'SELECT quantity, payment_status FROM orders WHERE order_id = ? AND archived_at IS NULL'
   ).bind(orderId).first();
   if (!order || order.payment_status !== PAYMENT_UNPAID) return false;
 
   const result = await db.prepare(
-    `UPDATE orders SET payment_status = ? WHERE order_id = ? AND payment_status = ?`
-  ).bind(PAYMENT_FAILED, orderId, PAYMENT_UNPAID).run();
+    `UPDATE orders SET payment_status = ?, status = ? WHERE order_id = ? AND payment_status = ? AND archived_at IS NULL`
+  ).bind(PAYMENT_FAILED, ORDER_STATUS_CANCELLED, orderId, PAYMENT_UNPAID).run();
 
   if ((result.meta?.changes ?? 0) > 0) {
     await incrementStock(db, order.quantity);
@@ -58,46 +109,53 @@ export async function markOrderFailedAndReleaseStock(db, orderId) {
   return false;
 }
 
+/** Checkout 失敗時: markOrderFailedAndReleaseStock を checkout.js から直接呼ぶ */
+
 export async function cleanupStaleOrders(env) {
   await ensureRateLimitTable(env.DB);
   await env.DB.prepare(
     `DELETE FROM rate_limits WHERE expires_at < ?`
   ).bind(nowIso()).run();
 
-  let deleted = 0;
+  let cleaned = 0;
 
   // Stripe セッション未紐付けの孤立注文（INSERT 後に UPDATE 失敗等）
-  const orphanFilter = `payment_status = '${PAYMENT_UNPAID}'
+  const orphanFilter = `archived_at IS NULL
+       AND payment_status = '${PAYMENT_UNPAID}'
        AND stripe_session_id IS NULL
-       AND status = '予約'
+       AND status = '${ORDER_STATUS_RESERVED}'
        AND created_at < datetime('now', '+9 hours', '-1 hours')`;
   const orphanRows = await env.DB.prepare(
-    `SELECT order_id, quantity FROM orders WHERE ${orphanFilter}`
+    `SELECT order_id FROM orders WHERE ${orphanFilter}`
   ).all();
   for (const row of orphanRows.results ?? []) {
-    await incrementStock(env.DB, row.quantity);
+    if (await markOrderFailedAndReleaseStock(env.DB, row.order_id)) {
+      cleaned += 1;
+    }
   }
-  deleted += (await env.DB.prepare(`DELETE FROM orders WHERE ${orphanFilter}`).run()).meta?.changes ?? 0;
 
-  const staleFilter = `payment_status IN ('${PAYMENT_UNPAID}', '${PAYMENT_FAILED}')
-       AND status = '予約'
+  const staleFilter = `archived_at IS NULL
+       AND payment_status IN ('${PAYMENT_UNPAID}', '${PAYMENT_FAILED}')
+       AND status = '${ORDER_STATUS_RESERVED}'
        AND created_at < datetime('now', '+9 hours', ?)`;
 
   const staleRows = await env.DB.prepare(
-    `SELECT order_id, quantity, payment_status FROM orders WHERE ${staleFilter}`
+    `SELECT order_id, payment_status FROM orders WHERE ${staleFilter}`
   ).bind(`-${STALE_STRIPE_ORDER_HOURS} hours`).all();
 
   for (const row of staleRows.results ?? []) {
     if (row.payment_status === PAYMENT_UNPAID) {
-      await incrementStock(env.DB, row.quantity);
+      if (await markOrderFailedAndReleaseStock(env.DB, row.order_id)) {
+        cleaned += 1;
+      }
+    } else {
+      cleaned += (await env.DB.prepare(
+        `UPDATE orders SET status = ? WHERE order_id = ? AND status = ?`
+      ).bind(ORDER_STATUS_CANCELLED, row.order_id, ORDER_STATUS_RESERVED).run()).meta?.changes ?? 0;
     }
   }
 
-  deleted += (await env.DB.prepare(
-    `DELETE FROM orders WHERE ${staleFilter}`
-  ).bind(`-${STALE_STRIPE_ORDER_HOURS} hours`).run()).meta?.changes ?? 0;
-
-  return deleted;
+  return cleaned;
 }
 
 export async function getShippingMap(db) {

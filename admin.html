@@ -13,7 +13,7 @@
       <p class="auth-error-help">
         メールアドレスによるワンタイム認証（PIN）が必要です。<br>
         下の「ログイン画面を開く」を押すと Cloudflare の画面が表示されます。<br>
-        <strong>shingo.satokimi2021@gmail.com</strong> を入力し、届いた6桁のコードでログインしてください。
+        <strong id="auth-login-email">登録済みのメールアドレス</strong> を入力し、届いた6桁のコードでログインしてください。
       </p>
       <p class="msg-error" id="auth-error-msg"></p>
       <button type="button" class="btn btn-primary" id="auth-reload-btn">ログイン画面を開く</button>
@@ -116,6 +116,10 @@
               <div class="card-title" id="orders-list-title">予約一覧</div>
               <button type="button" class="btn" id="toggle-orders-filter-btn">キャンセル一覧</button>
             </div>
+            <p class="card-note">
+              <strong>決済</strong>（未決済／決済済など）は Stripe 連携で自動更新されます。
+              <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。
+            </p>
             <div class="table-wrap">
               <table class="data-table">
                 <thead>
@@ -126,7 +130,7 @@
                     <th>住所</th>
                     <th>数量</th>
                     <th class="num">合計</th>
-                    <th>決済</th>
+                    <th>状態</th>
                     <th>日時</th>
                     <th>操作</th>
                   </tr>

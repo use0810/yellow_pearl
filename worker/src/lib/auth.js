@@ -10,8 +10,12 @@ function parseAdminAllowedEmails(env) {
   return raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 }
 
+export function getAdminLoginEmails(env) {
+  return parseAdminAllowedEmails(env) ?? [];
+}
+
 function isAdminEmailAllowed(email, allowed) {
-  if (!allowed?.length) return true;
+  if (!allowed?.length) return false;
   if (!email || typeof email !== 'string') return false;
   return allowed.includes(email.trim().toLowerCase());
 }
@@ -42,8 +46,8 @@ function parseJwtPart(part) {
 
 let accessCertsCache = { keys: null, fetchedAt: 0 };
 
-async function getAccessCerts(teamDomain) {
-  if (accessCertsCache.keys && Date.now() - accessCertsCache.fetchedAt < ACCESS_CERTS_TTL_MS) {
+async function getAccessCerts(teamDomain, bust = false) {
+  if (!bust && accessCertsCache.keys && Date.now() - accessCertsCache.fetchedAt < ACCESS_CERTS_TTL_MS) {
     return accessCertsCache.keys;
   }
   const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
@@ -58,25 +62,30 @@ async function verifyAccessJwtSignature(token, teamDomain) {
   if (parts.length !== 3) return false;
 
   const header = parseJwtPart(parts[0]);
-  const keys = await getAccessCerts(teamDomain);
-  const jwk = keys.find((k) => k.kid === header.kid);
-  if (!jwk) return false;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const keys = await getAccessCerts(teamDomain, attempt > 0);
+    const jwk = keys.find((k) => k.kid === header.kid);
+    if (!jwk) continue;
 
-  const key = await crypto.subtle.importKey(
-    'jwk',
-    jwk,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  );
+    const key = await crypto.subtle.importKey(
+      'jwk',
+      jwk,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
 
-  const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
-  return crypto.subtle.verify(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    base64UrlToBytes(parts[2]),
-    data,
-  );
+    const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+    if (await crypto.subtle.verify(
+      'RSASSA-PKCS1-v1_5',
+      key,
+      base64UrlToBytes(parts[2]),
+      data,
+    )) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function verifyAccessJwt(request, env) {
@@ -87,10 +96,10 @@ async function verifyAccessJwt(request, env) {
   try {
     const payload = parseJwtPart(jwt.split('.')[1]);
     if (payload.exp && payload.exp * 1000 < Date.now()) return null;
-    if (env.ACCESS_AUD && payload.aud) {
-      const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-      if (!aud.includes(env.ACCESS_AUD)) return null;
-    }
+    const requiredAud = env.ACCESS_AUD?.trim();
+    if (!requiredAud) return null;
+    const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!aud.includes(requiredAud)) return null;
     if (!(await verifyAccessJwtSignature(jwt, teamDomain))) return null;
 
     const email = typeof payload.email === 'string' ? payload.email : null;
@@ -114,7 +123,11 @@ export async function verifyAdminAuth(request, env) {
 export async function handleAdminSessionCheck(request, env, CORS) {
   const auth = await verifyAdminAuth(request, env);
   if (auth.error) {
-    return json({ authenticated: false, error: auth.error }, auth.status, CORS);
+    return json({
+      authenticated: false,
+      error: auth.error,
+      login_emails: getAdminLoginEmails(env),
+    }, auth.status, CORS);
   }
   return json({
     authenticated: true,

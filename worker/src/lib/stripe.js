@@ -146,3 +146,57 @@ export function stripePaymentIntentId(session) {
     ? session.payment_intent
     : session.payment_intent?.id ?? null;
 }
+
+export async function resolvePaymentIntentId(env, { paymentIntentId, sessionId } = {}) {
+  if (paymentIntentId) return paymentIntentId;
+  if (!sessionId || !isStripeEnabled(env)) return null;
+  try {
+    const session = await stripeFetch(
+      env,
+      `/checkout/sessions/${encodeURIComponent(sessionId)}`,
+      { method: 'GET' },
+    );
+    return stripePaymentIntentId(session);
+  } catch {
+    return null;
+  }
+}
+
+/** 決済済み注文の全額返金（管理画面キャンセル時） */
+export async function refundStripePayment(env, { paymentIntentId, sessionId } = {}) {
+  const pi = await resolvePaymentIntentId(env, { paymentIntentId, sessionId });
+  if (!pi) {
+    return { error: '返金対象の決済IDがありません', status: 400 };
+  }
+  if (!isStripeEnabled(env)) {
+    return { error: 'Stripe が設定されていません', status: 503 };
+  }
+  try {
+    const refund = await stripeFetch(env, '/refunds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ payment_intent: pi }).toString(),
+    });
+    return { ok: true, refund_id: refund.id, payment_intent_id: pi };
+  } catch (e) {
+    return { error: e.message || '返金に失敗しました', status: 502 };
+  }
+}
+
+/** 未決済 Checkout セッションを失効（キャンセル時など） */
+export async function expireStripeCheckoutSession(env, sessionId, { strict = false } = {}) {
+  if (!sessionId || !isStripeEnabled(env)) {
+    return strict ? { ok: false, error: 'Checkout セッションがありません' } : { ok: true, skipped: true };
+  }
+  try {
+    await stripeFetch(env, `/checkout/sessions/${encodeURIComponent(sessionId)}/expire`, {
+      method: 'POST',
+    });
+    return { ok: true };
+  } catch (e) {
+    if (strict) {
+      return { ok: false, error: e.message || 'Checkout セッションの失効に失敗しました' };
+    }
+    return { ok: true, ignored: true };
+  }
+}

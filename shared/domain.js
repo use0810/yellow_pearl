@@ -2,17 +2,44 @@
 
 export const PRODUCT_ID = 'yellow-pearl';
 export const PRODUCT_NAME = 'Yellow Pearl（イエローパール）';
-export const ORDER_STATUSES = ['予約', '済み', 'キャンセル'];
+
+export const ORDER_STATUS_RESERVED = '予約';
+export const ORDER_STATUS_DONE = '済み';
+export const ORDER_STATUS_CANCELLED = 'キャンセル';
+export const ORDER_STATUSES = [ORDER_STATUS_RESERVED, ORDER_STATUS_DONE, ORDER_STATUS_CANCELLED];
+
+export const FULFILLMENT_LABELS = {
+  [ORDER_STATUS_RESERVED]: '未発送',
+  [ORDER_STATUS_DONE]: '発送済',
+  [ORDER_STATUS_CANCELLED]: 'キャンセル',
+};
 
 export const PAYMENT_UNPAID = '未決済';
 export const PAYMENT_PAID = '決済済';
 export const PAYMENT_FAILED = '失敗';
+export const PAYMENT_CANCELLED = '取消';
+export const PAYMENT_REFUNDED = '返金済';
 
 export const MAX_ORDER_QTY = 5;
 
-export const BOOKKEEPING_ORDER_FILTER =
-  `status != 'キャンセル' AND payment_status = '${PAYMENT_PAID}'`;
+/** フリガナ（カタカナ） */
+export const KANA_PATTERN = /^[ァ-ヴー・]+$/;
 
+export const BOOKKEEPING_ORDER_FILTER =
+  `archived_at IS NULL AND status != '${ORDER_STATUS_CANCELLED}' AND payment_status = '${PAYMENT_PAID}'`;
+
+/** 一覧・集計から除外するアーカイブ済み行 */
+export const ORDER_NOT_ARCHIVED = 'archived_at IS NULL';
+
+/**
+ * デプロイ前 D1 実行: worker/migrate-payment-cancelled.sql
+ * 旧管理者キャンセル（失敗）→ 取消 への矯正
+ */
+export const LEGACY_ADMIN_CANCEL_SQL = `UPDATE orders
+SET payment_status = '${PAYMENT_CANCELLED}'
+WHERE status = '${ORDER_STATUS_CANCELLED}'
+  AND payment_status = '${PAYMENT_FAILED}'
+  AND stripe_session_id IS NOT NULL`;
 export const MAX_LEN = {
   name: 50,
   email: 100,
@@ -50,6 +77,104 @@ export function orderHoldsStock(paymentStatus) {
   return paymentStatus === PAYMENT_UNPAID || paymentStatus === PAYMENT_PAID;
 }
 
+/** 予約フォーム入力のサーバー／クライアント共通検証 */
+export function validateReserveFields(body) {
+  if (!body || typeof body !== 'object') return { error: 'Invalid JSON' };
+
+  const { last_name, first_name, email, phone, postal, prefecture, address1, quantity = 1 } = body;
+  const lastNameKana = body.last_name_kana || '';
+  const firstNameKana = body.first_name_kana || '';
+
+  if (!last_name || !first_name || !email || !phone || !postal || !prefecture || !address1) {
+    return { error: '必須項目が不足しています' };
+  }
+  if (!lastNameKana || !firstNameKana) {
+    return { error: 'フリガナは必須です' };
+  }
+  if (!KANA_PATTERN.test(lastNameKana) || !KANA_PATTERN.test(firstNameKana)) {
+    return { error: 'フリガナはカタカナで入力してください' };
+  }
+  if (!PREFECTURES.includes(prefecture)) {
+    return { error: '都道府県が不正です' };
+  }
+  if (
+    last_name.length > MAX_LEN.name || first_name.length > MAX_LEN.name ||
+    lastNameKana.length > MAX_LEN.name || firstNameKana.length > MAX_LEN.name ||
+    email.length > MAX_LEN.email || phone.length > MAX_LEN.phone ||
+    postal.length > MAX_LEN.postal || address1.length > MAX_LEN.address ||
+    (body.address2 || '').length > MAX_LEN.address ||
+    (body.note || '').length > MAX_LEN.note
+  ) {
+    return { error: '入力が長すぎます' };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'メールアドレスの形式が正しくありません' };
+  }
+  const postalDigits = String(postal).replace(/\D/g, '');
+  if (postalDigits.length !== 7) {
+    return { error: '郵便番号が正しくありません' };
+  }
+  const phoneDigits = String(phone).replace(/\D/g, '');
+  if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+    return { error: '電話番号が正しくありません' };
+  }
+
+  const qty = parseInt(quantity, 10);
+  if (isNaN(qty) || qty < 1 || qty > MAX_ORDER_QTY) {
+    return { error: '数量が不正です' };
+  }
+
+  return {
+    data: {
+      last_name,
+      first_name,
+      email,
+      phone,
+      postal,
+      prefecture,
+      address1,
+      address2: body.address2 || '',
+      note: body.note || '',
+      last_name_kana: lastNameKana,
+      first_name_kana: firstNameKana,
+      qty,
+    },
+  };
+}
+
+/** 管理画面: 決済×予約ステータスの要約ラベル */
+export function summarizeOrderState(order) {
+  const status = order?.status || ORDER_STATUS_RESERVED;
+  const pay = order?.payment_status || PAYMENT_UNPAID;
+
+  if (status === ORDER_STATUS_CANCELLED) {
+    if (pay === PAYMENT_REFUNDED) return { text: 'キャンセル（返金済）', className: 'summary-refunded' };
+    if (pay === PAYMENT_PAID) return { text: 'キャンセル（入金済・要確認）', className: 'summary-cancelled' };
+    if (pay === PAYMENT_CANCELLED) return { text: 'キャンセル（管理者）', className: 'summary-cancelled' };
+    if (pay === PAYMENT_FAILED) return { text: 'キャンセル（未入金）', className: 'summary-cancelled' };
+    return { text: 'キャンセル', className: 'summary-cancelled' };
+  }
+  if (pay === PAYMENT_PAID && status === ORDER_STATUS_RESERVED) {
+    return { text: '入金済・未発送', className: 'summary-paid-ready' };
+  }
+  if (pay === PAYMENT_PAID && status === ORDER_STATUS_DONE) {
+    return { text: '入金済・発送済', className: 'summary-done' };
+  }
+  if (pay === PAYMENT_UNPAID && status === ORDER_STATUS_RESERVED) {
+    return { text: '未入金（決済待ち）', className: 'summary-unpaid' };
+  }
+  if (pay === PAYMENT_FAILED) {
+    return { text: '決済未完了', className: 'summary-cancelled' };
+  }
+  if (pay === PAYMENT_REFUNDED) {
+    return { text: '返金済', className: 'summary-refunded' };
+  }
+  return {
+    text: `${pay}・${FULFILLMENT_LABELS[status] || status}`,
+    className: 'summary-unknown',
+  };
+}
+
 export function splitTaxInclusive(amountIncl, taxRate) {
   if (amountIncl <= 0 || taxRate <= 0) {
     return { excl: amountIncl, tax: 0, incl: amountIncl };
@@ -72,6 +197,10 @@ export function calcOrderAmount(unitPrice, qty, taxRate, shippingFeeIncl, shippi
     shippingTaxAmount: shipping.tax,
     totalAmount,
   };
+}
+
+export function calcShippingMargin(shippingIncome, actualShipping) {
+  return (shippingIncome ?? 0) - (actualShipping ?? 0);
 }
 
 export function findShippingRegion(id) {
