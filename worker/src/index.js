@@ -1,5 +1,6 @@
-const DEFAULT_ORIGIN = '*';
+const DEFAULT_ORIGINS = 'https://yellow-pearl.com,https://www.yellow-pearl.com';
 const PRODUCT_ID = 'yellow-pearl';
+const STALE_STRIPE_ORDER_HOURS = 48;
 
 const MAX_LEN = { name: 50, email: 100, phone: 20, postal: 10, address: 200, note: 500, admin_note: 500 };
 const ORDER_STATUSES = ['予約', '済み', 'キャンセル'];
@@ -26,16 +27,23 @@ const SHIPPING_REGIONS = [
   { id: 'kyushu', name: '九州地方', prefectures: ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県'] },
 ];
 
+function parseAllowedOrigins(env) {
+  const raw = env.ALLOWED_ORIGINS ?? env.ALLOWED_ORIGIN ?? DEFAULT_ORIGINS;
+  if (raw === '*') return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
 function buildCors(env, request, { credentials = false } = {}) {
-  const allowed = env.ALLOWED_ORIGIN ?? DEFAULT_ORIGIN;
+  const allowed = parseAllowedOrigins(env);
   const origin = request?.headers?.get('Origin');
-  const allowOrigin = allowed === '*' && origin ? origin : allowed;
   const headers = {
-    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
-  if (credentials) headers['Access-Control-Allow-Credentials'] = 'true';
+  if (origin && allowed.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    if (credentials) headers['Access-Control-Allow-Credentials'] = 'true';
+  }
   return headers;
 }
 
@@ -97,11 +105,8 @@ function skipsSiteBasicAuthRequest(request) {
   return skipsSiteBasicAuth(new URL(request.url).pathname);
 }
 
-function requireSiteBasicAuth(request, env) {
-  if (!isSitePasswordSet(env)) return null;
-  if (skipsSiteBasicAuthRequest(request)) return null;
-  if (isBasicAuthorized(request, env.SITE_PASSWORD)) return null;
-  return basicAuthChallenge();
+function requireSiteBasicAuth(_request, _env) {
+  return null;
 }
 
 /** Cloudflare Access が付与する JWT を検証（Access 保護が前提） */
@@ -302,6 +307,81 @@ function calcOrderAmount(unitPrice, qty, taxRate, shippingFee) {
   const taxAmount = Math.floor(subtotal * taxRate / 100);
   const totalAmount = subtotal + taxAmount + shippingFee;
   return { subtotal, taxAmount, totalAmount };
+}
+
+/** 在庫が足りるときだけ減算（1クエリで原子的に判定） */
+async function decrementStock(db, qty) {
+  const result = await db.prepare(
+    `UPDATE inventory SET
+      stock = stock - ?,
+      sold_out = CASE WHEN stock - ? <= 0 THEN 1 ELSE 0 END
+     WHERE product_id = ?
+       AND sold_out = 0
+       AND stock >= ?`
+  ).bind(qty, qty, PRODUCT_ID, qty).run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+async function incrementStock(db, qty) {
+  await db.prepare(
+    `UPDATE inventory SET
+      stock = stock + ?,
+      sold_out = CASE WHEN stock + ? > 0 THEN 0 ELSE sold_out END
+     WHERE product_id = ?`
+  ).bind(qty, qty, PRODUCT_ID).run();
+}
+
+let rateLimitTableReady = false;
+
+async function ensureRateLimitTable(db) {
+  if (rateLimitTableReady) return;
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS rate_limits (
+      key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 1,
+      expires_at TEXT NOT NULL
+    )`
+  ).run();
+  rateLimitTableReady = true;
+}
+
+/** 上限超えなら true（Stripe Webhook は除外すること） */
+async function isRateLimited(env, bucket, ip, limit, windowMinutes) {
+  await ensureRateLimitTable(env.DB);
+  const windowMs = windowMinutes * 60 * 1000;
+  const windowId = Math.floor(Date.now() / windowMs);
+  const key = `${bucket}:${ip}:${windowId}`;
+  const expiresAt = new Date((windowId + 1) * windowMs).toISOString();
+
+  await env.DB.prepare(
+    `INSERT INTO rate_limits (key, count, expires_at) VALUES (?, 1, ?)
+     ON CONFLICT(key) DO UPDATE SET count = count + 1`
+  ).bind(key, expiresAt).run();
+
+  const row = await env.DB.prepare('SELECT count FROM rate_limits WHERE key = ?').bind(key).first();
+  return (row?.count ?? 0) > limit;
+}
+
+function clientIp(request) {
+  return request.headers.get('CF-Connecting-IP') ?? 'unknown';
+}
+
+/** Stripe Checkout 途中で放置された注文のみ削除（現金予約は残す） */
+async function cleanupStaleOrders(env) {
+  await ensureRateLimitTable(env.DB);
+  await env.DB.prepare(
+    `DELETE FROM rate_limits WHERE expires_at < ?`
+  ).bind(nowIso()).run();
+
+  const result = await env.DB.prepare(
+    `DELETE FROM orders
+     WHERE payment_status IN ('未決済', '失敗')
+       AND komoju_session_id IS NOT NULL
+       AND status = '予約'
+       AND created_at < datetime('now', '+9 hours', ?)`
+  ).bind(`-${STALE_STRIPE_ORDER_HOURS} hours`).run();
+
+  return result.meta?.changes ?? 0;
 }
 
 async function getShippingMap(db) {
@@ -680,30 +760,18 @@ async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId =
     return { error: 'キャンセル済みの予約です', status: 409 };
   }
 
-  const inv = await env.DB.prepare(
-    'SELECT stock, sold_out FROM inventory WHERE product_id = ?'
-  ).bind(PRODUCT_ID).first();
-
-  if (!inv || inv.sold_out || inv.stock < order.quantity) {
+  const qty = order.quantity;
+  if (!(await decrementStock(env.DB, qty))) {
     return { error: '在庫が不足しているため決済を確定できません', status: 409 };
   }
 
-  const qty = order.quantity;
-  await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE orders SET
-        payment_status = '決済済',
-        komoju_session_id = COALESCE(?, komoju_session_id),
-        komoju_payment_id = COALESCE(?, komoju_payment_id)
-       WHERE order_id = ? AND payment_status != '決済済'`
-    ).bind(sessionId, paymentId, orderId),
-    env.DB.prepare(
-      `UPDATE inventory SET
-        stock = stock - ?,
-        sold_out = CASE WHEN stock - ? <= 0 THEN 1 ELSE 0 END
-       WHERE product_id = ?`
-    ).bind(qty, qty, PRODUCT_ID),
-  ]);
+  await env.DB.prepare(
+    `UPDATE orders SET
+      payment_status = '決済済',
+      komoju_session_id = COALESCE(?, komoju_session_id),
+      komoju_payment_id = COALESCE(?, komoju_payment_id)
+     WHERE order_id = ? AND payment_status != '決済済'`
+  ).bind(sessionId, paymentId, orderId).run();
 
   return { ok: true, order_id: orderId };
 }
@@ -744,8 +812,12 @@ async function handleReserve(request, env, CORS) {
   const { unitPrice, shippingFee, taxAmount, totalAmount } = pricing;
   const order_id = generateOrderId();
 
-  await env.DB.batch([
-    env.DB.prepare(
+  if (!(await decrementStock(env.DB, qty))) {
+    return json({ error: '在庫が不足しています' }, 409, CORS);
+  }
+
+  try {
+    await env.DB.prepare(
       `INSERT INTO orders (
         order_id, last_name, first_name, last_name_kana, first_name_kana,
         email, phone, postal, prefecture, address1, address2, note,
@@ -757,14 +829,11 @@ async function handleReserve(request, env, CORS) {
       last_name, first_name, last_name_kana, first_name_kana,
       email, phone, postal, prefecture, address1, address2, note,
       qty, unitPrice, shippingFee, taxAmount, totalAmount,
-    ),
-    env.DB.prepare(
-      `UPDATE inventory SET
-        stock = stock - ?,
-        sold_out = CASE WHEN stock - ? <= 0 THEN 1 ELSE 0 END
-       WHERE product_id = ?`
-    ).bind(qty, qty, PRODUCT_ID),
-  ]);
+    ).run();
+  } catch {
+    await incrementStock(env.DB, qty);
+    return json({ error: '予約の保存に失敗しました' }, 500, CORS);
+  }
 
   return json({ order_id, unit_price: unitPrice, tax_amount: taxAmount, shipping_fee: shippingFee, total_amount: totalAmount }, 200, CORS);
 }
@@ -862,25 +931,18 @@ async function handleAdminOrderUpdate(request, env, CORS, orderId) {
     }
     await env.DB.batch(stmts);
   } else if (oldStatus === 'キャンセル' && status !== 'キャンセル') {
-    const inv = await env.DB.prepare(
-      'SELECT stock, sold_out FROM inventory WHERE product_id = ?'
-    ).bind(PRODUCT_ID).first();
-
-    if (!inv || inv.stock < qty) {
+    if (!(await decrementStock(env.DB, qty))) {
       return json({ error: '在庫が不足しているため、キャンセルから戻せません' }, 409, CORS);
     }
 
-    await env.DB.batch([
-      env.DB.prepare(
+    try {
+      await env.DB.prepare(
         `UPDATE orders SET status = ?, admin_note = ? WHERE order_id = ?`
-      ).bind(status, adminNote, orderId),
-      env.DB.prepare(
-        `UPDATE inventory SET
-          stock = stock - ?,
-          sold_out = CASE WHEN stock - ? <= 0 THEN 1 ELSE 0 END
-         WHERE product_id = ?`
-      ).bind(qty, qty, PRODUCT_ID),
-    ]);
+      ).bind(status, adminNote, orderId).run();
+    } catch {
+      await incrementStock(env.DB, qty);
+      return json({ error: '予約の更新に失敗しました' }, 500, CORS);
+    }
   } else {
     await env.DB.prepare(
       `UPDATE orders SET status = ?, admin_note = ? WHERE order_id = ?`
@@ -1005,6 +1067,27 @@ async function handleApi(request, env) {
     return json({ error: 'DB binding が設定されていません' }, 500, CORS);
   }
 
+  const ip = clientIp(request);
+  const isStripeWebhook = !!request.headers.get('Stripe-Signature');
+
+  if (!isStripeWebhook) {
+    if (url.pathname === '/api/reserve' && request.method === 'POST') {
+      if (await isRateLimited(env, 'reserve', ip, 10, 1)) {
+        return json({ error: 'リクエストが多すぎます。しばらくしてからお試しください。' }, 429, CORS);
+      }
+    }
+    if (url.pathname === '/api/stock' && request.method === 'GET' && !url.searchParams.get('session_id')) {
+      if (await isRateLimited(env, 'stock', ip, 60, 1)) {
+        return json({ error: 'リクエストが多すぎます' }, 429, CORS);
+      }
+    }
+    if (url.pathname === '/api/admin/login' && request.method === 'POST') {
+      if (await isRateLimited(env, 'admin_login', ip, 10, 5)) {
+        return json({ error: 'リクエストが多すぎます。しばらくしてからお試しください。' }, 429, CORS);
+      }
+    }
+  }
+
   if (url.pathname === '/api/stock' && request.method === 'GET') {
     const sessionId = url.searchParams.get('session_id');
     if (sessionId) return handleCheckoutReturn(env, CORS, sessionId);
@@ -1078,5 +1161,9 @@ export default {
 
     // Worker が /* で受けた場合: Pages（HTML・CSS 等）へそのまま通す
     return fetch(request);
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(cleanupStaleOrders(env));
   },
 };

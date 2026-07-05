@@ -5,15 +5,16 @@ account_id = "e1b3f72b4806b9ee6db348e090df9590"
 
 # Pages公開後にドメインを設定する（例: https://yellow-pearl.pages.dev）
 [vars]
-ALLOWED_ORIGIN = "*"
+ALLOWED_ORIGINS = "https://yellow-pearl.com,https://www.yellow-pearl.com"
+
+[triggers]
+crons = ["0 18 * * *"]
 
 # Stripe Checkout:
 #   wrangler secret put STRIPE_SECRET_KEY
 #   wrangler secret put STRIPE_WEBHOOK_SECRET
 # Webhook URL: https://yellow-pearl.com/api/reserve
-#   wrangler secret put SITE_PASSWORD
-# 未設定なら認証なし。ユーザー名は任意、パスワードのみ照合。
-# Pages 側も同じ変数名 SITE_PASSWORD を環境変数で設定すること。
+# サイト全体 Basic 認証は無効（SITE_PASSWORD は使用しない）
 
 [[routes]]
 pattern = "yellow-pearl.com/*"
