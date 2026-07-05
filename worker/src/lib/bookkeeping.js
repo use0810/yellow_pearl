@@ -145,7 +145,7 @@ function buildBookkeepingCsv(year, months, totals, orders) {
     `\uFEFFYellow Pearl 帳簿データ,${year}年`,
     '',
     '【月次サマリー】',
-    '年月,件数,本数,商品売上(税抜),消費税(商品),消費税(送料),送料収入(税込),売上合計,実配送費,送料差額,メモ',
+    '年月,件数,本数,商品売上(税抜),消費税(商品),消費税(送料),送料収入(税込),売上合計,実配送費(任意税込),送料差額,メモ',
     ...months.map((m) => [
       m.year_month,
       m.order_count,

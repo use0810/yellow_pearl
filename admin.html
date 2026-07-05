@@ -95,7 +95,7 @@
 
           <div class="card">
             <div class="card-title">送料（地域別）</div>
-            <p class="card-note">金額は<strong>税込</strong>で入力。送料の消費税率は商品と別に設定できます（通常 10％）。</p>
+            <p class="card-note">金額は<strong>税抜</strong>で入力（商品単価と同じ）。送料の消費税率は商品と別に設定できます（通常 10％）。カートでは税込送料として表示されます。</p>
             <form id="shipping-form">
               <div class="field" style="max-width:200px;margin-bottom:1rem">
                 <label for="edit-shipping-tax-rate">送料の消費税率（％）</label>
@@ -175,7 +175,7 @@
           <div class="card">
             <div class="card-title">帳簿・申告サポート</div>
             <p class="card-note">
-              決済済みの注文から売上を自動集計します。月末に配送業者の請求書を見て<strong>実配送費</strong>を入力してください。
+              決済済みの注文から売上を自動集計します。月末に配送業者の請求書を見て<strong>実配送費（任意税込）</strong>を入力してください。
               PDF は印刷ダイアログから「PDFに保存」できます。
             </p>
 
@@ -195,7 +195,7 @@
               <div class="bk-stat"><div class="bk-stat-label">消費税（送料分）</div><div class="bk-stat-value" id="bk-sum-shipping-tax">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">送料収入（税込）</div><div class="bk-stat-value" id="bk-sum-shipping-in">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">売上合計</div><div class="bk-stat-value" id="bk-sum-total">—</div></div>
-              <div class="bk-stat"><div class="bk-stat-label">実配送費（入力）</div><div class="bk-stat-value" id="bk-sum-shipping-out">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">実配送費（任意税込）</div><div class="bk-stat-value" id="bk-sum-shipping-out">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">送料差額（収入−実費）</div><div class="bk-stat-value" id="bk-sum-margin">—</div></div>
             </div>
 
@@ -210,7 +210,7 @@
                     <th class="num">消費税(送料)</th>
                     <th class="num">送料(税込)</th>
                     <th class="num">合計</th>
-                    <th class="num">実配送費</th>
+                    <th>実配送費（任意税込）</th>
                     <th>メモ</th>
                   </tr>
                 </thead>

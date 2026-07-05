@@ -190,8 +190,8 @@ export async function loadPricing(env, prefecture, qty) {
   const unitPrice = inv.unit_price ?? 0;
   const taxRate = inv.tax_rate ?? 10;
   const shippingTaxRate = inv.shipping_tax_rate ?? 10;
-  const shippingFeeIncl = rate?.fee ?? 0;
-  const amounts = calcOrderAmount(unitPrice, qty, taxRate, shippingFeeIncl, shippingTaxRate);
+  const shippingFeeExcl = rate?.fee ?? 0;
+  const amounts = calcOrderAmount(unitPrice, qty, taxRate, shippingFeeExcl, shippingTaxRate);
 
   return {
     unitPrice,

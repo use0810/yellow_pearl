@@ -429,7 +429,8 @@
         margin-top: 0.5rem;
       }
 
-      .data-table .num { text-align: right; white-space: nowrap; }
+      .data-table td.num { text-align: right; white-space: nowrap; }
+      .data-table th.num { text-align: left; white-space: normal; }
 
       .shipping-grid {
         display: grid;

@@ -13,7 +13,7 @@ VALUES ('yellow-pearl', 1000, 0, 0, 10, 10);
 
 CREATE TABLE IF NOT EXISTS shipping_rates (
   prefecture TEXT PRIMARY KEY,
-  fee INTEGER NOT NULL DEFAULT 0
+  fee INTEGER NOT NULL DEFAULT 0  -- 税抜（円）
 );
 
 CREATE TABLE IF NOT EXISTS orders (

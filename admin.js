@@ -73,8 +73,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           <td class="num">${formatYen(m.shipping_tax_amount ?? 0)}</td>
           <td class="num">${formatYen(m.shipping_income)}</td>
           <td class="num">${formatYen(m.total_amount)}</td>
-          <td class="num">
-            <input type="number" min="0" class="bk-actual-shipping" value="${m.actual_shipping}" aria-label="${m.month}月の実配送費" />
+          <td>
+            <input type="number" min="0" class="bk-actual-shipping" value="${m.actual_shipping}" aria-label="${m.month}月の実配送費（任意税込）" />
           </td>
           <td>
             <input type="text" class="bk-note" value="${esc(m.note)}" placeholder="例: ヤマト請求書" aria-label="${m.month}月のメモ" />
@@ -189,12 +189,12 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             <div><div class="label">消費税（送料分）</div><div class="val">${yen(totals.shipping_tax_amount ?? 0)}</div></div>
             <div><div class="label">送料収入（税込）</div><div class="val">${yen(totals.shipping_income)}</div></div>
             <div><div class="label">売上合計</div><div class="val">${yen(totals.total_amount)}</div></div>
-            <div><div class="label">実配送費</div><div class="val">${yen(totals.actual_shipping)}</div></div>
+            <div><div class="label">実配送費（任意税込）</div><div class="val">${yen(totals.actual_shipping)}</div></div>
             <div><div class="label">送料差額</div><div class="val">${yen(margin)}</div></div>
           </div>
           <table>
             <thead><tr>
-              <th>月</th><th>件数</th><th>商品(税抜)</th><th>消費税(商品)</th><th>消費税(送料)</th><th>送料(税込)</th><th>合計</th><th>実配送費</th><th>メモ</th>
+              <th>月</th><th>件数</th><th>商品(税抜)</th><th>消費税(商品)</th><th>消費税(送料)</th><th>送料(税込)</th><th>合計</th><th>実配送費（任意税込）</th><th>メモ</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -367,7 +367,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               <span class="shipping-region-name">${esc(r.name)}</span>
               <span class="shipping-region-prefs">${esc(formatRegionPrefs(r.prefectures))}</span>
             </label>
-            <input type="number" min="0" data-region="${r.id}" value="${feeById[r.id] ?? 0}" />
+            <input type="number" min="0" data-region="${r.id}" value="${feeById[r.id] ?? 0}" aria-label="${esc(r.name)}の送料（税抜・円）" />
           </div>
         `).join('');
       }

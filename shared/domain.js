@@ -186,26 +186,21 @@ export function summarizeOrderState(order) {
   };
 }
 
-export function splitTaxInclusive(amountIncl, taxRate) {
-  if (amountIncl <= 0 || taxRate <= 0) {
-    return { excl: amountIncl, tax: 0, incl: amountIncl };
-  }
-  const excl = Math.floor(amountIncl * 100 / (100 + taxRate));
-  const tax = amountIncl - excl;
-  return { excl, tax, incl: amountIncl };
-}
-
-export function calcOrderAmount(unitPrice, qty, taxRate, shippingFeeIncl, shippingTaxRate) {
+export function calcOrderAmount(unitPrice, qty, taxRate, shippingFeeExcl, shippingTaxRate) {
   const subtotal = unitPrice * qty;
   const taxAmount = Math.floor(subtotal * taxRate / 100);
-  const shipping = splitTaxInclusive(shippingFeeIncl, shippingTaxRate);
-  const totalAmount = subtotal + taxAmount + shipping.incl;
+  const shippingExcl = shippingFeeExcl ?? 0;
+  const shippingTaxAmount = shippingExcl > 0 && shippingTaxRate > 0
+    ? Math.floor(shippingExcl * shippingTaxRate / 100)
+    : 0;
+  const shippingFeeIncl = shippingExcl + shippingTaxAmount;
+  const totalAmount = subtotal + taxAmount + shippingFeeIncl;
   return {
     subtotal,
     taxAmount,
-    shippingFeeIncl: shipping.incl,
-    shippingExcl: shipping.excl,
-    shippingTaxAmount: shipping.tax,
+    shippingFeeIncl,
+    shippingExcl,
+    shippingTaxAmount,
     totalAmount,
   };
 }

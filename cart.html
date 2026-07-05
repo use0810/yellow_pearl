@@ -241,26 +241,31 @@
       }
 
       function updatePricingSummary() {
-        const shippingIncl = getShippingFee();
+        const shippingExcl = getShippingFee();
         const productEl = document.getElementById('summary-product');
         const shipEl = document.getElementById('summary-shipping');
 
         if (!unitPrice) {
           productEl.textContent = '—';
-          shipEl.textContent = shippingIncl === null ? '都道府県を選択してください' : formatYen(shippingIncl);
+          if (shippingExcl === null) {
+            shipEl.textContent = '都道府県を選択してください';
+          } else {
+            const ship = calcOrderAmount(0, 1, 0, shippingExcl, shippingTaxRate);
+            shipEl.textContent = formatYen(ship.shippingFeeIncl);
+          }
           document.getElementById('summary-total').textContent = '—';
           return;
         }
 
-        const fee = shippingIncl ?? 0;
+        const fee = shippingExcl ?? 0;
         const amounts = calcOrderAmount(unitPrice, qty, taxRate, fee, shippingTaxRate);
         productEl.textContent = `Yellow Pearl × ${qty}本　${formatYen(amounts.subtotal + amounts.taxAmount)}`;
 
-        if (shippingIncl === null) {
+        if (shippingExcl === null) {
           shipEl.textContent = '都道府県を選択してください';
           document.getElementById('summary-total').textContent = '—';
         } else {
-          shipEl.textContent = formatYen(shippingIncl);
+          shipEl.textContent = formatYen(amounts.shippingFeeIncl);
           document.getElementById('summary-total').textContent = formatYen(amounts.totalAmount);
         }
       }
