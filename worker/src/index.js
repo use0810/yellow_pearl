@@ -50,7 +50,13 @@ function buildCors(env, request, { credentials = false } = {}) {
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store', ...headers },
+    headers: {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      ...headers,
+    },
   });
 }
 
@@ -60,69 +66,80 @@ function generateOrderId() {
   return `YP-${ts}-${rand}`;
 }
 
-const SITE_AUTH_REALM = 'Yellow Pearl';
 const ADMIN_SESSION_COOKIE = 'yp_admin_session';
 const MAX_ADMIN_LOGIN_FAILURES = 10;
 const ADMIN_LOCK_MINUTES = 30;
 const ADMIN_SESSION_HOURS = 12;
+const ACCESS_CERTS_TTL_MS = 3600_000;
 
-function isSitePasswordSet(env) {
-  return typeof env.SITE_PASSWORD === 'string' && env.SITE_PASSWORD.length > 0;
+function base64UrlToBytes(str) {
+  const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+  const bin = atob(pad);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }
 
-function isBasicAuthorized(request, password) {
-  const auth = request.headers.get('Authorization');
-  if (!auth?.startsWith('Basic ')) return false;
-  try {
-    const decoded = atob(auth.slice(6));
-    const idx = decoded.indexOf(':');
-    const pass = idx >= 0 ? decoded.slice(idx + 1) : decoded;
-    return pass === password;
-  } catch {
-    return false;
+function parseJwtPart(part) {
+  const json = atob(part.replace(/-/g, '+').replace(/_/g, '/')
+    + '='.repeat((4 - (part.length % 4)) % 4));
+  return JSON.parse(json);
+}
+
+let accessCertsCache = { keys: null, fetchedAt: 0 };
+
+async function getAccessCerts(teamDomain) {
+  if (accessCertsCache.keys && Date.now() - accessCertsCache.fetchedAt < ACCESS_CERTS_TTL_MS) {
+    return accessCertsCache.keys;
   }
+  const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
+  if (!res.ok) throw new Error('Access certs fetch failed');
+  const data = await res.json();
+  accessCertsCache = { keys: data.keys ?? [], fetchedAt: Date.now() };
+  return accessCertsCache.keys;
 }
 
-function basicAuthChallenge() {
-  return new Response('認証が必要です', {
-    status: 401,
-    headers: {
-      'WWW-Authenticate': `Basic realm="${SITE_AUTH_REALM}", charset="UTF-8"`,
-      'Cache-Control': 'no-store',
-    },
-  });
+async function verifyAccessJwtSignature(token, teamDomain) {
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+
+  const header = parseJwtPart(parts[0]);
+  const keys = await getAccessCerts(teamDomain);
+  const jwk = keys.find((k) => k.kid === header.kid);
+  if (!jwk) return false;
+
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+
+  const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+  return crypto.subtle.verify(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    base64UrlToBytes(parts[2]),
+    data,
+  );
 }
 
-/** 管理画面・Stripe Webhook は Basic 認証スキップ */
-function skipsSiteBasicAuth(pathname) {
-  return pathname === '/admin.html'
-    || pathname.startsWith('/admin')
-    || pathname.startsWith('/api/admin/');
-}
-
-function skipsSiteBasicAuthRequest(request) {
-  if (request.headers.get('Stripe-Signature')) return true;
-  return skipsSiteBasicAuth(new URL(request.url).pathname);
-}
-
-function requireSiteBasicAuth(_request, _env) {
-  return null;
-}
-
-/** Cloudflare Access が付与する JWT を検証（Access 保護が前提） */
-function verifyAccessJwt(request, env) {
+/** Cloudflare Access JWT（ACCESS_TEAM_DOMAIN 設定時のみ署名検証） */
+async function verifyAccessJwt(request, env) {
   const jwt = request.headers.get('Cf-Access-Jwt-Assertion');
-  if (!jwt) return null;
+  const teamDomain = env.ACCESS_TEAM_DOMAIN?.trim();
+  if (!jwt || !teamDomain) return null;
 
   try {
-    const b64 = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const pad = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-    const payload = JSON.parse(atob(pad));
+    const payload = parseJwtPart(jwt.split('.')[1]);
     if (payload.exp && payload.exp * 1000 < Date.now()) return null;
     if (env.ACCESS_AUD && payload.aud) {
       const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
       if (!aud.includes(env.ACCESS_AUD)) return null;
     }
+    if (!(await verifyAccessJwtSignature(jwt, teamDomain))) return null;
     return { ok: true, via: 'access' };
   } catch {
     return null;
@@ -240,7 +257,7 @@ async function verifyAdminSession(request, env) {
 }
 
 async function verifyAdminAuth(request, env) {
-  const access = verifyAccessJwt(request, env);
+  const access = await verifyAccessJwt(request, env);
   if (access) return access;
   const session = await verifyAdminSession(request, env);
   if (session) return session;
@@ -371,6 +388,10 @@ async function cleanupStaleOrders(env) {
   await ensureRateLimitTable(env.DB);
   await env.DB.prepare(
     `DELETE FROM rate_limits WHERE expires_at < ?`
+  ).bind(nowIso()).run();
+
+  await env.DB.prepare(
+    `DELETE FROM admin_sessions WHERE expires_at < ?`
   ).bind(nowIso()).run();
 
   const result = await env.DB.prepare(
@@ -629,8 +650,8 @@ async function handleCheckout(request, env, CORS) {
       taxAmount,
       shippingFee,
     });
-  } catch (e) {
-    return json({ error: e.message || '決済セッションの作成に失敗しました' }, 502, CORS);
+  } catch {
+    return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
   }
 
   if (!session?.url || !session?.id) {
@@ -668,8 +689,8 @@ async function handleCheckoutReturn(env, CORS, sessionId) {
     session = await stripeFetch(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'GET',
     });
-  } catch (e) {
-    return json({ error: e.message || '決済情報の取得に失敗しました' }, 502, CORS);
+  } catch {
+    return json({ error: '決済情報の取得に失敗しました' }, 502, CORS);
   }
 
   const orderId = stripeOrderId(session);
@@ -1151,9 +1172,6 @@ async function handleApi(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    const authFail = requireSiteBasicAuth(request, env);
-    if (authFail) return authFail;
 
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, env);

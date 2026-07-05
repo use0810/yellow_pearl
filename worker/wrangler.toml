@@ -28,6 +28,7 @@ zone_name = "yellow-pearl.com"
 #   wrangler secret put ADMIN_PASSWORD
 #   wrangler secret put ADMIN_USER   # 省略時は admin
 # 管理者API: Cloudflare Zero Trust Access（任意・併用可）
+# [vars] ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
 # [vars] ACCESS_AUD = "<Access Application の AUD tag>"
 
 [[d1_databases]]

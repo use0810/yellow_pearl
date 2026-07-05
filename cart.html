@@ -573,7 +573,8 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>郵便番号<span>*</span></label>
-                <input type="text" id="postal" placeholder="000-0000" maxlength="8" required />
+                <input type="text" id="postal" placeholder="000-0000" maxlength="8" inputmode="numeric" autocomplete="postal-code" required />
+                <span class="field-error" id="err-postal"></span>
               </div>
               <div class="form-group">
                 <label>都道府県<span>*</span></label>
@@ -803,6 +804,65 @@
       }
 
       document.getElementById('prefecture').addEventListener('change', updatePricingSummary);
+
+      function normalizePostal(raw) {
+        return raw.replace(/\D/g, '');
+      }
+
+      function formatPostal(digits) {
+        if (digits.length >= 7) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}`;
+        return digits;
+      }
+
+      let postalLookupToken = 0;
+
+      async function lookupAddressFromPostal() {
+        const postalEl = document.getElementById('postal');
+        const errEl = document.getElementById('err-postal');
+        const digits = normalizePostal(postalEl.value);
+
+        if (digits.length !== 7) {
+          if (errEl) errEl.textContent = '';
+          return;
+        }
+
+        postalEl.value = formatPostal(digits);
+        const token = ++postalLookupToken;
+
+        try {
+          const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${digits}`);
+          const data = await res.json();
+          if (token !== postalLookupToken) return;
+
+          if (data.status !== 200 || !data.results?.length) {
+            if (errEl) errEl.textContent = '郵便番号が見つかりません';
+            return;
+          }
+
+          const r = data.results[0];
+          const prefEl = document.getElementById('prefecture');
+          const addrEl = document.getElementById('address1');
+
+          prefEl.value = r.address1;
+          addrEl.value = `${r.address2}${r.address3}`;
+          if (errEl) errEl.textContent = '';
+          postalEl.classList.remove('invalid');
+          prefEl.classList.remove('invalid');
+          addrEl.classList.remove('invalid');
+          updatePricingSummary();
+        } catch {
+          if (token === postalLookupToken && errEl) {
+            errEl.textContent = '住所の取得に失敗しました';
+          }
+        }
+      }
+
+      document.getElementById('postal').addEventListener('input', () => {
+        if (normalizePostal(document.getElementById('postal').value).length === 7) {
+          lookupAddressFromPostal();
+        }
+      });
+      document.getElementById('postal').addEventListener('blur', lookupAddressFromPostal);
 
       loadStock();
 
