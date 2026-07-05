@@ -692,16 +692,19 @@
       <p class="footer-copy">© 郷のきみの会 — Yellow Pearl, Shingo Village, Aomori</p>
     </footer>
 
-    <script>
+    <script type="module">
+      import { calcOrderAmount, MAX_ORDER_QTY } from '/shared/domain.js';
+
       const WORKER_URL = window.location.origin;
 
       let qty = 1;
-      const MAX_QTY = 5;
+      const MAX_QTY = MAX_ORDER_QTY;
       let maxStock = MAX_QTY;
       let soldOut = false;
       let unitPrice = 0;
       let taxRate = 10;
       let shippingMap = {};
+      let shippingTaxRate = 10;
       let checkoutEnabled = true;
 
       function formatYen(n) {
@@ -714,32 +717,29 @@
         return shippingMap[pref] ?? 0;
       }
 
-      function calcTax(subtotal) {
-        return Math.floor(subtotal * taxRate / 100);
-      }
-
       function updatePricingSummary() {
-        const subtotal = unitPrice * qty;
-        const tax = calcTax(subtotal);
-        const productIncl = subtotal + tax;
         const shippingIncl = getShippingFee();
-
         const productEl = document.getElementById('summary-product');
+        const shipEl = document.getElementById('summary-shipping');
+
         if (!unitPrice) {
           productEl.textContent = '—';
-        } else {
-          productEl.textContent = `Yellow Pearl × ${qty}本　${formatYen(productIncl)}`;
+          shipEl.textContent = shippingIncl === null ? '都道府県を選択してください' : formatYen(shippingIncl);
+          document.getElementById('summary-total').textContent = '—';
+          return;
         }
 
-        const shipEl = document.getElementById('summary-shipping');
+        const fee = shippingIncl ?? 0;
+        const amounts = calcOrderAmount(unitPrice, qty, taxRate, fee, shippingTaxRate);
+        productEl.textContent = `Yellow Pearl × ${qty}本　${formatYen(amounts.subtotal + amounts.taxAmount)}`;
+
         if (shippingIncl === null) {
           shipEl.textContent = '都道府県を選択してください';
+          document.getElementById('summary-total').textContent = '—';
         } else {
           shipEl.textContent = formatYen(shippingIncl);
+          document.getElementById('summary-total').textContent = formatYen(amounts.totalAmount);
         }
-
-        document.getElementById('summary-total').textContent =
-          (unitPrice && shippingIncl !== null) ? formatYen(productIncl + shippingIncl) : '—';
       }
 
       function changeQty(delta) {
@@ -774,6 +774,7 @@
           setSoldOut(false);
           unitPrice = data.unit_price ?? 0;
           taxRate = data.tax_rate ?? 10;
+          shippingTaxRate = data.shipping_tax_rate ?? 10;
           shippingMap = data.shipping ?? {};
           checkoutEnabled = !!data.checkout_enabled;
           if (!checkoutEnabled) {
@@ -956,18 +957,14 @@
           });
           const data = await res.json();
 
-          if (res.ok && checkoutEnabled && data.session_url) {
+          if (res.ok && data.session_url) {
             window.location.href = data.session_url;
             return;
           }
 
-          if (res.ok) {
-            showComplete(data.order_id);
-          } else {
-            alert(data.error || '送信に失敗しました。もう一度お試しください。');
-            btn.disabled = false;
-            btn.textContent = 'お支払いへ進む — Checkout';
-          }
+          alert(data.error || '送信に失敗しました。もう一度お試しください。');
+          btn.disabled = false;
+          btn.textContent = 'お支払いへ進む — Checkout';
         } catch {
           alert('通信エラーが発生しました。もう一度お試しください。');
           btn.disabled = false;
@@ -985,13 +982,6 @@
 
           if (res.ok && data.ok) {
             showComplete(data.order_id);
-          } else if (data.pending) {
-            alert(data.message || 'お支払いの確認をお待ちしています。');
-            if (data.order_id) {
-              showComplete(data.order_id);
-              document.getElementById('complete-order-id').textContent =
-                `予約番号：${data.order_id}（入金確認待ち）`;
-            }
           } else {
             alert(data.message || data.error || '決済が完了していません。');
           }

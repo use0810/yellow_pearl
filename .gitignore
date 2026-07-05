@@ -8,6 +8,10 @@
 !style.css
 !cart.html
 !admin.html
+!admin.css
+!admin.js
+!shared/
+!shared/**
 !privacy.html
 !tokusho.html
 !assets/
