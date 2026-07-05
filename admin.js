@@ -77,7 +77,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             <input type="number" min="0" class="bk-actual-shipping" value="${m.actual_shipping}" aria-label="${m.month}月の実配送費（任意税込）" />
           </td>
           <td>
-            <input type="text" class="bk-note" value="${esc(m.note)}" placeholder="例: ヤマト請求書" aria-label="${m.month}月のメモ" />
+            <input type="text" class="bk-note" value="${esc(m.note)}" aria-label="${m.month}月のメモ" />
           </td>
         </tr>`).join('');
       }
