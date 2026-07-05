@@ -57,10 +57,15 @@ export async function handleAdminDashboard(env, CORS) {
 }
 
 export async function handleAdminOrders(env, CORS, url) {
-  const filter = url.searchParams.get('filter') === 'cancelled' ? 'cancelled' : 'active';
-  const query = filter === 'cancelled'
-    ? `SELECT ${ORDER_SELECT} FROM orders WHERE status = '${ORDER_STATUS_CANCELLED}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`
-    : `SELECT ${ORDER_SELECT} FROM orders WHERE status != '${ORDER_STATUS_CANCELLED}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`;
+  const filter = url.searchParams.get('filter') || 'pending';
+  let query;
+  if (filter === 'cancelled') {
+    query = `SELECT ${ORDER_SELECT} FROM orders WHERE status = '${ORDER_STATUS_CANCELLED}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`;
+  } else if (filter === 'shipped') {
+    query = `SELECT ${ORDER_SELECT} FROM orders WHERE status = '${ORDER_STATUS_DONE}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`;
+  } else {
+    query = `SELECT ${ORDER_SELECT} FROM orders WHERE status = '${ORDER_STATUS_RESERVED}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`;
+  }
 
   const rows = await env.DB.prepare(query).all();
   return json({ orders: rows.results ?? [], filter }, 200, CORS);

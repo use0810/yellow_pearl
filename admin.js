@@ -24,7 +24,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         stats: '統計',
         bookkeeping: '帳簿・申告',
       };
-      let orderFilter = 'active';
+      let orderFilter = 'pending';
       let activeScreen = 'products';
       let accessLogoutUrl = null;
       let bookkeepingData = null;
@@ -475,7 +475,12 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       function renderOrders(orders) {
         const tbody = document.getElementById('orders-table-body');
         const cards = document.getElementById('orders-cards');
-        const emptyLabel = orderFilter === 'cancelled' ? 'キャンセルなし' : '予約なし';
+        const emptyLabels = {
+          pending: '未発送の予約なし',
+          shipped: '発送済みの予約なし',
+          cancelled: 'キャンセルなし',
+        };
+        const emptyLabel = emptyLabels[orderFilter] || '予約なし';
 
         if (!orders.length) {
           tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">${emptyLabel}</td></tr>`;
@@ -527,16 +532,21 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       }
 
       function updateOrdersFilterUI() {
-        const isCancelled = orderFilter === 'cancelled';
-        document.getElementById('orders-list-title').textContent =
-          isCancelled ? 'キャンセル一覧' : '予約一覧';
-        document.getElementById('toggle-orders-filter-btn').textContent =
-          isCancelled ? '予約一覧に戻る' : 'キャンセル一覧';
+        const titles = {
+          pending: '未発送一覧',
+          shipped: '発送済一覧',
+          cancelled: 'キャンセル一覧',
+        };
+        document.getElementById('orders-list-title').textContent = titles[orderFilter] || '予約一覧';
+        document.querySelectorAll('.orders-filter-btn').forEach((btn) => {
+          const active = btn.dataset.ordersFilter === orderFilter;
+          btn.classList.toggle('active', active);
+          btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
       }
 
       async function loadOrders() {
-        const filter = orderFilter === 'cancelled' ? 'cancelled' : 'active';
-        const data = await api(`/api/admin/orders?filter=${filter}`);
+        const data = await api(`/api/admin/orders?filter=${orderFilter}`);
         updateOrdersFilterUI();
         renderOrders(data.orders ?? []);
       }
@@ -577,7 +587,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               admin_note: btn.dataset.adminNote || '',
             }),
           });
-          orderFilter = 'active';
+          orderFilter = 'pending';
           await loadOrders();
           await loadDashboard();
         } finally {
@@ -799,9 +809,12 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         }
       });
 
-      document.getElementById('toggle-orders-filter-btn').addEventListener('click', () => {
-        orderFilter = orderFilter === 'cancelled' ? 'active' : 'cancelled';
-        loadOrders().catch((err) => alert(err.message));
+      document.querySelectorAll('.orders-filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (orderFilter === btn.dataset.ordersFilter) return;
+          orderFilter = btn.dataset.ordersFilter;
+          loadOrders().catch((err) => alert(err.message));
+        });
       });
 
       document.getElementById('orders-table-body').addEventListener('click', handleOrdersClick);

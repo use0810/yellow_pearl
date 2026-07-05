@@ -145,12 +145,16 @@
         <section id="screen-orders" class="screen">
           <div class="card">
             <div class="card-head-row">
-              <div class="card-title" id="orders-list-title">予約一覧</div>
-              <button type="button" class="btn" id="toggle-orders-filter-btn">キャンセル一覧</button>
+              <div class="card-title" id="orders-list-title">未発送一覧</div>
+              <div class="orders-filter-tabs" role="tablist" aria-label="予約一覧の表示">
+                <button type="button" class="orders-filter-btn active" data-orders-filter="pending" role="tab" aria-selected="true">未発送</button>
+                <button type="button" class="orders-filter-btn" data-orders-filter="shipped" role="tab" aria-selected="false">発送済</button>
+                <button type="button" class="orders-filter-btn" data-orders-filter="cancelled" role="tab" aria-selected="false">キャンセル</button>
+              </div>
             </div>
             <p class="card-note">
               <strong>決済</strong>（未決済／決済済など）は Stripe 連携で自動更新されます。
-              <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。
+              <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。発送済にすると「未発送」一覧から消え、「発送済」一覧に移ります。
             </p>
             <div class="table-wrap">
               <table class="data-table">
