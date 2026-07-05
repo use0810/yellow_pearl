@@ -36,20 +36,22 @@ CREATE TABLE IF NOT EXISTS orders (
   total_amount INTEGER NOT NULL DEFAULT 0,
   tax_amount INTEGER NOT NULL DEFAULT 0,
   payment_status TEXT NOT NULL DEFAULT '未決済',
-  komoju_session_id TEXT,
-  komoju_payment_id TEXT,
+  stripe_session_id TEXT,
+  stripe_payment_id TEXT,
   status TEXT NOT NULL DEFAULT '予約',
   admin_note TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
 );
 
-CREATE TABLE IF NOT EXISTS admin_sessions (
-  token TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 1,
   expires_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS admin_login_attempts (
-  username TEXT PRIMARY KEY,
-  failures INTEGER NOT NULL DEFAULT 0,
-  locked_until TEXT
+CREATE TABLE IF NOT EXISTS monthly_expenses (
+  year_month TEXT PRIMARY KEY,
+  actual_shipping INTEGER NOT NULL DEFAULT 0,
+  note TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
 );

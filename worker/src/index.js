@@ -1,5 +1,6 @@
 const DEFAULT_ORIGINS = 'https://yellow-pearl.com,https://www.yellow-pearl.com';
 const PRODUCT_ID = 'yellow-pearl';
+const PRODUCT_NAME = 'Yellow Pearl（イエローパール）';
 const STALE_STRIPE_ORDER_HOURS = 48;
 
 const MAX_LEN = { name: 50, email: 100, phone: 20, postal: 10, address: 200, note: 500, admin_note: 500 };
@@ -28,7 +29,7 @@ const SHIPPING_REGIONS = [
 ];
 
 function parseAllowedOrigins(env) {
-  const raw = env.ALLOWED_ORIGINS ?? env.ALLOWED_ORIGIN ?? DEFAULT_ORIGINS;
+  const raw = env.ALLOWED_ORIGINS ?? DEFAULT_ORIGINS;
   if (raw === '*') return [];
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
@@ -66,11 +67,28 @@ function generateOrderId() {
   return `YP-${ts}-${rand}`;
 }
 
-const ADMIN_SESSION_COOKIE = 'yp_admin_session';
-const MAX_ADMIN_LOGIN_FAILURES = 10;
-const ADMIN_LOCK_MINUTES = 30;
-const ADMIN_SESSION_HOURS = 12;
-const ACCESS_CERTS_TTL_MS = 3600_000;
+function accessConfigured(env) {
+  return typeof env.ACCESS_TEAM_DOMAIN === 'string' && env.ACCESS_TEAM_DOMAIN.trim().length > 0;
+}
+
+function parseAdminAllowedEmails(env) {
+  const raw = env.ADMIN_ALLOWED_EMAILS?.trim();
+  if (!raw) return null;
+  return raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+}
+
+function isAdminEmailAllowed(email, allowed) {
+  if (!allowed?.length) return true;
+  if (!email || typeof email !== 'string') return false;
+  return allowed.includes(email.trim().toLowerCase());
+}
+
+function accessLogoutUrl(request, env) {
+  const team = env.ACCESS_TEAM_DOMAIN?.trim();
+  if (!team) return null;
+  const returnTo = `${new URL(request.url).origin}/admin.html`;
+  return `https://${team}/cdn-cgi/access/logout?return_to=${encodeURIComponent(returnTo)}`;
+}
 
 function base64UrlToBytes(str) {
   const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
@@ -80,6 +98,8 @@ function base64UrlToBytes(str) {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
 }
+
+const ACCESS_CERTS_TTL_MS = 3600_000;
 
 function parseJwtPart(part) {
   const json = atob(part.replace(/-/g, '+').replace(/_/g, '/')
@@ -126,7 +146,7 @@ async function verifyAccessJwtSignature(token, teamDomain) {
   );
 }
 
-/** Cloudflare Access JWT（ACCESS_TEAM_DOMAIN 設定時のみ署名検証） */
+/** Cloudflare Access JWT（署名 + exp + aud） */
 async function verifyAccessJwt(request, env) {
   const jwt = request.headers.get('Cf-Access-Jwt-Assertion');
   const teamDomain = env.ACCESS_TEAM_DOMAIN?.trim();
@@ -140,183 +160,40 @@ async function verifyAccessJwt(request, env) {
       if (!aud.includes(env.ACCESS_AUD)) return null;
     }
     if (!(await verifyAccessJwtSignature(jwt, teamDomain))) return null;
-    return { ok: true, via: 'access' };
+
+    const email = typeof payload.email === 'string' ? payload.email : null;
+    if (!isAdminEmailAllowed(email, parseAdminAllowedEmails(env))) return null;
+
+    return { ok: true, via: 'access', email };
   } catch {
     return null;
   }
 }
 
-function adminPasswordConfigured(env) {
-  return typeof env.ADMIN_PASSWORD === 'string' && env.ADMIN_PASSWORD.length > 0;
-}
-
-function adminUsername(env) {
-  const user = env.ADMIN_USER?.trim();
-  return user || 'admin';
-}
-
-function parseCookie(request, name) {
-  const raw = request.headers.get('Cookie') || '';
-  for (const part of raw.split(';')) {
-    const [k, ...rest] = part.trim().split('=');
-    if (k === name) return decodeURIComponent(rest.join('='));
-  }
-  return null;
-}
-
-function sessionCookie(token, maxAgeSec) {
-  return `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=${maxAgeSec}`;
-}
-
-function clearSessionCookie() {
-  return `${ADMIN_SESSION_COOKIE}=; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=0`;
-}
-
-function passwordsEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const len = Math.max(a.length, b.length);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < len; i++) {
-    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  }
-  return diff === 0;
-}
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function addMinutesIso(minutes) {
-  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
-}
-
-async function getLoginAttempt(env, username) {
-  return env.DB.prepare(
-    'SELECT username, failures, locked_until FROM admin_login_attempts WHERE username = ?'
-  ).bind(username).first();
-}
-
-async function isAdminAccountLocked(env, username) {
-  const row = await getLoginAttempt(env, username);
-  if (!row?.locked_until) return false;
-  if (row.locked_until > nowIso()) return true;
-  await env.DB.prepare(
-    'UPDATE admin_login_attempts SET failures = 0, locked_until = NULL WHERE username = ?'
-  ).bind(username).run();
-  return false;
-}
-
-async function recordAdminLoginFailure(env, username) {
-  const row = await getLoginAttempt(env, username);
-  const failures = (row?.failures ?? 0) + 1;
-  if (failures >= MAX_ADMIN_LOGIN_FAILURES) {
-    const lockedUntil = addMinutesIso(ADMIN_LOCK_MINUTES);
-    await env.DB.prepare(
-      `INSERT INTO admin_login_attempts (username, failures, locked_until)
-       VALUES (?, ?, ?)
-       ON CONFLICT(username) DO UPDATE SET failures = excluded.failures, locked_until = excluded.locked_until`
-    ).bind(username, failures, lockedUntil).run();
-    return { locked: true, failures };
-  }
-  await env.DB.prepare(
-    `INSERT INTO admin_login_attempts (username, failures, locked_until)
-     VALUES (?, ?, NULL)
-     ON CONFLICT(username) DO UPDATE SET failures = excluded.failures`
-  ).bind(username, failures).run();
-  return { locked: false, failures };
-}
-
-async function clearAdminLoginFailures(env, username) {
-  await env.DB.prepare(
-    'DELETE FROM admin_login_attempts WHERE username = ?'
-  ).bind(username).run();
-}
-
-async function createAdminSession(env) {
-  const token = crypto.randomUUID();
-  const expiresAt = addMinutesIso(ADMIN_SESSION_HOURS * 60);
-  await env.DB.prepare(
-    'INSERT INTO admin_sessions (token, expires_at) VALUES (?, ?)'
-  ).bind(token, expiresAt).run();
-  return { token, maxAgeSec: ADMIN_SESSION_HOURS * 3600 };
-}
-
-async function verifyAdminSession(request, env) {
-  const token = parseCookie(request, ADMIN_SESSION_COOKIE);
-  if (!token) return null;
-  const row = await env.DB.prepare(
-    'SELECT token, expires_at FROM admin_sessions WHERE token = ?'
-  ).bind(token).first();
-  if (!row || row.expires_at <= nowIso()) {
-    if (row) {
-      await env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run();
-    }
-    return null;
-  }
-  return { ok: true, via: 'session' };
-}
-
 async function verifyAdminAuth(request, env) {
+  if (!accessConfigured(env)) {
+    return { error: '管理者認証（Cloudflare Access）が設定されていません', status: 503 };
+  }
   const access = await verifyAccessJwt(request, env);
   if (access) return access;
-  const session = await verifyAdminSession(request, env);
-  if (session) return session;
   return { error: '認証が必要です', status: 401 };
-}
-
-async function handleAdminLogin(request, env, CORS) {
-  if (!adminPasswordConfigured(env)) {
-    return json({ error: '管理者ログインは設定されていません' }, 503, CORS);
-  }
-
-  const body = await request.json().catch(() => null);
-  const username = (body?.username || '').trim();
-  const password = body?.password || '';
-  const expectedUser = adminUsername(env);
-
-  if (!username || !password) {
-    return json({ error: 'ユーザー名とパスワードを入力してください' }, 400, CORS);
-  }
-
-  if (await isAdminAccountLocked(env, expectedUser)) {
-    return json({
-      error: 'ログイン試行回数の上限に達しました。しばらくしてからお試しください。',
-      locked: true,
-    }, 423, CORS);
-  }
-
-  const valid = username === expectedUser && passwordsEqual(password, env.ADMIN_PASSWORD);
-  if (!valid) {
-    const result = await recordAdminLoginFailure(env, expectedUser);
-    if (result.locked) {
-      return json({
-        error: 'ログイン試行回数の上限に達しました。しばらくしてからお試しください。',
-        locked: true,
-      }, 423, CORS);
-    }
-    return json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401, CORS);
-  }
-
-  await clearAdminLoginFailures(env, expectedUser);
-  const session = await createAdminSession(env);
-  return json({ ok: true }, 200, {
-    ...CORS,
-    'Set-Cookie': sessionCookie(session.token, session.maxAgeSec),
-  });
-}
-
-async function handleAdminLogout(request, env, CORS) {
-  const token = parseCookie(request, ADMIN_SESSION_COOKIE);
-  if (token) {
-    await env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run();
-  }
-  return json({ ok: true }, 200, { ...CORS, 'Set-Cookie': clearSessionCookie() });
 }
 
 async function handleAdminSessionCheck(request, env, CORS) {
   const auth = await verifyAdminAuth(request, env);
-  if (auth.error) return json({ authenticated: false }, 401, CORS);
-  return json({ authenticated: true, via: auth.via }, 200, CORS);
+  if (auth.error) {
+    return json({ authenticated: false, error: auth.error }, auth.status, CORS);
+  }
+  return json({
+    authenticated: true,
+    via: auth.via,
+    email: auth.email ?? null,
+    logout_url: accessLogoutUrl(request, env),
+  }, 200, CORS);
+}
+
+function nowIso() {
+  return new Date().toISOString();
 }
 
 function calcOrderAmount(unitPrice, qty, taxRate, shippingFee) {
@@ -383,21 +260,17 @@ function clientIp(request) {
   return request.headers.get('CF-Connecting-IP') ?? 'unknown';
 }
 
-/** Stripe Checkout 途中で放置された注文のみ削除（現金予約は残す） */
+/** Stripe Checkout 途中で放置された注文のみ削除 */
 async function cleanupStaleOrders(env) {
   await ensureRateLimitTable(env.DB);
   await env.DB.prepare(
     `DELETE FROM rate_limits WHERE expires_at < ?`
   ).bind(nowIso()).run();
 
-  await env.DB.prepare(
-    `DELETE FROM admin_sessions WHERE expires_at < ?`
-  ).bind(nowIso()).run();
-
   const result = await env.DB.prepare(
     `DELETE FROM orders
      WHERE payment_status IN ('未決済', '失敗')
-       AND komoju_session_id IS NOT NULL
+       AND stripe_session_id IS NOT NULL
        AND status = '予約'
        AND created_at < datetime('now', '+9 hours', ?)`
   ).bind(`-${STALE_STRIPE_ORDER_HOURS} hours`).run();
@@ -486,7 +359,7 @@ async function verifyStripeWebhook(rawBody, signatureHeader, secret) {
 }
 
 function buildStripeCheckoutParams({
-  origin, orderId, email, qty, unitPrice, taxAmount, shippingFee,
+  origin, orderId, email, qty, unitPrice, taxRate, taxAmount, shippingFee,
 }) {
   const params = new URLSearchParams();
   params.append('mode', 'payment');
@@ -495,20 +368,22 @@ function buildStripeCheckoutParams({
   params.append('customer_email', email);
   params.append('client_reference_id', orderId);
   params.append('metadata[order_id]', orderId);
+  params.append('metadata[unit_price]', String(unitPrice));
+  params.append('metadata[tax_rate]', String(taxRate));
   params.append('locale', 'ja');
   params.append('customer_creation', 'always');
 
   params.append('line_items[0][quantity]', String(qty));
   params.append('line_items[0][price_data][currency]', 'jpy');
   params.append('line_items[0][price_data][unit_amount]', String(unitPrice));
-  params.append('line_items[0][price_data][product_data][name]', 'Yellow Pearl（イエローパール）');
+  params.append('line_items[0][price_data][product_data][name]', PRODUCT_NAME);
 
   let idx = 1;
   if (taxAmount > 0) {
     params.append(`line_items[${idx}][quantity]`, '1');
     params.append(`line_items[${idx}][price_data][currency]`, 'jpy');
     params.append(`line_items[${idx}][price_data][unit_amount]`, String(taxAmount));
-    params.append(`line_items[${idx}][price_data][product_data][name]`, '消費税');
+    params.append(`line_items[${idx}][price_data][product_data][name]`, `消費税（${taxRate}%）`);
     idx += 1;
   }
   if (shippingFee > 0) {
@@ -635,7 +510,11 @@ async function handleCheckout(request, env, CORS) {
   const pricing = await loadPricing(env, prefecture, qty);
   if (pricing.error) return json({ error: pricing.error }, pricing.status, CORS);
 
-  const { unitPrice, shippingFee, taxAmount, totalAmount } = pricing;
+  const { unitPrice, taxRate, shippingFee, taxAmount, totalAmount } = pricing;
+  if (unitPrice <= 0) {
+    return json({ error: '商品単価が設定されていません。管理画面で価格を設定してください。' }, 503, CORS);
+  }
+
   const order_id = generateOrderId();
   const origin = new URL(request.url).origin;
 
@@ -647,6 +526,7 @@ async function handleCheckout(request, env, CORS) {
       email,
       qty,
       unitPrice,
+      taxRate,
       taxAmount,
       shippingFee,
     });
@@ -663,7 +543,7 @@ async function handleCheckout(request, env, CORS) {
       order_id, last_name, first_name, last_name_kana, first_name_kana,
       email, phone, postal, prefecture, address1, address2, note,
       quantity, unit_price, shipping_fee, tax_amount, total_amount,
-      payment_status, komoju_session_id, status, admin_note
+      payment_status, stripe_session_id, status, admin_note
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', ?, '予約', '')`
   ).bind(
     order_id,
@@ -789,8 +669,8 @@ async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId =
   await env.DB.prepare(
     `UPDATE orders SET
       payment_status = '決済済',
-      komoju_session_id = COALESCE(?, komoju_session_id),
-      komoju_payment_id = COALESCE(?, komoju_payment_id)
+      stripe_session_id = COALESCE(?, stripe_session_id),
+      stripe_payment_id = COALESCE(?, stripe_payment_id)
      WHERE order_id = ? AND payment_status != '決済済'`
   ).bind(sessionId, paymentId, orderId).run();
 
@@ -813,50 +693,7 @@ async function handleStock(env, CORS) {
     tax_rate: row.tax_rate ?? 10,
     shipping,
     checkout_enabled: isStripeEnabled(env),
-    stripe_enabled: isStripeEnabled(env),
   }, 200, CORS);
-}
-
-async function handleReserve(request, env, CORS) {
-  const body = await request.json().catch(() => null);
-  const parsed = parseReserveBody(body);
-  if (parsed.error) return json({ error: parsed.error }, 400, CORS);
-
-  const {
-    last_name, first_name, email, phone, postal, prefecture, address1,
-    address2, note, last_name_kana, first_name_kana, qty,
-  } = parsed.data;
-
-  const pricing = await loadPricing(env, prefecture, qty);
-  if (pricing.error) return json({ error: pricing.error }, pricing.status, CORS);
-
-  const { unitPrice, shippingFee, taxAmount, totalAmount } = pricing;
-  const order_id = generateOrderId();
-
-  if (!(await decrementStock(env.DB, qty))) {
-    return json({ error: '在庫が不足しています' }, 409, CORS);
-  }
-
-  try {
-    await env.DB.prepare(
-      `INSERT INTO orders (
-        order_id, last_name, first_name, last_name_kana, first_name_kana,
-        email, phone, postal, prefecture, address1, address2, note,
-        quantity, unit_price, shipping_fee, tax_amount, total_amount,
-        payment_status, status, admin_note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未決済', '予約', '')`
-    ).bind(
-      order_id,
-      last_name, first_name, last_name_kana, first_name_kana,
-      email, phone, postal, prefecture, address1, address2, note,
-      qty, unitPrice, shippingFee, taxAmount, totalAmount,
-    ).run();
-  } catch {
-    await incrementStock(env.DB, qty);
-    return json({ error: '予約の保存に失敗しました' }, 500, CORS);
-  }
-
-  return json({ order_id, unit_price: unitPrice, tax_amount: taxAmount, shipping_fee: shippingFee, total_amount: totalAmount }, 200, CORS);
 }
 
 async function handleAdminDashboard(env, CORS) {
@@ -924,15 +761,14 @@ async function handleAdminOrderUpdate(request, env, CORS, orderId) {
   }
 
   const order = await env.DB.prepare(
-    'SELECT quantity, status, payment_status, komoju_session_id FROM orders WHERE order_id = ?'
+    'SELECT quantity, status, payment_status FROM orders WHERE order_id = ?'
   ).bind(orderId).first();
 
   if (!order) return json({ error: '予約が見つかりません' }, 404, CORS);
 
   const oldStatus = order.status || '予約';
   const qty = order.quantity;
-  const stockWasAllocated = order.payment_status === '決済済'
-    || (order.payment_status === '未決済' && !order.komoju_session_id);
+  const stockWasAllocated = order.payment_status === '決済済';
 
   if (oldStatus !== 'キャンセル' && status === 'キャンセル') {
     const stmts = [
@@ -1004,6 +840,9 @@ async function handleAdminInventoryUpdate(request, env, CORS) {
   if (isNaN(unitPrice) || unitPrice < 0) {
     return json({ error: '単価の値が不正です' }, 400, CORS);
   }
+  if (unitPrice === 0 && !body.sold_out && stock > 0) {
+    return json({ error: '単価は1円以上で設定してください' }, 400, CORS);
+  }
   if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
     return json({ error: '税率の値が不正です' }, 400, CORS);
   }
@@ -1049,6 +888,229 @@ async function handleAdminShippingUpdate(request, env, CORS) {
 
   const shippingMap = await getShippingMap(env.DB);
   return json({ shipping_regions: getShippingRegionsFromMap(shippingMap) }, 200, CORS);
+}
+
+const BOOKKEEPING_ORDER_FILTER = `status != 'キャンセル' AND payment_status = '決済済'`;
+
+function parseBookkeepingYear(url) {
+  const year = parseInt(url.searchParams.get('year') || '', 10);
+  if (Number.isNaN(year) || year < 2000 || year > 2100) return null;
+  return year;
+}
+
+function sumBookkeepingMonths(months) {
+  return months.reduce((acc, m) => ({
+    order_count: acc.order_count + m.order_count,
+    total_quantity: acc.total_quantity + m.total_quantity,
+    product_subtotal: acc.product_subtotal + m.product_subtotal,
+    tax_amount: acc.tax_amount + m.tax_amount,
+    shipping_income: acc.shipping_income + m.shipping_income,
+    total_amount: acc.total_amount + m.total_amount,
+    actual_shipping: acc.actual_shipping + m.actual_shipping,
+  }), {
+    order_count: 0,
+    total_quantity: 0,
+    product_subtotal: 0,
+    tax_amount: 0,
+    shipping_income: 0,
+    total_amount: 0,
+    actual_shipping: 0,
+  });
+}
+
+async function loadBookkeepingMonths(db, year) {
+  const salesRows = await db.prepare(
+    `SELECT strftime('%Y-%m', created_at) AS ym,
+            COUNT(*) AS order_count,
+            COALESCE(SUM(quantity), 0) AS total_quantity,
+            COALESCE(SUM(unit_price * quantity), 0) AS product_subtotal,
+            COALESCE(SUM(tax_amount), 0) AS tax_amount,
+            COALESCE(SUM(shipping_fee), 0) AS shipping_income,
+            COALESCE(SUM(total_amount), 0) AS total_amount
+     FROM orders
+     WHERE ${BOOKKEEPING_ORDER_FILTER}
+       AND strftime('%Y', created_at) = ?
+     GROUP BY ym
+     ORDER BY ym`
+  ).bind(String(year)).all();
+
+  const expenseRows = await db.prepare(
+    `SELECT year_month, actual_shipping, note
+     FROM monthly_expenses
+     WHERE year_month LIKE ?`
+  ).bind(`${year}-%`).all();
+
+  const salesByMonth = Object.fromEntries((salesRows.results ?? []).map((r) => [r.ym, r]));
+  const expenseByMonth = Object.fromEntries(
+    (expenseRows.results ?? []).map((r) => [r.year_month, r]),
+  );
+
+  const months = [];
+  for (let m = 1; m <= 12; m += 1) {
+    const ym = `${year}-${String(m).padStart(2, '0')}`;
+    const sales = salesByMonth[ym] ?? {};
+    const exp = expenseByMonth[ym] ?? {};
+    const shippingIncome = sales.shipping_income ?? 0;
+    const actualShipping = exp.actual_shipping ?? 0;
+    months.push({
+      year_month: ym,
+      month: m,
+      order_count: sales.order_count ?? 0,
+      total_quantity: sales.total_quantity ?? 0,
+      product_subtotal: sales.product_subtotal ?? 0,
+      tax_amount: sales.tax_amount ?? 0,
+      shipping_income: shippingIncome,
+      total_amount: sales.total_amount ?? 0,
+      actual_shipping: actualShipping,
+      shipping_margin: shippingIncome - actualShipping,
+      note: exp.note ?? '',
+    });
+  }
+  return months;
+}
+
+async function handleAdminBookkeeping(env, CORS, url) {
+  const year = parseBookkeepingYear(url);
+  if (!year) return json({ error: '年が不正です' }, 400, CORS);
+
+  const months = await loadBookkeepingMonths(env.DB, year);
+  const totals = sumBookkeepingMonths(months);
+
+  return json({
+    year,
+    months,
+    totals: {
+      ...totals,
+      shipping_margin: totals.shipping_income - totals.actual_shipping,
+    },
+  }, 200, CORS);
+}
+
+async function handleAdminBookkeepingExpensesUpdate(request, env, CORS) {
+  const body = await request.json().catch(() => null);
+  if (!body || !Array.isArray(body.expenses)) {
+    return json({ error: 'expenses 配列が必要です' }, 400, CORS);
+  }
+  if (body.expenses.length > 12) {
+    return json({ error: '一度に保存できるのは12件までです' }, 400, CORS);
+  }
+
+  const stmts = [];
+  for (const item of body.expenses) {
+    if (!/^\d{4}-\d{2}$/.test(item.year_month ?? '')) {
+      return json({ error: '年月の形式が不正です' }, 400, CORS);
+    }
+    const actualShipping = parseInt(item.actual_shipping, 10);
+    if (Number.isNaN(actualShipping) || actualShipping < 0) {
+      return json({ error: '実配送費の値が不正です' }, 400, CORS);
+    }
+    const note = String(item.note ?? '').slice(0, MAX_LEN.admin_note);
+    stmts.push(
+      env.DB.prepare(
+        `INSERT INTO monthly_expenses (year_month, actual_shipping, note, updated_at)
+         VALUES (?, ?, ?, datetime('now', '+9 hours'))
+         ON CONFLICT(year_month) DO UPDATE SET
+           actual_shipping = excluded.actual_shipping,
+           note = excluded.note,
+           updated_at = excluded.updated_at`
+      ).bind(item.year_month, actualShipping, note),
+    );
+  }
+
+  if (stmts.length) await env.DB.batch(stmts);
+
+  const year = parseInt(body.expenses[0]?.year_month?.slice(0, 4), 10)
+    || new Date().getFullYear();
+  const months = await loadBookkeepingMonths(env.DB, year);
+  const totals = sumBookkeepingMonths(months);
+  return json({
+    ok: true,
+    months,
+    totals: { ...totals, shipping_margin: totals.shipping_income - totals.actual_shipping },
+  }, 200, CORS);
+}
+
+function csvEscape(value) {
+  const s = String(value ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function buildBookkeepingCsv(year, months, totals, orders) {
+  const lines = [
+    `\uFEFFYellow Pearl 帳簿データ,${year}年`,
+    '',
+    '【月次サマリー】',
+    '年月,件数,本数,商品売上(税抜),消費税(商品),送料収入,売上合計,実配送費,送料差額,メモ',
+    ...months.map((m) => [
+      m.year_month,
+      m.order_count,
+      m.total_quantity,
+      m.product_subtotal,
+      m.tax_amount,
+      m.shipping_income,
+      m.total_amount,
+      m.actual_shipping,
+      m.shipping_margin,
+      m.note,
+    ].map(csvEscape).join(',')),
+    '',
+    '【年間合計】',
+    [
+      `${year}年`,
+      totals.order_count,
+      totals.total_quantity,
+      totals.product_subtotal,
+      totals.tax_amount,
+      totals.shipping_income,
+      totals.total_amount,
+      totals.actual_shipping,
+      totals.shipping_income - totals.actual_shipping,
+      '',
+    ].map(csvEscape).join(','),
+    '',
+    '【注文明細（決済済み）】',
+    '予約番号,日時,数量,税抜単価,商品売上(税抜),消費税,送料収入,合計,都道府県',
+    ...orders.map((o) => [
+      o.order_id,
+      o.created_at,
+      o.quantity,
+      o.unit_price,
+      o.unit_price * o.quantity,
+      o.tax_amount,
+      o.shipping_fee,
+      o.total_amount,
+      o.prefecture,
+    ].map(csvEscape).join(',')),
+  ];
+  return lines.join('\r\n');
+}
+
+async function handleAdminBookkeepingExport(env, CORS, url) {
+  const year = parseBookkeepingYear(url);
+  if (!year) return json({ error: '年が不正です' }, 400, CORS);
+
+  const months = await loadBookkeepingMonths(env.DB, year);
+  const totals = sumBookkeepingMonths(months);
+
+  const orderRows = await env.DB.prepare(
+    `SELECT order_id, created_at, quantity, unit_price, tax_amount,
+            shipping_fee, total_amount, prefecture
+     FROM orders
+     WHERE ${BOOKKEEPING_ORDER_FILTER}
+       AND strftime('%Y', created_at) = ?
+     ORDER BY created_at ASC`
+  ).bind(String(year)).all();
+
+  const csv = buildBookkeepingCsv(year, months, totals, orderRows.results ?? []);
+  return new Response(csv, {
+    status: 200,
+    headers: {
+      ...CORS,
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="yellow-pearl-bookkeeping-${year}.csv"`,
+    },
+  });
 }
 
 async function handleAdminStats(env, CORS) {
@@ -1102,11 +1164,6 @@ async function handleApi(request, env) {
         return json({ error: 'リクエストが多すぎます' }, 429, CORS);
       }
     }
-    if (url.pathname === '/api/admin/login' && request.method === 'POST') {
-      if (await isRateLimited(env, 'admin_login', ip, 10, 5)) {
-        return json({ error: 'リクエストが多すぎます。しばらくしてからお試しください。' }, 429, CORS);
-      }
-    }
   }
 
   if (url.pathname === '/api/stock' && request.method === 'GET') {
@@ -1120,16 +1177,10 @@ async function handleApi(request, env) {
       return handleStripeWebhook(request, env);
     }
     if (isStripeEnabled(env)) return handleCheckout(request, env, CORS);
-    return handleReserve(request, env, CORS);
+    return json({ error: '決済は現在利用できません' }, 503, CORS);
   }
 
   if (isAdmin) {
-    if (url.pathname === '/api/admin/login' && request.method === 'POST') {
-      return handleAdminLogin(request, env, CORS);
-    }
-    if (url.pathname === '/api/admin/logout' && request.method === 'POST') {
-      return handleAdminLogout(request, env, CORS);
-    }
     if (url.pathname === '/api/admin/session' && request.method === 'GET') {
       return handleAdminSessionCheck(request, env, CORS);
     }
@@ -1151,6 +1202,18 @@ async function handleApi(request, env) {
 
     if (url.pathname === '/api/admin/stats' && request.method === 'GET') {
       return handleAdminStats(env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/bookkeeping' && request.method === 'GET') {
+      return handleAdminBookkeeping(env, CORS, url);
+    }
+
+    if (url.pathname === '/api/admin/bookkeeping/expenses' && request.method === 'PUT') {
+      return handleAdminBookkeepingExpensesUpdate(request, env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/bookkeeping/export.csv' && request.method === 'GET') {
+      return handleAdminBookkeepingExport(env, CORS, url);
     }
 
     if (url.pathname === '/api/admin/orders' && request.method === 'GET') {

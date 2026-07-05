@@ -709,7 +709,7 @@
       let unitPrice = 0;
       let taxRate = 10;
       let shippingMap = {};
-      let checkoutEnabled = false;
+      let checkoutEnabled = true;
 
       function formatYen(n) {
         return `¥${Number(n).toLocaleString('ja-JP')}`;
@@ -764,7 +764,7 @@
         const btn = document.getElementById('submit-btn');
         const notice = document.getElementById('sold-out-notice');
         btn.disabled = closed;
-        btn.textContent = closed ? '受付終了 — Closed' : (checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve');
+        btn.textContent = closed ? '受付終了 — Closed' : 'お支払いへ進む — Checkout';
         notice.style.display = closed ? 'block' : 'none';
         document.getElementById('qty-minus').disabled = closed || qty <= 1;
         document.getElementById('qty-plus').disabled = closed || qty >= maxStock;
@@ -784,13 +784,15 @@
           unitPrice = data.unit_price ?? 0;
           taxRate = data.tax_rate ?? 10;
           shippingMap = data.shipping ?? {};
-          checkoutEnabled = !!(data.checkout_enabled || data.stripe_enabled);
-          const payEl = document.getElementById('summary-payment');
-          if (payEl) {
-            payEl.textContent = checkoutEnabled ? 'クレジットカード（Stripe）' : '受取時現金払い / 後日請求書';
+          checkoutEnabled = !!data.checkout_enabled;
+          if (!checkoutEnabled) {
+            setSoldOut(true);
+            document.getElementById('sold-out-notice').textContent =
+              '決済の準備中です。しばらくしてからお試しください。';
+            return;
           }
-          document.getElementById('submit-btn').textContent =
-            checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
+          document.getElementById('sold-out-notice').textContent =
+            '現在、予約の受付を終了しております。';
           maxStock = Math.min(MAX_QTY, data.stock);
           if (qty > maxStock) {
             qty = maxStock;
@@ -932,7 +934,7 @@
       // フォーム送信
       document.getElementById('reserve-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (soldOut) return;
+        if (soldOut || !checkoutEnabled) return;
         if (!validate()) return;
 
         const btn = document.getElementById('submit-btn');
@@ -974,12 +976,12 @@
           } else {
             alert(data.error || '送信に失敗しました。もう一度お試しください。');
             btn.disabled = false;
-            btn.textContent = checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
+            btn.textContent = 'お支払いへ進む — Checkout';
           }
         } catch {
           alert('通信エラーが発生しました。もう一度お試しください。');
           btn.disabled = false;
-          btn.textContent = checkoutEnabled ? 'お支払いへ進む — Checkout' : '予約する — Reserve';
+          btn.textContent = 'お支払いへ進む — Checkout';
         }
       });
 

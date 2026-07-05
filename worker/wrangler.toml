@@ -6,6 +6,8 @@ account_id = "e1b3f72b4806b9ee6db348e090df9590"
 # Pages公開後にドメインを設定する（例: https://yellow-pearl.pages.dev）
 [vars]
 ALLOWED_ORIGINS = "https://yellow-pearl.com,https://www.yellow-pearl.com"
+# 管理画面にアクセスできるメール（カンマ区切り）。Access ポリシーと Worker の二重チェック
+ADMIN_ALLOWED_EMAILS = "shingo.satokimi2021@gmail.com"
 
 [triggers]
 crons = ["0 18 * * *"]
@@ -14,7 +16,6 @@ crons = ["0 18 * * *"]
 #   wrangler secret put STRIPE_SECRET_KEY
 #   wrangler secret put STRIPE_WEBHOOK_SECRET
 # Webhook URL: https://yellow-pearl.com/api/reserve
-# サイト全体 Basic 認証は無効（SITE_PASSWORD は使用しない）
 
 [[routes]]
 pattern = "yellow-pearl.com/*"
@@ -24,12 +25,16 @@ zone_name = "yellow-pearl.com"
 pattern = "www.yellow-pearl.com/*"
 zone_name = "yellow-pearl.com"
 
-# 管理者ログイン（10回失敗で30分ロック）:
-#   wrangler secret put ADMIN_PASSWORD
-#   wrangler secret put ADMIN_USER   # 省略時は admin
-# 管理者API: Cloudflare Zero Trust Access（任意・併用可）
-# [vars] ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
-# [vars] ACCESS_AUD = "<Access Application の AUD tag>"
+# 管理画面: Cloudflare Access（メール OTP / ワンタイム PIN）必須
+# 1) Zero Trust → Integrations → Identity providers → One-time PIN を追加
+# 2) Access → Applications → Add application（Self-hosted）
+#    - yellow-pearl.com/admin.html
+#    - yellow-pearl.com/api/admin/*
+#    Identity: One-time PIN のみ
+#    Policy: Allow → Emails → shingo.satokimi2021@gmail.com
+# 3) Application の AUD をコピーし、Team domain を確認（Settings → Custom pages）
+#    wrangler secret put ACCESS_TEAM_DOMAIN   # 例: xxx.cloudflareaccess.com
+#    wrangler secret put ACCESS_AUD           # Application の AUD tag
 
 [[d1_databases]]
 binding = "DB"

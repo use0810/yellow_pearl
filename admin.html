@@ -361,56 +361,21 @@
 
       #auth-error .msg-error { margin-top: 0; font-size: 1rem; }
 
-      #login-screen {
-        display: none;
-        max-width: 400px;
-        margin: 4rem auto;
-        padding: 2rem;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
+      #auth-error h2 {
+        font-size: 1.1rem;
+        margin: 0 0 0.75rem;
+        color: #111;
       }
 
-      #login-screen h1 {
-        font-size: 1.25rem;
-        margin: 0 0 1.25rem;
-        text-align: center;
-      }
-
-      #login-screen .field { margin-bottom: 1rem; }
-
-      #login-screen label {
-        display: block;
+      .auth-error-help {
         font-size: 0.85rem;
         color: #555;
-        margin-bottom: 0.35rem;
-      }
-
-      #login-screen input {
-        width: 100%;
-        padding: 0.6rem 0.75rem;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        font-size: 1rem;
-      }
-
-      #login-screen .btn-primary {
-        width: 100%;
-        margin-top: 0.5rem;
-      }
-
-      #login-error {
-        color: #b91c1c;
-        font-size: 0.9rem;
-        min-height: 1.25rem;
-        margin: 0.5rem 0 0;
-      }
-
-      .card-note {
-        font-size: 0.8rem;
-        color: #888;
+        line-height: 1.65;
         margin-bottom: 1rem;
+        text-align: left;
       }
+
+      .admin-app { display: none; }
 
       /* 棒グラフ */
       .bar-chart {
@@ -571,35 +536,160 @@
       .status-pill.reserved { background: #dbeafe; color: #1d4ed8; }
       .status-pill.done { background: #dcfce7; color: #166534; }
       .status-pill.cancelled { background: #fee2e2; color: #991b1b; }
+
+      .card-note {
+        font-size: 0.85rem;
+        color: #666;
+        line-height: 1.55;
+        margin: -0.35rem 0 1rem;
+      }
+
+      .product-name {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #111;
+        margin-bottom: 0.35rem;
+      }
+
+      .form-section {
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid #eee;
+      }
+
+      .form-section-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 0.75rem;
+      }
+
+      .pricing-preview {
+        margin-top: 1rem;
+        padding: 0.85rem 1rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        line-height: 1.65;
+        color: #334155;
+      }
+
+      .pricing-preview strong {
+        color: #1d4ed8;
+      }
+
+      .pricing-preview-note {
+        display: block;
+        margin-top: 0.5rem;
+        font-size: 0.78rem;
+        color: #64748b;
+      }
+
+      .bookkeeping-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+
+      .bookkeeping-toolbar label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .bookkeeping-toolbar select {
+        padding: 0.4rem 0.6rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 0.85rem;
+      }
+
+      .bookkeeping-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-left: auto;
+      }
+
+      .bookkeeping-summary {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+      }
+
+      @media (min-width: 768px) {
+        .bookkeeping-summary { grid-template-columns: repeat(3, 1fr); }
+      }
+
+      .bk-stat {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 0.75rem;
+      }
+
+      .bk-stat-label {
+        font-size: 0.72rem;
+        color: #64748b;
+        margin-bottom: 0.25rem;
+      }
+
+      .bk-stat-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1e293b;
+      }
+
+      .bk-stat-value.positive { color: #166534; }
+      .bk-stat-value.negative { color: #991b1b; }
+
+      .data-table input[type="number"],
+      .data-table input[type="text"] {
+        width: 100%;
+        min-width: 72px;
+        padding: 0.3rem 0.4rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+
+      .data-table input[type="text"] { min-width: 100px; }
+
+      .bookkeeping-disclaimer {
+        font-size: 0.78rem;
+        color: #888;
+        line-height: 1.55;
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+      }
     </style>
   </head>
   <body>
-    <div id="login-screen">
-      <h1>管理者ログイン</h1>
-      <form id="login-form">
-        <div class="field">
-          <label for="login-username">ユーザー名</label>
-          <input type="text" id="login-username" name="username" autocomplete="username" required />
-        </div>
-        <div class="field">
-          <label for="login-password">パスワード</label>
-          <input type="password" id="login-password" name="password" autocomplete="current-password" required />
-        </div>
-        <p id="login-error" role="alert"></p>
-        <button type="submit" class="btn btn-primary" id="login-btn">ログイン</button>
-      </form>
-    </div>
-
     <div id="auth-error">
+      <h2>管理画面ログイン</h2>
+      <p class="auth-error-help">
+        メールアドレスによるワンタイム認証（PIN）が必要です。<br>
+        下の「ログイン画面を開く」を押すと Cloudflare の画面が表示されます。<br>
+        <strong>shingo.satokimi2021@gmail.com</strong> を入力し、届いた6桁のコードでログインしてください。
+      </p>
       <p class="msg-error" id="auth-error-msg"></p>
+      <button type="button" class="btn btn-primary" id="auth-reload-btn">ログイン画面を開く</button>
     </div>
 
-    <div class="admin-app" id="app" hidden>
+    <div class="admin-app" id="app">
       <nav class="desktop-nav" aria-label="メインメニュー">
         <div class="nav-brand">Yellow Pearl</div>
         <button type="button" class="nav-btn active" data-screen="products">商品管理</button>
         <button type="button" class="nav-btn" data-screen="orders">予約管理</button>
         <button type="button" class="nav-btn" data-screen="stats">統計</button>
+        <button type="button" class="nav-btn" data-screen="bookkeeping">帳簿</button>
       </nav>
 
       <main class="admin-main">
@@ -630,29 +720,39 @@
           </div>
 
           <div class="card">
-            <div class="card-title">在庫の更新</div>
+            <div class="product-name">Yellow Pearl（イエローパール）</div>
+            <p class="card-note">当サイトの唯一の商品です。ここで設定した<strong>税抜単価</strong>と<strong>消費税率</strong>は、予約ページの表示・Stripe Checkout の商品明細・決済金額にそのまま反映されます（Stripe Dashboard の商品マスタは使用しません）。</p>
             <form id="inventory-form">
-              <div class="field" style="max-width:240px">
-                <label for="edit-stock">残り在庫（本）</label>
-                <input type="number" id="edit-stock" min="0" required />
-              </div>
-              <div class="form-row">
-                <div class="field">
-                  <label for="edit-unit-price">単価（税抜・円／本）</label>
-                  <input type="number" id="edit-unit-price" min="0" required />
+              <div class="form-section" style="margin-top:0;padding-top:0;border-top:none">
+                <div class="form-section-title">価格・消費税</div>
+                <div class="form-row">
+                  <div class="field">
+                    <label for="edit-unit-price">税抜単価（円／本）</label>
+                    <input type="number" id="edit-unit-price" min="1" required />
+                  </div>
+                  <div class="field">
+                    <label for="edit-tax-rate">消費税率（％）</label>
+                    <input type="number" id="edit-tax-rate" min="0" max="100" value="10" required />
+                  </div>
                 </div>
-                <div class="field">
-                  <label for="edit-tax-rate">税率（％）</label>
-                  <input type="number" id="edit-tax-rate" min="0" max="100" value="10" required />
-                </div>
+                <div class="pricing-preview" id="pricing-preview" aria-live="polite"></div>
               </div>
-              <label class="checkbox-row">
-                <input type="checkbox" id="edit-sold-out" />
-                受付終了にする
-              </label>
+
+              <div class="form-section">
+                <div class="form-section-title">在庫・受付</div>
+                <div class="field" style="max-width:240px">
+                  <label for="edit-stock">残り在庫（本）</label>
+                  <input type="number" id="edit-stock" min="0" required />
+                </div>
+                <label class="checkbox-row">
+                  <input type="checkbox" id="edit-sold-out" />
+                  受付終了にする
+                </label>
+              </div>
+
               <p class="msg-error" id="inventory-error"></p>
               <p class="msg-success" id="inventory-success"></p>
-              <button type="submit" class="btn btn-primary" id="save-btn">在庫・単価を保存</button>
+              <button type="submit" class="btn btn-primary" id="save-btn">保存（カート・Stripe に反映）</button>
             </form>
           </div>
 
@@ -723,18 +823,83 @@
             </div>
           </div>
         </section>
+
+        <!-- 帳簿・申告サポート -->
+        <section id="screen-bookkeeping" class="screen">
+          <div class="card">
+            <div class="card-title">帳簿・申告サポート</div>
+            <p class="card-note">
+              決済済みの注文から売上を自動集計します。月末に配送業者の請求書を見て<strong>実配送費</strong>を入力してください。
+              PDF は印刷ダイアログから「PDFに保存」できます。
+            </p>
+
+            <div class="bookkeeping-toolbar">
+              <label for="bk-year">対象年</label>
+              <select id="bk-year" aria-label="対象年"></select>
+              <div class="bookkeeping-actions">
+                <button type="button" class="btn" id="bk-reload-btn">更新</button>
+                <button type="button" class="btn" id="bk-csv-btn">CSV</button>
+                <button type="button" class="btn btn-primary" id="bk-pdf-btn">PDF（印刷）</button>
+              </div>
+            </div>
+
+            <div class="bookkeeping-summary" id="bk-summary">
+              <div class="bk-stat"><div class="bk-stat-label">商品売上（税抜）</div><div class="bk-stat-value" id="bk-sum-product">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">消費税（商品分）</div><div class="bk-stat-value" id="bk-sum-tax">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">送料収入</div><div class="bk-stat-value" id="bk-sum-shipping-in">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">売上合計</div><div class="bk-stat-value" id="bk-sum-total">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">実配送費（入力）</div><div class="bk-stat-value" id="bk-sum-shipping-out">—</div></div>
+              <div class="bk-stat"><div class="bk-stat-label">送料差額（収入−実費）</div><div class="bk-stat-value" id="bk-sum-margin">—</div></div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="data-table" id="bk-monthly-table">
+                <thead>
+                  <tr>
+                    <th>月</th>
+                    <th class="num">件数</th>
+                    <th class="num">商品(税抜)</th>
+                    <th class="num">消費税</th>
+                    <th class="num">送料収入</th>
+                    <th class="num">合計</th>
+                    <th class="num">実配送費</th>
+                    <th>メモ</th>
+                  </tr>
+                </thead>
+                <tbody id="bk-monthly-body">
+                  <tr><td colspan="8" class="empty-msg">読み込み中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p class="msg-error" id="bk-error"></p>
+            <p class="msg-success" id="bk-success"></p>
+            <button type="button" class="btn btn-primary" id="bk-save-expenses-btn">実配送費を保存</button>
+
+            <p class="bookkeeping-disclaimer">
+              ※ 課税事業者向けのたたき台です。送料の消費税区分・Stripe 手数料・農業所得との区分などは税理士にご確認ください。
+              配送業者の請求書 PDF は別途保管してください。
+            </p>
+          </div>
+        </section>
       </main>
 
       <nav class="mobile-nav" aria-label="メインメニュー">
         <button type="button" class="nav-btn active" data-screen="products">商品</button>
         <button type="button" class="nav-btn" data-screen="orders">予約</button>
         <button type="button" class="nav-btn" data-screen="stats">統計</button>
+        <button type="button" class="nav-btn" data-screen="bookkeeping">帳簿</button>
       </nav>
     </div>
 
     <script>
       const WORKER_URL = window.location.origin;
-      const SCREEN_TITLES = { products: '商品管理', orders: '予約管理', stats: '統計' };
+      const SCREEN_TITLES = {
+        products: '商品管理',
+        orders: '予約管理',
+        stats: '統計',
+        bookkeeping: '帳簿・申告',
+      };
       const ORDER_STATUSES = ['予約', '済み', 'キャンセル'];
       let orderFilter = 'active';
       const SHIPPING_REGIONS = [
@@ -749,6 +914,205 @@
         { id: 'kyushu', name: '九州地方', prefectures: ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県'] },
       ];
       let activeScreen = 'products';
+      let accessLogoutUrl = null;
+      let bookkeepingData = null;
+
+      function yen(n) {
+        return `¥${formatYen(n)}`;
+      }
+
+      function initBookkeepingYearSelect() {
+        const sel = document.getElementById('bk-year');
+        if (!sel || sel.options.length) return;
+        const now = new Date().getFullYear();
+        for (let y = now; y >= now - 5; y -= 1) {
+          const opt = document.createElement('option');
+          opt.value = String(y);
+          opt.textContent = `${y}年`;
+          sel.appendChild(opt);
+        }
+      }
+
+      function getBookkeepingYear() {
+        return parseInt(document.getElementById('bk-year').value, 10) || new Date().getFullYear();
+      }
+
+      function renderBookkeepingSummary(totals) {
+        document.getElementById('bk-sum-product').textContent = yen(totals.product_subtotal);
+        document.getElementById('bk-sum-tax').textContent = yen(totals.tax_amount);
+        document.getElementById('bk-sum-shipping-in').textContent = yen(totals.shipping_income);
+        document.getElementById('bk-sum-total').textContent = yen(totals.total_amount);
+        document.getElementById('bk-sum-shipping-out').textContent = yen(totals.actual_shipping);
+        const marginEl = document.getElementById('bk-sum-margin');
+        const margin = totals.shipping_margin ?? (totals.shipping_income - totals.actual_shipping);
+        marginEl.textContent = yen(margin);
+        marginEl.classList.toggle('positive', margin >= 0);
+        marginEl.classList.toggle('negative', margin < 0);
+      }
+
+      function renderBookkeepingTable(months) {
+        const tbody = document.getElementById('bk-monthly-body');
+        tbody.innerHTML = months.map((m) => `<tr data-ym="${esc(m.year_month)}">
+          <td>${m.month}月</td>
+          <td class="num">${m.order_count}</td>
+          <td class="num">${formatYen(m.product_subtotal)}</td>
+          <td class="num">${formatYen(m.tax_amount)}</td>
+          <td class="num">${formatYen(m.shipping_income)}</td>
+          <td class="num">${formatYen(m.total_amount)}</td>
+          <td class="num">
+            <input type="number" min="0" class="bk-actual-shipping" value="${m.actual_shipping}" aria-label="${m.month}月の実配送費" />
+          </td>
+          <td>
+            <input type="text" class="bk-note" value="${esc(m.note)}" placeholder="例: ヤマト請求書" aria-label="${m.month}月のメモ" />
+          </td>
+        </tr>`).join('');
+      }
+
+      async function loadBookkeeping() {
+        const year = getBookkeepingYear();
+        const data = await api(`/api/admin/bookkeeping?year=${year}`);
+        bookkeepingData = data;
+        renderBookkeepingSummary(data.totals);
+        renderBookkeepingTable(data.months);
+      }
+
+      function collectBookkeepingExpenses() {
+        return [...document.querySelectorAll('#bk-monthly-body tr[data-ym]')].map((row) => ({
+          year_month: row.dataset.ym,
+          actual_shipping: parseInt(row.querySelector('.bk-actual-shipping').value, 10) || 0,
+          note: row.querySelector('.bk-note').value.trim(),
+        }));
+      }
+
+      async function saveBookkeepingExpenses() {
+        const errEl = document.getElementById('bk-error');
+        const okEl = document.getElementById('bk-success');
+        const btn = document.getElementById('bk-save-expenses-btn');
+        errEl.textContent = '';
+        okEl.textContent = '';
+        btn.disabled = true;
+        try {
+          const data = await api('/api/admin/bookkeeping/expenses', {
+            method: 'PUT',
+            body: JSON.stringify({ expenses: collectBookkeepingExpenses() }),
+          });
+          bookkeepingData = { ...bookkeepingData, months: data.months, totals: data.totals };
+          renderBookkeepingSummary(data.totals);
+          renderBookkeepingTable(data.months);
+          okEl.textContent = '実配送費を保存しました';
+        } catch (err) {
+          errEl.textContent = err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      async function downloadBookkeepingCsv() {
+        const year = getBookkeepingYear();
+        const res = await fetch(
+          `${WORKER_URL}/api/admin/bookkeeping/export.csv?year=${year}`,
+          { credentials: 'include' },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'CSV の取得に失敗しました');
+        }
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `yellow-pearl-bookkeeping-${year}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
+      function getBookkeepingViewData() {
+        const expenses = collectBookkeepingExpenses();
+        const months = (bookkeepingData?.months ?? []).map((m, i) => {
+          const actualShipping = expenses[i]?.actual_shipping ?? m.actual_shipping;
+          return {
+            ...m,
+            actual_shipping: actualShipping,
+            note: expenses[i]?.note ?? m.note,
+            shipping_margin: m.shipping_income - actualShipping,
+          };
+        });
+        const totals = months.reduce((acc, m) => ({
+          order_count: acc.order_count + m.order_count,
+          product_subtotal: acc.product_subtotal + m.product_subtotal,
+          tax_amount: acc.tax_amount + m.tax_amount,
+          shipping_income: acc.shipping_income + m.shipping_income,
+          total_amount: acc.total_amount + m.total_amount,
+          actual_shipping: acc.actual_shipping + m.actual_shipping,
+        }), {
+          order_count: 0,
+          product_subtotal: 0,
+          tax_amount: 0,
+          shipping_income: 0,
+          total_amount: 0,
+          actual_shipping: 0,
+        });
+        totals.shipping_margin = totals.shipping_income - totals.actual_shipping;
+        return { year: getBookkeepingYear(), months, totals };
+      }
+
+      function printBookkeepingPdf() {
+        if (!bookkeepingData) return;
+        const { year, months, totals } = getBookkeepingViewData();
+        const margin = totals.shipping_margin ?? (totals.shipping_income - totals.actual_shipping);
+        const rows = months.map((m) => `<tr>
+          <td>${m.month}月</td>
+          <td style="text-align:right">${m.order_count}</td>
+          <td style="text-align:right">${formatYen(m.product_subtotal)}</td>
+          <td style="text-align:right">${formatYen(m.tax_amount)}</td>
+          <td style="text-align:right">${formatYen(m.shipping_income)}</td>
+          <td style="text-align:right">${formatYen(m.total_amount)}</td>
+          <td style="text-align:right">${formatYen(m.actual_shipping)}</td>
+          <td>${esc(m.note)}</td>
+        </tr>`).join('');
+        const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
+          <title>Yellow Pearl 帳簿 ${year}年</title>
+          <style>
+            body { font-family: sans-serif; font-size: 12px; color: #111; padding: 24px; }
+            h1 { font-size: 18px; margin: 0 0 4px; }
+            .meta { color: #666; margin-bottom: 20px; }
+            .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+            .summary div { border: 1px solid #ccc; padding: 8px; border-radius: 4px; }
+            .label { font-size: 10px; color: #666; }
+            .val { font-size: 14px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; }
+            th { background: #f5f5f5; text-align: left; }
+            .note { font-size: 10px; color: #666; line-height: 1.5; }
+            @media print { body { padding: 0; } }
+          </style></head><body>
+          <h1>Yellow Pearl 帳簿サマリー</h1>
+          <p class="meta">${year}年 · 決済済み注文ベース · 出力日 ${new Date().toLocaleDateString('ja-JP')}</p>
+          <div class="summary">
+            <div><div class="label">商品売上（税抜）</div><div class="val">${yen(totals.product_subtotal)}</div></div>
+            <div><div class="label">消費税（商品分）</div><div class="val">${yen(totals.tax_amount)}</div></div>
+            <div><div class="label">送料収入</div><div class="val">${yen(totals.shipping_income)}</div></div>
+            <div><div class="label">売上合計</div><div class="val">${yen(totals.total_amount)}</div></div>
+            <div><div class="label">実配送費</div><div class="val">${yen(totals.actual_shipping)}</div></div>
+            <div><div class="label">送料差額</div><div class="val">${yen(margin)}</div></div>
+          </div>
+          <table>
+            <thead><tr>
+              <th>月</th><th>件数</th><th>商品(税抜)</th><th>消費税</th><th>送料収入</th><th>合計</th><th>実配送費</th><th>メモ</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p class="note">※ 課税事業者向けたたき台。送料の消費税区分・Stripe手数料等は税理士にご確認ください。</p>
+          </body></html>`;
+        const w = window.open('', '_blank', 'noopener,noreferrer');
+        if (!w) {
+          alert('ポップアップを許可してください');
+          return;
+        }
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        setTimeout(() => w.print(), 300);
+      }
 
       function esc(s) {
         return String(s ?? '')
@@ -774,53 +1138,38 @@
         return data;
       }
 
-      function showLogin() {
-        document.getElementById('login-screen').style.display = 'block';
-        document.getElementById('auth-error').style.display = 'none';
-        document.getElementById('app').hidden = true;
-      }
-
       function showApp() {
-        document.getElementById('login-screen').style.display = 'none';
         document.getElementById('auth-error').style.display = 'none';
-        document.getElementById('app').hidden = false;
+        document.getElementById('app').style.display = 'flex';
       }
 
       function showAuthError(msg) {
-        document.getElementById('login-screen').style.display = 'none';
         document.getElementById('auth-error').style.display = 'block';
         document.getElementById('auth-error-msg').textContent = msg;
-        document.getElementById('app').hidden = true;
+        document.getElementById('app').style.display = 'none';
       }
 
       async function checkAdminSession() {
         const res = await fetch(`${WORKER_URL}/api/admin/session`, { credentials: 'include' });
-        if (res.ok) return true;
-        return false;
-      }
-
-      async function loginAdmin(username, password) {
-        const res = await fetch(`${WORKER_URL}/api/admin/login`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password }),
-        });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const err = new Error(data.error || 'ログインに失敗しました');
-          err.locked = !!data.locked;
-          throw err;
+        if (res.ok && data.authenticated) {
+          accessLogoutUrl = data.logout_url || null;
+          return true;
         }
-        return data;
+        if (res.status === 503) {
+          throw new Error(data.error || '管理者認証（Cloudflare Access）が設定されていません。');
+        }
+        throw new Error(
+          data.error || 'メールでのワンタイム認証が必要です。ログイン画面を開いてください。',
+        );
       }
 
-      async function logoutAdmin() {
-        await fetch(`${WORKER_URL}/api/admin/logout`, {
-          method: 'POST',
-          credentials: 'include',
-        }).catch(() => {});
-        showLogin();
+      function logoutAdmin() {
+        if (accessLogoutUrl) {
+          window.location.href = accessLogoutUrl;
+          return;
+        }
+        window.location.reload();
       }
 
       function formatYen(n) {
@@ -830,6 +1179,24 @@
       function fmtNum(n) {
         return Number(n ?? 0).toLocaleString('ja-JP');
       }
+
+      function updatePricingPreview() {
+        const unitPrice = parseInt(document.getElementById('edit-unit-price').value, 10) || 0;
+        const taxRate = parseInt(document.getElementById('edit-tax-rate').value, 10) || 0;
+        const taxPerUnit = Math.floor(unitPrice * taxRate / 100);
+        const inclPerUnit = unitPrice + taxPerUnit;
+        const el = document.getElementById('pricing-preview');
+        if (!el) return;
+        el.innerHTML = `
+          1本あたり　税抜 ${formatYen(unitPrice)} 円 ＋ 消費税（${taxRate}%） ${formatYen(taxPerUnit)} 円
+          ＝ <strong>税込 ${formatYen(inclPerUnit)} 円</strong>（商品のみ・送料別）
+          <span class="pricing-preview-note">Stripe には「${esc('Yellow Pearl（イエローパール）')}」と「消費税（${taxRate}%）」の明細行として送信されます。</span>
+        `;
+      }
+
+      ['edit-unit-price', 'edit-tax-rate'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('input', updatePricingPreview);
+      });
 
       function switchScreen(name) {
         activeScreen = name;
@@ -842,6 +1209,7 @@
         document.getElementById('screen-title').textContent = SCREEN_TITLES[name] || '';
         if (name === 'stats') loadStats().catch((err) => alert(err.message));
         if (name === 'orders') loadOrders().catch((err) => alert(err.message));
+        if (name === 'bookkeeping') loadBookkeeping().catch((err) => alert(err.message));
       }
 
       document.querySelectorAll('.nav-btn').forEach((btn) => {
@@ -1102,6 +1470,7 @@
           badge.classList.remove('sold-out');
         }
 
+        updatePricingPreview();
         renderShippingGrid(data.shipping_regions ?? []);
         if (activeScreen === 'orders') loadOrders().catch(() => {});
       }
@@ -1109,7 +1478,7 @@
       async function loadDashboard() {
         const data = await api('/api/admin/dashboard');
         renderDashboard(data);
-        document.getElementById('app').hidden = false;
+        document.getElementById('app').style.display = 'flex';
       }
 
       document.getElementById('refresh-btn').addEventListener('click', async () => {
@@ -1117,6 +1486,7 @@
           await loadDashboard();
           if (activeScreen === 'stats') await loadStats();
           if (activeScreen === 'orders') await loadOrders();
+          if (activeScreen === 'bookkeeping') await loadBookkeeping();
         } catch (err) {
           alert(err.message);
         }
@@ -1141,7 +1511,7 @@
               sold_out: document.getElementById('edit-sold-out').checked,
             }),
           });
-          okEl.textContent = '在庫を更新しました';
+          okEl.textContent = '保存しました。予約ページと Stripe Checkout に反映されます。';
           await loadDashboard();
         } catch (err) {
           errEl.textContent = err.message;
@@ -1190,35 +1560,30 @@
         logoutAdmin();
       });
 
-      document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const errEl = document.getElementById('login-error');
-        const btn = document.getElementById('login-btn');
-        errEl.textContent = '';
-        btn.disabled = true;
-        try {
-          await loginAdmin(
-            document.getElementById('login-username').value.trim(),
-            document.getElementById('login-password').value,
-          );
-          document.getElementById('login-password').value = '';
-          showApp();
-          await loadDashboard();
-        } catch (err) {
-          errEl.textContent = err.message;
-        } finally {
-          btn.disabled = false;
-        }
+      document.getElementById('auth-reload-btn').addEventListener('click', () => {
+        window.location.reload();
       });
+
+      initBookkeepingYearSelect();
+      document.getElementById('bk-year').addEventListener('change', () => {
+        loadBookkeeping().catch((err) => alert(err.message));
+      });
+      document.getElementById('bk-reload-btn').addEventListener('click', () => {
+        loadBookkeeping().catch((err) => alert(err.message));
+      });
+      document.getElementById('bk-save-expenses-btn').addEventListener('click', () => {
+        saveBookkeepingExpenses().catch((err) => alert(err.message));
+      });
+      document.getElementById('bk-csv-btn').addEventListener('click', () => {
+        downloadBookkeepingCsv().catch((err) => alert(err.message));
+      });
+      document.getElementById('bk-pdf-btn').addEventListener('click', printBookkeepingPdf);
 
       (async function initAdmin() {
         try {
-          if (await checkAdminSession()) {
-            showApp();
-            await loadDashboard();
-          } else {
-            showLogin();
-          }
+          await checkAdminSession();
+          showApp();
+          await loadDashboard();
         } catch (err) {
           showAuthError(err.message || '認証の確認に失敗しました');
         }
