@@ -74,7 +74,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           <td class="num">${formatYen(m.shipping_income)}</td>
           <td class="num">${formatYen(m.total_amount)}</td>
           <td>
-            <input type="number" min="0" class="bk-actual-shipping" value="${m.actual_shipping}" aria-label="${m.month}月の実配送費（任意税込）" />
+            <input type="number" min="0" step="100" class="bk-actual-shipping" value="${m.actual_shipping}" aria-label="${m.month}月の実配送費（任意税込）" />
           </td>
           <td>
             <input type="text" class="bk-note" value="${esc(m.note)}" aria-label="${m.month}月のメモ" />
@@ -368,7 +368,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               <span class="shipping-region-name">${esc(r.name)}</span>
               <span class="shipping-region-prefs">${esc(formatRegionPrefs(r.prefectures))}</span>
             </label>
-            <input type="number" min="0" data-region="${r.id}" value="${feeById[r.id] ?? 0}" aria-label="${esc(r.name)}の送料（税抜・円）" />
+            <input type="number" min="0" step="100" data-region="${r.id}" value="${feeById[r.id] ?? 0}" aria-label="${esc(r.name)}の送料（税抜・円）" />
           </div>
         `).join('');
       }
@@ -616,6 +616,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const reception = resolveReceptionStatus({
           sold_out: inv.sold_out,
           stock: inv.stock,
+          unit_price: inv.unit_price,
           checkout_enabled: inv.checkout_enabled,
         });
         badge.textContent = reception.label;
