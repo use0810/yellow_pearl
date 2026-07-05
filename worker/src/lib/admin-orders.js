@@ -22,7 +22,7 @@ import {
   incrementStock,
   inventoryPublicFields,
 } from './inventory.js';
-import { expireStripeCheckoutSession, refundStripePayment } from './stripe.js';
+import { expireStripeCheckoutSession, refundStripePayment, resolveStripeMode } from './stripe.js';
 
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
@@ -98,9 +98,14 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
         return json({ error: 'キャンセルできません（決済状態が変更されています）' }, 409, CORS);
       }
 
+      const stripeMode = resolveStripeMode({
+        sessionId: order.stripe_session_id,
+        paymentIntentId: order.stripe_payment_id,
+      });
       const refund = await refundStripePayment(env, {
         paymentIntentId: order.stripe_payment_id,
         sessionId: order.stripe_session_id,
+        mode: stripeMode,
       });
       if (refund.error) {
         await env.DB.prepare(
@@ -137,7 +142,9 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
       await incrementStock(env.DB, qty);
 
       if (order.stripe_session_id) {
-        await expireStripeCheckoutSession(env, order.stripe_session_id);
+        await expireStripeCheckoutSession(env, order.stripe_session_id, {
+          mode: resolveStripeMode({ sessionId: order.stripe_session_id }),
+        });
       }
 
       await logOrderEvent(env.DB, orderId, 'cancelled', `admin:${PAYMENT_CANCELLED}`);

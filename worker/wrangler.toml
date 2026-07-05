@@ -12,10 +12,14 @@ ADMIN_ALLOWED_EMAILS = "shingo.satokimi2021@gmail.com"
 [triggers]
 crons = ["0 18 * * *"]
 
-# Stripe Checkout:
-#   wrangler secret put STRIPE_SECRET_KEY
-#   wrangler secret put STRIPE_WEBHOOK_SECRET
-# Webhook URL: https://yellow-pearl.com/api/reserve
+# Stripe Checkout（テスト）:
+#   wrangler secret put STRIPE_SECRET_KEY          # sk_test_...
+#   wrangler secret put STRIPE_WEBHOOK_SECRET        # テスト Webhook の whsec_...
+# Stripe Checkout（本番）:
+#   wrangler secret put STRIPE_SECRET_KEY_LIVE       # sk_live_...
+#   wrangler secret put STRIPE_WEBHOOK_SECRET_LIVE   # 本番 Webhook の whsec_...
+# 管理画面の「Stripe 決済モード」で test/live を切り替え（デフォルト test）
+# Webhook URL（テスト・本番とも同一）: https://yellow-pearl.com/api/reserve
 
 [[routes]]
 pattern = "yellow-pearl.com/*"

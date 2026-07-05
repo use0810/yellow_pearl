@@ -624,7 +624,25 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
 
         updatePricingPreview();
         renderShippingGrid(data.shipping_regions ?? []);
+        renderStripeMode(inv);
         if (activeScreen === 'orders') loadOrders().catch(() => {});
+      }
+
+      function renderStripeMode(inv) {
+        const mode = inv.stripe_mode === 'live' ? 'live' : 'test';
+        document.getElementById('stripe-mode-test').checked = mode === 'test';
+        document.getElementById('stripe-mode-live').checked = mode === 'live';
+
+        const testOk = !!inv.stripe_test_configured;
+        const liveOk = !!inv.stripe_live_configured;
+        document.getElementById('stripe-test-status').textContent = testOk
+          ? 'Worker キー設定済み'
+          : 'STRIPE_SECRET_KEY 未設定';
+        document.getElementById('stripe-live-status').textContent = liveOk
+          ? 'Worker キー設定済み'
+          : 'STRIPE_SECRET_KEY_LIVE 未設定';
+
+        document.getElementById('stripe-mode-live').disabled = !liveOk;
       }
 
       async function loadDashboard() {
@@ -664,6 +682,43 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             }),
           });
           okEl.textContent = '保存しました。予約ページと Stripe Checkout に反映されます。';
+          await loadDashboard();
+        } catch (err) {
+          errEl.textContent = err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      document.getElementById('stripe-mode-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('stripe-mode-error');
+        const okEl = document.getElementById('stripe-mode-success');
+        const btn = document.getElementById('save-stripe-mode-btn');
+        errEl.textContent = '';
+        okEl.textContent = '';
+        btn.disabled = true;
+
+        const selected = document.querySelector('input[name="stripe_mode"]:checked')?.value || 'test';
+        if (selected === 'live') {
+          const ok = window.confirm(
+            '本番決済モードに切り替えます。実際のカード決済が行われます。よろしいですか？',
+          );
+          if (!ok) {
+            btn.disabled = false;
+            return;
+          }
+        }
+
+        try {
+          const data = await api('/api/admin/stripe-mode', {
+            method: 'PUT',
+            body: JSON.stringify({ stripe_mode: selected }),
+          });
+          okEl.textContent = selected === 'live'
+            ? '本番決済モードに切り替えました'
+            : 'テスト決済モードに切り替えました';
+          renderStripeMode(data.inventory ?? {});
           await loadDashboard();
         } catch (err) {
           errEl.textContent = err.message;

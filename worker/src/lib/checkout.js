@@ -11,21 +11,25 @@ import {
 import { json, generateOrderId } from './http.js';
 import {
   decrementStock,
+  fetchInventoryRow,
   incrementStock,
   insertReservedOrder,
+  inventoryStripeMode,
   loadPricing,
   markOrderFailedAndReleaseStock,
 } from './inventory.js';
 import {
   createStripeCheckoutSession,
   expireStripeCheckoutSession,
-  isStripeEnabled,
+  isStripeEnabledForMode,
   isStripeSessionPaid,
   refundStripePayment,
+  resolveStripeMode,
   stripeFetch,
+  stripeModeFromResourceId,
   stripeOrderId,
   stripePaymentIntentId,
-  verifyStripeWebhook,
+  verifyStripeWebhookAny,
 } from './stripe.js';
 
 /** 決済確定: 在庫は Checkout 開始時に確保済み。payment_status のみ更新 */
@@ -47,6 +51,7 @@ export async function confirmOrderPayment(env, orderId, { sessionId = null, paym
       const refund = await refundStripePayment(env, {
         paymentIntentId: paymentId,
         sessionId,
+        mode: resolveStripeMode({ sessionId, paymentIntentId: paymentId }),
       });
       if (refund.error) {
         return { error: 'キャンセル済み注文への入金返金に失敗しました', status: 503 };
@@ -115,7 +120,9 @@ export async function confirmOrderPayment(env, orderId, { sessionId = null, paym
 }
 
 export async function handleCheckout(request, env, CORS) {
-  if (!isStripeEnabled(env)) {
+  const inv = await fetchInventoryRow(env.DB);
+  const stripeMode = inventoryStripeMode(inv);
+  if (!isStripeEnabledForMode(env, stripeMode)) {
     return json({ error: '決済は現在利用できません' }, 503, CORS);
   }
 
@@ -166,7 +173,7 @@ export async function handleCheckout(request, env, CORS) {
       shippingExcl,
       shippingTaxRate,
       shippingTaxAmount,
-    });
+    }, stripeMode);
   } catch {
     await markOrderFailedAndReleaseStock(env.DB, order_id);
     return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
@@ -185,7 +192,7 @@ export async function handleCheckout(request, env, CORS) {
       throw new Error('session link failed');
     }
   } catch {
-    await expireStripeCheckoutSession(env, session.id);
+    await expireStripeCheckoutSession(env, session.id, { mode: stripeMode });
     await markOrderFailedAndReleaseStock(env.DB, order_id);
     return json({ error: '予約の更新に失敗しました' }, 500, CORS);
   }
@@ -199,13 +206,18 @@ export async function handleCheckout(request, env, CORS) {
 
 export async function handleCheckoutReturn(env, CORS, sessionId) {
   if (!sessionId) return json({ error: 'session_id が必要です' }, 400, CORS);
-  if (!isStripeEnabled(env)) return json({ error: '決済は現在利用できません' }, 503, CORS);
+
+  const stripeMode = stripeModeFromResourceId(sessionId)
+    ?? inventoryStripeMode(await fetchInventoryRow(env.DB));
+  if (!isStripeEnabledForMode(env, stripeMode)) {
+    return json({ error: '決済は現在利用できません' }, 503, CORS);
+  }
 
   let session;
   try {
     session = await stripeFetch(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'GET',
-    });
+    }, stripeMode);
   } catch {
     return json({ error: '決済情報の取得に失敗しました' }, 502, CORS);
   }
@@ -261,11 +273,7 @@ export async function handleStripeWebhook(request, env) {
   const rawBody = await request.text();
   const signature = request.headers.get('Stripe-Signature');
 
-  const event = await verifyStripeWebhook(
-    rawBody,
-    signature,
-    env.STRIPE_WEBHOOK_SECRET,
-  );
+  const event = await verifyStripeWebhookAny(rawBody, signature, env);
   if (!event) return new Response('Invalid signature', { status: 401 });
 
   const type = event.type;

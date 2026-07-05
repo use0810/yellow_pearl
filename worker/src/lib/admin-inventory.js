@@ -1,6 +1,7 @@
 import { findShippingRegion, getShippingRegionsFromMap, PRODUCT_ID } from '../../../shared/domain.js';
 import { json } from './http.js';
-import { getShippingMap } from './inventory.js';
+import { fetchInventoryRow, getShippingMap, inventoryPublicFields } from './inventory.js';
+import { isStripeEnabledForMode, normalizeStripeMode } from './stripe.js';
 
 export async function handleAdminInventoryUpdate(request, env, CORS) {
   const body = await request.json().catch(() => null);
@@ -84,5 +85,31 @@ export async function handleAdminShippingUpdate(request, env, CORS) {
   return json({
     shipping_regions: getShippingRegionsFromMap(shippingMap),
     shipping_tax_rate: shippingTaxRate,
+  }, 200, CORS);
+}
+
+export async function handleAdminStripeModeUpdate(request, env, CORS) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ error: 'Invalid JSON' }, 400, CORS);
+
+  const stripeMode = normalizeStripeMode(body.stripe_mode);
+  if (stripeMode === 'live' && !isStripeEnabledForMode(env, 'live')) {
+    return json({
+      error: '本番用 Stripe キー（STRIPE_SECRET_KEY_LIVE）が Worker に設定されていません',
+    }, 400, CORS);
+  }
+  if (stripeMode === 'test' && !isStripeEnabledForMode(env, 'test')) {
+    return json({
+      error: 'テスト用 Stripe キー（STRIPE_SECRET_KEY）が Worker に設定されていません',
+    }, 400, CORS);
+  }
+
+  await env.DB.prepare(
+    `UPDATE inventory SET stripe_mode = ? WHERE product_id = ?`
+  ).bind(stripeMode, PRODUCT_ID).run();
+
+  const inv = await fetchInventoryRow(env.DB);
+  return json({
+    inventory: inventoryPublicFields(inv, env),
   }, 200, CORS);
 }

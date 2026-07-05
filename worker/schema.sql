@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS inventory (
   sold_out INTEGER NOT NULL DEFAULT 0,
   unit_price INTEGER NOT NULL DEFAULT 0,
   tax_rate INTEGER NOT NULL DEFAULT 10,
-  shipping_tax_rate INTEGER NOT NULL DEFAULT 10
+  shipping_tax_rate INTEGER NOT NULL DEFAULT 10,
+  stripe_mode TEXT NOT NULL DEFAULT 'test'
 );
 
 INSERT OR IGNORE INTO inventory (product_id, stock, sold_out, unit_price, tax_rate, shipping_tax_rate)

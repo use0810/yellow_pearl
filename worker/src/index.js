@@ -5,9 +5,9 @@ import {
   handleCheckoutReturn,
   handleStripeWebhook,
 } from './lib/checkout.js';
-import { cleanupStaleOrders, handleStock } from './lib/inventory.js';
+import { cleanupStaleOrders, fetchInventoryRow, handleStock, inventoryStripeMode } from './lib/inventory.js';
 import { isRateLimited } from './lib/rate-limit.js';
-import { isStripeEnabled } from './lib/stripe.js';
+import { isStripeEnabledForMode } from './lib/stripe.js';
 import {
   handleAdminDashboard,
   handleAdminOrderDelete,
@@ -18,6 +18,7 @@ import {
 import {
   handleAdminInventoryUpdate,
   handleAdminShippingUpdate,
+  handleAdminStripeModeUpdate,
 } from './lib/admin-inventory.js';
 import {
   handleAdminBookkeeping,
@@ -65,7 +66,9 @@ async function handleApi(request, env) {
   }
 
   if (url.pathname === '/api/reserve' && request.method === 'POST') {
-    if (isStripeEnabled(env)) return handleCheckout(request, env, CORS);
+    const inv = await fetchInventoryRow(env.DB);
+    const stripeMode = inventoryStripeMode(inv);
+    if (isStripeEnabledForMode(env, stripeMode)) return handleCheckout(request, env, CORS);
     return json({ error: '決済は現在利用できません' }, 503, CORS);
   }
 
@@ -92,6 +95,10 @@ async function handleApi(request, env) {
 
     if (url.pathname === '/api/admin/shipping' && request.method === 'PUT') {
       return handleAdminShippingUpdate(request, env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/stripe-mode' && request.method === 'PUT') {
+      return handleAdminStripeModeUpdate(request, env, CORS);
     }
 
     if (url.pathname === '/api/admin/stats' && request.method === 'GET') {

@@ -271,6 +271,47 @@
         font-size: 0.9rem;
       }
 
+      .stripe-mode-options {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .stripe-mode-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        padding: 0.85rem 1rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        background: #fafafa;
+      }
+
+      .stripe-mode-option:has(input:checked) {
+        border-color: #1d4ed8;
+        background: #eff6ff;
+      }
+
+      .stripe-mode-option:has(input:disabled) {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .stripe-mode-label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        font-size: 0.9rem;
+      }
+
+      .stripe-mode-desc {
+        font-size: 0.8rem;
+        color: #666;
+        font-weight: 400;
+      }
+
       .msg-error { color: #dc2626; font-size: 0.85rem; margin-top: 0.5rem; }
       .msg-success { color: #16a34a; font-size: 0.85rem; margin-top: 0.5rem; }
 

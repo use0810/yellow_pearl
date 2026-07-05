@@ -94,6 +94,37 @@
           </div>
 
           <div class="card">
+            <div class="card-title">Stripe 決済モード</div>
+            <p class="card-note">
+              予約ページの Checkout に使う Stripe アカウントモードです。
+              <strong>テスト</strong>ではテストカード（4242…）が使えます。
+              <strong>本番</strong>では実際のカード決済が行われます。
+              Worker にはテスト用・本番用のシークレットキーを別々に設定してください。
+            </p>
+            <form id="stripe-mode-form">
+              <div class="stripe-mode-options">
+                <label class="stripe-mode-option">
+                  <input type="radio" name="stripe_mode" value="test" id="stripe-mode-test" checked />
+                  <span class="stripe-mode-label">
+                    <strong>テスト決済</strong>
+                    <span class="stripe-mode-desc" id="stripe-test-status">—</span>
+                  </span>
+                </label>
+                <label class="stripe-mode-option">
+                  <input type="radio" name="stripe_mode" value="live" id="stripe-mode-live" />
+                  <span class="stripe-mode-label">
+                    <strong>本番決済</strong>
+                    <span class="stripe-mode-desc" id="stripe-live-status">—</span>
+                  </span>
+                </label>
+              </div>
+              <p class="msg-error" id="stripe-mode-error"></p>
+              <p class="msg-success" id="stripe-mode-success"></p>
+              <button type="submit" class="btn btn-primary" id="save-stripe-mode-btn">決済モードを保存</button>
+            </form>
+          </div>
+
+          <div class="card">
             <div class="card-title">送料（地域別）</div>
             <p class="card-note">金額は<strong>税抜</strong>で入力（商品単価と同じ）。送料の消費税率は商品と別に設定できます（通常 10％）。カートでは税込送料として表示されます。</p>
             <form id="shipping-form">

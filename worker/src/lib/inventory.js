@@ -8,12 +8,12 @@ import {
   calcOrderAmount,
 } from '../../../shared/domain.js';
 import { json, nowIso } from './http.js';
-import { isStripeEnabled } from './stripe.js';
+import { isStripeEnabledForMode, normalizeStripeMode } from './stripe.js';
 import { ensureRateLimitTable } from './rate-limit.js';
 
 const STALE_STRIPE_ORDER_HOURS = 48;
 
-const INVENTORY_SELECT = `stock, sold_out, unit_price, tax_rate, shipping_tax_rate`;
+const INVENTORY_SELECT = `stock, sold_out, unit_price, tax_rate, shipping_tax_rate, stripe_mode`;
 
 const ORDER_INSERT_COLUMNS = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
@@ -69,15 +69,23 @@ export async function fetchInventoryRow(db) {
   ).bind(PRODUCT_ID).first();
 }
 
+export function inventoryStripeMode(row) {
+  return normalizeStripeMode(row?.stripe_mode);
+}
+
 /** /api/stock と管理ダッシュボードで共有する inventory 公開フィールド */
 export function inventoryPublicFields(row, env) {
+  const stripeMode = inventoryStripeMode(row);
   return {
     stock: row?.stock ?? 0,
     sold_out: row?.sold_out === 1,
     unit_price: row?.unit_price ?? 0,
     tax_rate: row?.tax_rate ?? 10,
     shipping_tax_rate: row?.shipping_tax_rate ?? 10,
-    checkout_enabled: isStripeEnabled(env),
+    stripe_mode: stripeMode,
+    stripe_test_configured: isStripeEnabledForMode(env, 'test'),
+    stripe_live_configured: isStripeEnabledForMode(env, 'live'),
+    checkout_enabled: isStripeEnabledForMode(env, stripeMode),
   };
 }
 
