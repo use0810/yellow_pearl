@@ -200,15 +200,16 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           </table>
           <p class="note">※ CSV 出力と同一データソース。課税事業者向けたたき台。送料の消費税区分・Stripe手数料等は税理士にご確認ください。</p>
           </body></html>`;
-        const w = window.open('', '_blank', 'noopener,noreferrer');
+        const w = window.open('about:blank', '_blank');
         if (!w) {
           alert('ポップアップを許可してください');
           return;
         }
+        w.document.open();
         w.document.write(html);
         w.document.close();
         w.focus();
-        setTimeout(() => w.print(), 300);
+        setTimeout(() => w.print(), 250);
       }
 
       function esc(s) {
