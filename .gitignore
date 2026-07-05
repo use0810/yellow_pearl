@@ -15,6 +15,8 @@
 !shared/**
 !privacy.html
 !tokusho.html
+!robots.txt
+!sitemap.xml
 !assets/
 !assets/**
 !worker/
