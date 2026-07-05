@@ -6,6 +6,7 @@ import {
   ORDER_STATUS_RESERVED,
   ORDER_NOT_ARCHIVED,
   PAYMENT_CANCELLED,
+  PAYMENT_FAILED,
   PAYMENT_PAID,
   PAYMENT_REFUNDED,
   PAYMENT_UNPAID,
@@ -146,10 +147,14 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
         await incrementStock(env.DB, qty);
       }
 
+      const paymentStatus = order.payment_status === PAYMENT_FAILED
+        ? PAYMENT_CANCELLED
+        : order.payment_status;
+
       const lock = await env.DB.prepare(
-        `UPDATE orders SET status = ?, admin_note = ?
+        `UPDATE orders SET status = ?, payment_status = ?, admin_note = ?
          WHERE order_id = ? AND status != ? AND ${ORDER_NOT_ARCHIVED}`
-      ).bind(ORDER_STATUS_CANCELLED, adminNote, orderId, ORDER_STATUS_CANCELLED).run();
+      ).bind(ORDER_STATUS_CANCELLED, paymentStatus, adminNote, orderId, ORDER_STATUS_CANCELLED).run();
 
       if ((lock.meta?.changes ?? 0) === 0) {
         return json({ error: 'キャンセルできません（状態が変更されています）' }, 409, CORS);
@@ -180,6 +185,7 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
         await incrementStock(env.DB, qty);
         return json({ error: '再予約に戻せません（状態が変更されています）' }, 409, CORS);
       }
+      await logOrderEvent(env.DB, orderId, 'restored', status);
     } catch {
       await incrementStock(env.DB, qty);
       return json({ error: '予約の更新に失敗しました' }, 500, CORS);

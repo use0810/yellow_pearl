@@ -203,7 +203,7 @@
     <script type="module" src="/shared/site-footer.js"></script>
 
     <script type="module">
-      import { calcOrderAmount, KANA_PATTERN, MAX_LEN, MAX_ORDER_QTY, PREFECTURES, validateReserveFields } from '/shared/domain.js';
+      import { calcOrderAmount, MAX_LEN, MAX_ORDER_QTY, PREFECTURES, validateReserveFields, reserveValidationFieldId } from '/shared/domain.js';
       import { applyCartReceptionUI } from '/shared/reception-status.js';
 
       const WORKER_URL = window.location.origin;
@@ -411,7 +411,6 @@
           { id: 'address1',         label: '住所' },
         ];
 
-        let valid = true;
         let firstInvalid = null;
 
         fields.forEach(({ id }) => {
@@ -421,7 +420,6 @@
             el.classList.add('invalid');
             if (err) err.textContent = '必須項目です';
             if (!firstInvalid) firstInvalid = el;
-            valid = false;
           } else {
             el.classList.remove('invalid');
             if (err) err.textContent = '';
@@ -447,50 +445,6 @@
             const err = document.getElementById(`err-${id}`);
             if (err) err.textContent = `${max}文字以内で入力してください`;
             if (!firstInvalid) firstInvalid = el;
-            valid = false;
-          }
-        });
-
-        const email = document.getElementById('email');
-        if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-          email.classList.add('invalid');
-          const err = document.getElementById('err-email');
-          if (err) err.textContent = '形式が正しくありません';
-          if (!firstInvalid) firstInvalid = email;
-          valid = false;
-        }
-
-        const postal = document.getElementById('postal');
-        if (postal.value.trim() && normalizePostal(postal.value).length !== 7) {
-          postal.classList.add('invalid');
-          const err = document.getElementById('err-postal');
-          if (err) err.textContent = '7桁の郵便番号を入力してください';
-          if (!firstInvalid) firstInvalid = postal;
-          valid = false;
-        }
-
-        const phone = document.getElementById('phone');
-        const phoneDigits = phone.value.replace(/\D/g, '');
-        if (phone.value.trim() && (phoneDigits.length < 10 || phoneDigits.length > 11)) {
-          phone.classList.add('invalid');
-          const err = document.getElementById('err-phone');
-          if (err) err.textContent = '10〜11桁で入力してください';
-          if (!firstInvalid) firstInvalid = phone;
-          valid = false;
-        }
-
-        [
-          { id: 'last-name-kana',  label: 'セイ' },
-          { id: 'first-name-kana', label: 'メイ' },
-        ].forEach(({ id }) => {
-          const el = document.getElementById(id);
-          const err = document.getElementById(`err-${id}`);
-          const val = el.value.trim();
-          if (val && !KANA_PATTERN.test(val)) {
-            el.classList.add('invalid');
-            if (err) err.textContent = 'カタカナで入力してください';
-            if (!firstInvalid) firstInvalid = el;
-            valid = false;
           }
         });
 
@@ -502,7 +456,19 @@
 
         const serverCheck = validateReserveFields(buildReservePayload());
         if (serverCheck.error) {
-          alert(serverCheck.error);
+          const fieldId = reserveValidationFieldId(serverCheck.error);
+          if (fieldId) {
+            const el = document.getElementById(fieldId);
+            const err = document.getElementById(`err-${fieldId}`);
+            if (el) {
+              el.classList.add('invalid');
+              if (err) err.textContent = serverCheck.error;
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.focus();
+            }
+          } else {
+            alert(serverCheck.error);
+          }
           return false;
         }
 

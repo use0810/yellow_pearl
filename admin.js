@@ -407,13 +407,9 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         return 'payment-unpaid';
       }
 
-      function formatPaymentStatus(paymentStatus) {
-        return paymentStatus || PAYMENT_UNPAID;
-      }
-
       function renderOrderStatusCell(o) {
         const status = o.status || ORDER_STATUS_RESERVED;
-        const paymentStatus = formatPaymentStatus(o.payment_status);
+        const paymentStatus = o.payment_status || PAYMENT_UNPAID;
         const summary = summarizeOrderState(o);
         const fulfillLabel = FULFILLMENT_LABELS[status] || status;
         return `<div class="order-status-cell">

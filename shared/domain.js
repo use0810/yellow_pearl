@@ -31,15 +31,24 @@ export const BOOKKEEPING_ORDER_FILTER =
 /** 一覧・集計から除外するアーカイブ済み行 */
 export const ORDER_NOT_ARCHIVED = 'archived_at IS NULL';
 
-/**
- * デプロイ前 D1 実行: worker/migrate-payment-cancelled.sql
- * 旧管理者キャンセル（失敗）→ 取消 への矯正
- */
-export const LEGACY_ADMIN_CANCEL_SQL = `UPDATE orders
-SET payment_status = '${PAYMENT_CANCELLED}'
-WHERE status = '${ORDER_STATUS_CANCELLED}'
-  AND payment_status = '${PAYMENT_FAILED}'
-  AND stripe_session_id IS NOT NULL`;
+/** 旧管理者キャンセル矯正 — migrate-payment-cancelled.sql と同等（一括マイグレーション専用） */
+export const LEGACY_ADMIN_CANCEL_PREDICATE =
+  `status = '${ORDER_STATUS_CANCELLED}' AND payment_status = '${PAYMENT_FAILED}' AND stripe_session_id IS NOT NULL`;
+
+/** validateReserveFields の error を cart フォーム field id にマップ */
+export function reserveValidationFieldId(error) {
+  const map = {
+    'フリガナは必須です': 'last-name-kana',
+    'フリガナはカタカナで入力してください': 'last-name-kana',
+    'メールアドレスの形式が正しくありません': 'email',
+    '郵便番号が正しくありません': 'postal',
+    '電話番号が正しくありません': 'phone',
+    '都道府県が不正です': 'prefecture',
+    '必須項目が不足しています': 'last-name',
+  };
+  return map[error] ?? null;
+}
+
 export const MAX_LEN = {
   name: 50,
   email: 100,

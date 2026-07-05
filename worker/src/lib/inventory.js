@@ -1,8 +1,9 @@
 import {
   ORDER_STATUS_CANCELLED,
   ORDER_STATUS_RESERVED,
+  LEGACY_ADMIN_CANCEL_PREDICATE,
+  PAYMENT_CANCELLED,
   PAYMENT_FAILED,
-  PAYMENT_PAID,
   PAYMENT_UNPAID,
   PRODUCT_ID,
   PREFECTURES,
@@ -109,7 +110,14 @@ export async function markOrderFailedAndReleaseStock(db, orderId) {
   return false;
 }
 
-/** Checkout 失敗時: markOrderFailedAndReleaseStock を checkout.js から直接呼ぶ */
+/** 旧管理者キャンセル（失敗）→ 取消。migrate-payment-cancelled.sql と同等・冪等（手動/一括用） */
+export async function healLegacyAdminCancelPayments(db) {
+  const result = await db.prepare(
+    `UPDATE orders SET payment_status = ?
+     WHERE ${LEGACY_ADMIN_CANCEL_PREDICATE}`
+  ).bind(PAYMENT_CANCELLED).run();
+  return result.meta?.changes ?? 0;
+}
 
 export async function cleanupStaleOrders(env) {
   await ensureRateLimitTable(env.DB);

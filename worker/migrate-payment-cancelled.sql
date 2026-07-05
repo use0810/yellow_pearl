@@ -1,5 +1,7 @@
 -- 旧管理者キャンセル（payment_status='失敗'）を '取消' に矯正
 -- stripe_session_id が NULL の行は Stripe 失敗由来の可能性があるため対象外
+-- 一括マイグレーション専用（決済 Webhook では実行しない）
+-- domain.js LEGACY_ADMIN_CANCEL_PREDICATE / healLegacyAdminCancelPayments() と同等
 -- デプロイ前に migrate-audit.sql の後に実行すること
 UPDATE orders
 SET payment_status = '取消'
