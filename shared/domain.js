@@ -22,6 +22,32 @@ export const PAYMENT_REFUNDED = '返金済';
 
 export const MAX_ORDER_QTY = 50;
 
+/** Stripe Dashboard（本番）— 管理画面リンク用 */
+export const STRIPE_DASHBOARD = {
+  payments: 'https://dashboard.stripe.com/payments',
+  payouts: 'https://dashboard.stripe.com/payouts',
+  balance: 'https://dashboard.stripe.com/balance/overview',
+  reports: 'https://dashboard.stripe.com/reports/hub',
+};
+
+export function isStripeLiveResourceId(id) {
+  return typeof id === 'string' && id.length > 0 && id.includes('_live_');
+}
+
+/** 本番 Stripe Dashboard の決済詳細 URL（決済済・返金済のみ。テスト ID は null） */
+export function stripeLiveDashboardPaymentUrl({ paymentIntentId, sessionId, paymentStatus }) {
+  if (paymentStatus !== PAYMENT_PAID && paymentStatus !== PAYMENT_REFUNDED) return null;
+  const pi = paymentIntentId || '';
+  const cs = sessionId || '';
+  if (isStripeLiveResourceId(pi)) {
+    return `https://dashboard.stripe.com/payments/${encodeURIComponent(pi)}`;
+  }
+  if (isStripeLiveResourceId(cs)) {
+    return `https://dashboard.stripe.com/checkout/sessions/${encodeURIComponent(cs)}`;
+  }
+  return null;
+}
+
 /** フリガナ（カタカナ） */
 export const KANA_PATTERN = /^[ァ-ヴー・]+$/;
 

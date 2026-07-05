@@ -28,7 +28,7 @@ import { maybeSendCancellationEmail, resendConfirmationEmail } from './email.js'
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
   quantity, unit_price, shipping_fee, tax_amount, total_amount,
-  status, payment_status, admin_note, created_at`;
+  status, payment_status, admin_note, stripe_session_id, stripe_payment_id, created_at`;
 
 async function logOrderEvent(db, orderId, eventType, detail = '') {
   await db.prepare(

@@ -221,6 +221,43 @@
               </div>
             </div>
 
+            <div class="stripe-dash-block">
+              <p class="stripe-dash-block-title">Stripe（本番）— 手数料・振込の確認</p>
+              <p class="card-note" style="margin-bottom:0.75rem">Stripe にログインが必要です。テスト決済（<code>cs_test_</code>）は対象外です。</p>
+              <div class="stripe-dash-links">
+                <a href="https://dashboard.stripe.com/payments" target="_blank" rel="noopener noreferrer" class="stripe-dash-link">決済一覧</a>
+                <a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noopener noreferrer" class="stripe-dash-link">振込（Payouts）</a>
+                <a href="https://dashboard.stripe.com/balance/overview" target="_blank" rel="noopener noreferrer" class="stripe-dash-link">残高・手数料</a>
+                <a href="https://dashboard.stripe.com/reports/hub" target="_blank" rel="noopener noreferrer" class="stripe-dash-link">レポート（CSV）</a>
+              </div>
+              <p class="card-note" style="margin-top:0.75rem;margin-bottom:0">
+                <strong>レポート</strong> から期間を指定して CSV をダウンロードし、電子ファイルまたは紙で保管してください。
+              </p>
+            </div>
+
+            <div class="stripe-tax-guide">
+              <p class="stripe-tax-guide-title">確定申告の準備（たたき台）</p>
+              <p>Stripe から「領収書」は発行されません。代わりに、次の資料を<strong>ダウンロードして電子ファイルまたは紙で7年程度保管</strong>し、確定申告のときに参照してください。</p>
+              <p class="stripe-tax-guide-subhead">毎月（または四半期）— ダウンロードして保存</p>
+              <ol>
+                <li><strong>この画面の「CSV」</strong> … 当サイトの売上・送料（決済済み注文の集計）</li>
+                <li><strong><a href="https://dashboard.stripe.com/reports/hub" target="_blank" rel="noopener noreferrer">Stripe → レポート（CSV）</a></strong> … 決済手数料・入金額の明細（対象年・月を指定して CSV を保存）</li>
+                <li><strong>実配送費</strong> … 配送業者の請求書 PDF（別フォルダで保管）。金額は下の表に入力</li>
+              </ol>
+              <p class="stripe-tax-guide-subhead">年1回（2月中旬〜3月中旬の申告期間前）</p>
+              <ol>
+                <li><strong><a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noopener noreferrer">Stripe → 振込（Payouts）</a></strong> … 銀行口座への入金日・金額（<strong>通帳</strong>と突合）</li>
+                <li><strong><a href="https://dashboard.stripe.com/payments" target="_blank" rel="noopener noreferrer">Stripe → 決済一覧</a></strong> … 返金・取りこぼしがないか確認</li>
+                <li>上記と <strong>通帳</strong> をそろえ、<strong><a href="https://www.e-tax.nta.go.jp/" target="_blank" rel="noopener noreferrer">e-Tax（国税庁）</a></strong> または <strong><a href="https://www.keisan.nta.go.jp/" target="_blank" rel="noopener noreferrer">確定申告書等作成コーナー</a></strong> から申告（農業所得がある場合は <strong>収支内訳書（農業所得）</strong> も必要になることがあります）</li>
+              </ol>
+              <p class="stripe-tax-guide-subhead">わからないとき</p>
+              <ul>
+                <li>最寄りの <strong>税務署</strong>（無料の相談窓口があります）</li>
+                <li>国税庁の Web サイト・確定申告書等作成コーナーの説明</li>
+              </ul>
+              <p class="stripe-tax-guide-note">※ 本画面の集計は申告の <strong>たたき台</strong> です。消費税・農業所得と事業所得の区分など、判断に迷う場合は税務署に相談してください。</p>
+            </div>
+
             <div class="bookkeeping-summary" id="bk-summary">
               <div class="bk-stat"><div class="bk-stat-label">商品売上（税抜）</div><div class="bk-stat-value" id="bk-sum-product">—</div></div>
               <div class="bk-stat"><div class="bk-stat-label">消費税（商品分）</div><div class="bk-stat-value" id="bk-sum-tax">—</div></div>
@@ -257,8 +294,8 @@
             <button type="button" class="btn btn-primary" id="bk-save-expenses-btn">実配送費を保存</button>
 
             <p class="bookkeeping-disclaimer">
-              ※ 課税事業者向けのたたき台です。送料の消費税区分・Stripe 手数料・農業所得との区分などは税理士にご確認ください。
-              配送業者の請求書 PDF は別途保管してください。
+              ※ 課税事業者向けのたたき台です。Stripe 手数料は上の Stripe リンクから CSV で取得してください。
+              配送業者の請求書 PDF は別途保管してください。詳細は「確定申告の準備」を参照。
             </p>
           </div>
         </section>

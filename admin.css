@@ -712,6 +712,88 @@
         margin-left: auto;
       }
 
+      .stripe-dash-block {
+        margin-bottom: 1.25rem;
+        padding: 1rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+      }
+
+      .stripe-dash-block-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 0.35rem;
+      }
+
+      .stripe-dash-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.75rem;
+      }
+
+      a.stripe-dash-link {
+        display: inline-block;
+        font-size: 0.78rem;
+        padding: 0.3rem 0.65rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        background: #fff;
+        color: #1d4ed8;
+        text-decoration: none;
+      }
+
+      a.stripe-dash-link:hover {
+        background: #eff6ff;
+        border-color: #93c5fd;
+      }
+
+      .stripe-tax-guide {
+        margin-bottom: 1.25rem;
+        padding: 1rem 1rem 1rem 1.1rem;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-left: 4px solid #f59e0b;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        line-height: 1.65;
+        color: #44403c;
+      }
+
+      .stripe-tax-guide-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #78350f;
+        margin-bottom: 0.5rem;
+      }
+
+      .stripe-tax-guide-subhead {
+        font-weight: 700;
+        margin: 0.85rem 0 0.35rem;
+        color: #57534e;
+      }
+
+      .stripe-tax-guide ol,
+      .stripe-tax-guide ul {
+        margin: 0.25rem 0 0.5rem 1.25rem;
+      }
+
+      .stripe-tax-guide li {
+        margin-bottom: 0.35rem;
+      }
+
+      .stripe-tax-guide a {
+        color: #1d4ed8;
+      }
+
+      .stripe-tax-guide-note {
+        margin-top: 0.75rem;
+        margin-bottom: 0;
+        font-size: 0.78rem;
+        color: #78716c;
+      }
+
       .bookkeeping-summary {
         display: grid;
         grid-template-columns: repeat(2, 1fr);

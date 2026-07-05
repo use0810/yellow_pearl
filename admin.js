@@ -13,6 +13,7 @@ import {
   calcOrderAmount,
   calcShippingMargin,
   summarizeOrderState,
+  stripeLiveDashboardPaymentUrl,
 } from '/shared/domain.js';
 import { resolveReceptionStatus } from '/shared/reception-status.js';
 
@@ -426,8 +427,19 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         </div>`;
       }
 
+      function renderStripePaymentLink(o) {
+        const url = stripeLiveDashboardPaymentUrl({
+          paymentIntentId: o.stripe_payment_id,
+          sessionId: o.stripe_session_id,
+          paymentStatus: o.payment_status || PAYMENT_UNPAID,
+        });
+        if (!url) return '';
+        return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="stripe-dash-link">Stripe 決済</a>`;
+      }
+
       function renderOpsCell(o) {
         const status = o.status || ORDER_STATUS_RESERVED;
+        const stripeLink = renderStripePaymentLink(o);
         if (status === ORDER_STATUS_CANCELLED) {
           return `<div class="ops-cell ops-cell-cancelled" data-order-id="${esc(o.order_id)}">
             <div class="ops-actions">
@@ -437,6 +449,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
                 data-admin-note="${esc(o.admin_note || '')}">再予約</button>
               <button type="button" class="btn btn-danger ops-delete-btn"
                 data-order-id="${esc(o.order_id)}">アーカイブ</button>
+              ${stripeLink}
             </div>
           </div>`;
         }
@@ -454,6 +467,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           <div class="ops-actions">
             <button type="button" class="btn ops-save ops-save-btn" data-order-id="${esc(o.order_id)}">保存</button>
             ${resendEmailBtn}
+            ${stripeLink}
           </div>
         </div>`;
       }
