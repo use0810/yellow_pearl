@@ -23,6 +23,7 @@ import {
   inventoryPublicFields,
 } from './inventory.js';
 import { expireStripeCheckoutSession, refundStripePayment, resolveStripeMode } from './stripe.js';
+import { maybeSendCancellationEmail, resendConfirmationEmail } from './email.js';
 
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
@@ -127,6 +128,7 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
       }
 
       await logOrderEvent(env.DB, orderId, 'cancelled', `refunded:${PAYMENT_PAID}`);
+      await maybeSendCancellationEmail(env, orderId, { refunded: true });
     } else if (order.payment_status === PAYMENT_UNPAID) {
       const lock = await env.DB.prepare(
         `UPDATE orders SET status = ?, payment_status = ?, admin_note = ?
@@ -148,6 +150,7 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
       }
 
       await logOrderEvent(env.DB, orderId, 'cancelled', `admin:${PAYMENT_CANCELLED}`);
+      await maybeSendCancellationEmail(env, orderId, { refunded: false });
     } else {
       const oldPaymentStatus = order.payment_status;
       const paymentStatus = oldPaymentStatus === PAYMENT_FAILED
@@ -171,6 +174,9 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
       }
 
       await logOrderEvent(env.DB, orderId, 'cancelled', oldPaymentStatus);
+      await maybeSendCancellationEmail(env, orderId, {
+        refunded: oldPaymentStatus === PAYMENT_REFUNDED,
+      });
     }
   } else if (oldStatus === ORDER_STATUS_CANCELLED && status !== ORDER_STATUS_CANCELLED) {
     if (
@@ -217,6 +223,14 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
   ).bind(orderId).first();
 
   return json({ order: updated }, 200, CORS);
+}
+
+export async function handleAdminResendConfirmationEmail(env, CORS, orderId) {
+  const result = await resendConfirmationEmail(env, orderId);
+  if (result.error) {
+    return json({ error: result.error }, result.status ?? 500, CORS);
+  }
+  return json({ ok: true }, 200, CORS);
 }
 
 export async function handleAdminOrderDelete(env, CORS, orderId, adminEmail = '') {

@@ -44,3 +44,9 @@ zone_name = "yellow-pearl.com"
 binding = "DB"
 database_name = "yellow-pearl-db"
 database_id = "83ca742c-5668-4f55-8385-9de1a6d027e1"
+
+# Email Sending（予約確認・キャンセル通知）:
+#   Dashboard → Email Service → Email Sending → yellow-pearl.com をオンボード
+#   送信元: info@yellow-pearl.com（オンボード済みドメイン内のアドレス）
+[[send_email]]
+name = "EMAIL"

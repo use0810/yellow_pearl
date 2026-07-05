@@ -440,14 +440,21 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             </div>
           </div>`;
         }
+        const paymentStatus = o.payment_status || PAYMENT_UNPAID;
         const options = ORDER_STATUSES.map((s) =>
           `<option value="${s}"${s === status ? ' selected' : ''}>${FULFILLMENT_LABELS[s] || s}</option>`
         ).join('');
-        return `<div class="ops-cell" data-order-id="${esc(o.order_id)}" data-payment-status="${esc(o.payment_status || PAYMENT_UNPAID)}">
+        const resendEmailBtn = paymentStatus === PAYMENT_PAID
+          ? `<button type="button" class="btn ops-resend-email-btn" data-order-id="${esc(o.order_id)}">確認メール再送</button>`
+          : '';
+        return `<div class="ops-cell" data-order-id="${esc(o.order_id)}" data-payment-status="${esc(paymentStatus)}">
           <p class="ops-status-hint">発送ステータス（手動）</p>
           <select class="ops-status" aria-label="予約ステータス">${options}</select>
           <textarea class="ops-note" placeholder="特記事項（管理者用）">${esc(o.admin_note || '')}</textarea>
-          <button type="button" class="btn ops-save ops-save-btn" data-order-id="${esc(o.order_id)}">保存</button>
+          <div class="ops-actions">
+            <button type="button" class="btn ops-save ops-save-btn" data-order-id="${esc(o.order_id)}">保存</button>
+            ${resendEmailBtn}
+          </div>
         </div>`;
       }
 
@@ -579,6 +586,20 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         }
       }
 
+      async function resendOrderConfirmationEmail(btn) {
+        const orderId = btn.dataset.orderId;
+        if (!confirm(`${orderId} の確認メールを再送しますか？`)) return;
+        btn.disabled = true;
+        try {
+          await api(`/api/admin/orders/${encodeURIComponent(orderId)}/resend-confirmation-email`, {
+            method: 'POST',
+          });
+          alert('確認メールを送信しました');
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
       function handleOrdersClick(e) {
         const restoreBtn = e.target.closest('.ops-restore-btn');
         if (restoreBtn) {
@@ -588,6 +609,11 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const deleteBtn = e.target.closest('.ops-delete-btn');
         if (deleteBtn) {
           archiveOrder(deleteBtn).catch((err) => alert(err.message));
+          return;
+        }
+        const resendBtn = e.target.closest('.ops-resend-email-btn');
+        if (resendBtn) {
+          resendOrderConfirmationEmail(resendBtn).catch((err) => alert(err.message));
           return;
         }
         const saveBtn = e.target.closest('.ops-save-btn');

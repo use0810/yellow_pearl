@@ -18,6 +18,7 @@ import {
   loadPricing,
   markOrderFailedAndReleaseStock,
 } from './inventory.js';
+import { maybeSendConfirmationEmail } from './email.js';
 import {
   createStripeCheckoutSession,
   expireStripeCheckoutSession,
@@ -41,6 +42,7 @@ export async function confirmOrderPayment(env, orderId, { sessionId = null, paym
 
   if (!order) return { error: '予約が見つかりません', status: 404 };
   if (order.payment_status === PAYMENT_PAID) {
+    await maybeSendConfirmationEmail(env, orderId);
     return { ok: true, order_id: orderId, already: true };
   }
   if (order.payment_status === PAYMENT_REFUNDED) {
@@ -111,11 +113,13 @@ export async function confirmOrderPayment(env, orderId, { sessionId = null, paym
       `SELECT payment_status FROM orders WHERE order_id = ?`
     ).bind(orderId).first();
     if (current?.payment_status === PAYMENT_PAID) {
+      await maybeSendConfirmationEmail(env, orderId);
       return { ok: true, order_id: orderId, already: true };
     }
     return { error: '決済状態を更新できません', status: 409 };
   }
 
+  await maybeSendConfirmationEmail(env, orderId);
   return { ok: true, order_id: orderId };
 }
 

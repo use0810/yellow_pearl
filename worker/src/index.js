@@ -13,6 +13,7 @@ import {
   handleAdminOrderDelete,
   handleAdminOrders,
   handleAdminOrderUpdate,
+  handleAdminResendConfirmationEmail,
   handleAdminStats,
 } from './lib/admin-orders.js';
 import {
@@ -119,6 +120,13 @@ async function handleApi(request, env) {
 
     if (url.pathname === '/api/admin/orders' && request.method === 'GET') {
       return handleAdminOrders(env, CORS, url);
+    }
+
+    const resendEmailMatch = url.pathname.match(
+      /^\/api\/admin\/orders\/([^/]+)\/resend-confirmation-email$/,
+    );
+    if (resendEmailMatch && request.method === 'POST') {
+      return handleAdminResendConfirmationEmail(env, CORS, resendEmailMatch[1]);
     }
 
     const orderMatch = url.pathname.match(/^\/api\/admin\/orders\/([^/]+)$/);
