@@ -26,6 +26,7 @@ import {
   handleAdminBookkeepingExpensesUpdate,
   handleAdminBookkeepingExport,
 } from './lib/bookkeeping.js';
+import { handleIndexHtml, isIndexHtmlPath } from './lib/html-seo.js';
 
 async function handleApi(request, env) {
   const url = new URL(request.url);
@@ -147,6 +148,11 @@ export default {
 
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, env);
+    }
+
+    // トップページの Product JSON-LD に DB の税込単価を埋め込む（Search Console 対策）
+    if (request.method === 'GET' && isIndexHtmlPath(url.pathname)) {
+      return handleIndexHtml(request, env);
     }
 
     return fetch(request);
