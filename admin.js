@@ -369,7 +369,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               <span class="shipping-region-name">${esc(r.name)}</span>
               <span class="shipping-region-prefs">${esc(formatRegionPrefs(r.prefectures))}</span>
             </label>
-            <input type="number" min="0" step="100" data-region="${r.id}" value="${feeById[r.id] ?? 0}" aria-label="${esc(r.name)}の送料（税抜・円）" />
+            <input type="number" min="0" step="1" data-region="${r.id}" value="${feeById[r.id] ?? 0}" aria-label="${esc(r.name)}の送料（税抜・円）" />
           </div>
         `).join('');
       }
