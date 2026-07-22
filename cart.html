@@ -169,7 +169,7 @@
             </div>
             <div class="order-row">
               <span class="key">お支払い</span>
-              <span class="val" id="summary-payment">クレジットカード</span>
+              <span class="val" id="summary-payment">クレジットカード / 銀行振込</span>
             </div>
           </div>
 
@@ -194,7 +194,7 @@
       <div id="complete-screen">
         <div class="complete-icon">✦</div>
         <h2 class="complete-title">Reservation Complete</h2>
-        <p class="complete-text">
+        <p class="complete-text" id="complete-text">
           ご予約ありがとうございます。<br />
           お支払いが完了しました。<br />
           予約番号を必ず控えてください。<br />
@@ -534,8 +534,10 @@
           );
           const data = await res.json();
 
-          if (res.ok && data.ok) {
-            showComplete(data.order_id);
+          if (res.ok && data.ok && data.pending) {
+            showComplete(data.order_id, { pending: true });
+          } else if (res.ok && data.ok) {
+            showComplete(data.order_id, { pending: false });
           } else {
             alert(data.message || data.error || '決済が完了していません。');
           }
@@ -563,12 +565,29 @@
         if (sessionId) handleCheckoutReturn(sessionId);
       })();
 
-      function showComplete(orderId) {
+      function showComplete(orderId, { pending = false } = {}) {
         document.getElementById('step2').classList.add('done');
         document.getElementById('step3').classList.add('active');
         document.getElementById('cart-screen').style.display = 'none';
         const complete = document.getElementById('complete-screen');
         complete.style.display = 'block';
+        const textEl = document.getElementById('complete-text');
+        if (textEl) {
+          textEl.innerHTML = pending
+            ? [
+                'ご予約ありがとうございます。<br />',
+                'お支払い画面の振込案内に従ってお支払いください。<br />',
+                '入金確認後に予約が確定し、確認メールをお送りします。<br />',
+                '予約番号を必ず控えてください。<br />',
+                '発送は2026年9月1日より順次行います。',
+              ].join('')
+            : [
+                'ご予約ありがとうございます。<br />',
+                'お支払いが完了しました。<br />',
+                '予約番号を必ず控えてください。<br />',
+                '発送は2026年9月1日より順次行います。',
+              ].join('');
+        }
         if (orderId) {
           document.getElementById('complete-order-id').textContent = `予約番号：${orderId}`;
         }

@@ -21,6 +21,7 @@ import {
 import { maybeSendConfirmationEmail } from './email.js';
 import {
   createStripeCheckoutSession,
+  createStripeCustomer,
   expireStripeCheckoutSession,
   isStripeEnabledForMode,
   isStripeSessionPaid,
@@ -165,10 +166,18 @@ export async function handleCheckout(request, env, CORS) {
 
   let session;
   try {
+    const customerName = `${last_name} ${first_name}`.trim();
+    const customer = await createStripeCustomer(env, {
+      email,
+      name: customerName || undefined,
+    }, stripeMode);
+    if (!customer?.id) {
+      throw new Error('customer create failed');
+    }
     session = await createStripeCheckoutSession(env, {
       origin,
       orderId: order_id,
-      email,
+      customerId: customer.id,
       qty,
       unitPrice,
       taxRate,
@@ -250,6 +259,18 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
       order_id: orderId,
       payment_status: PAYMENT_FAILED,
       session_status: session.status,
+    }, 200, CORS);
+  }
+
+  // 銀行振込など非同期決済: Session 完了後も unpaid のまま振込待ち
+  if (session.status === 'complete' || session.status === 'open') {
+    return json({
+      ok: true,
+      pending: true,
+      order_id: orderId,
+      payment_status: PAYMENT_UNPAID,
+      session_status: session.status,
+      message: '振込案内に従ってお支払いください。入金確認後に予約が確定し、確認メールをお送りします。',
     }, 200, CORS);
   }
 

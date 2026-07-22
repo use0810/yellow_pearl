@@ -125,22 +125,36 @@ export async function verifyStripeWebhookAny(rawBody, signatureHeader, env) {
   return null;
 }
 
+/** 銀行振込（customer_balance）に必須の Customer を作成 */
+export async function createStripeCustomer(env, { email, name } = {}, mode = 'test') {
+  const params = new URLSearchParams();
+  if (email) params.append('email', email);
+  if (name) params.append('name', name);
+  return stripeFetch(env, '/customers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  }, mode);
+}
+
 function buildStripeCheckoutParams({
-  origin, orderId, email, qty, unitPrice, taxRate, taxAmount,
+  origin, orderId, customerId, qty, unitPrice, taxRate, taxAmount,
   shippingFeeIncl, shippingExcl, shippingTaxRate, shippingTaxAmount,
 }) {
   const params = new URLSearchParams();
   params.append('mode', 'payment');
   params.append('success_url', `${origin}/cart.html?session_id={CHECKOUT_SESSION_ID}`);
   params.append('cancel_url', `${origin}/cart.html?cancelled=1`);
-  params.append('customer_email', email);
+  params.append('customer', customerId);
   params.append('client_reference_id', orderId);
   params.append('metadata[order_id]', orderId);
   params.append('metadata[unit_price]', String(unitPrice));
   params.append('metadata[tax_rate]', String(taxRate));
   params.append('metadata[shipping_tax_rate]', String(shippingTaxRate));
   params.append('locale', 'ja');
-  params.append('customer_creation', 'always');
+  // 日本の銀行振込（Dashboard で有効時に Checkout へ表示。Customer 必須）
+  params.append('payment_method_options[customer_balance][funding_type]', 'bank_transfer');
+  params.append('payment_method_options[customer_balance][bank_transfer][type]', 'jp_bank_transfer');
 
   params.append('line_items[0][quantity]', String(qty));
   params.append('line_items[0][price_data][currency]', 'jpy');

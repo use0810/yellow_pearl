@@ -8,10 +8,13 @@ import {
   calcOrderAmount,
 } from '../../../shared/domain.js';
 import { json, nowIso } from './http.js';
-import { isStripeEnabledForMode, normalizeStripeMode } from './stripe.js';
+import { isStripeEnabledForMode, normalizeStripeMode, stripeFetch, stripeModeFromResourceId } from './stripe.js';
 import { ensureRateLimitTable } from './rate-limit.js';
 
+/** カード離脱などの安全網（Webhook が主経路） */
 const STALE_STRIPE_ORDER_HOURS = 48;
+/** 銀行振込待ちの絶対上限 */
+const BANK_TRANSFER_PENDING_MAX_HOURS = 14 * 24;
 
 const INVENTORY_SELECT = `stock, sold_out, unit_price, tax_rate, shipping_tax_rate, stripe_mode`;
 
@@ -151,24 +154,75 @@ export async function cleanupStaleOrders(env) {
     }
   }
 
-  const staleFilter = `archived_at IS NULL
-       AND payment_status IN ('${PAYMENT_UNPAID}', '${PAYMENT_FAILED}')
+  // 失敗のまま予約ステータスが残っているもの
+  const failedReserved = await env.DB.prepare(
+    `SELECT order_id FROM orders
+     WHERE archived_at IS NULL
+       AND payment_status = '${PAYMENT_FAILED}'
        AND status = '${ORDER_STATUS_RESERVED}'
-       AND created_at < datetime('now', '+9 hours', ?)`;
+       AND created_at < datetime('now', '+9 hours', ?)`
+  ).bind(`-${STALE_STRIPE_ORDER_HOURS} hours`).all();
+  for (const row of failedReserved.results ?? []) {
+    cleaned += (await env.DB.prepare(
+      `UPDATE orders SET status = ? WHERE order_id = ? AND status = ?`
+    ).bind(ORDER_STATUS_CANCELLED, row.order_id, ORDER_STATUS_RESERVED).run()).meta?.changes ?? 0;
+  }
 
-  const staleRows = await env.DB.prepare(
-    `SELECT order_id, payment_status FROM orders WHERE ${staleFilter}`
+  // 未決済＋セッションあり: 振込待ちはスキップ、expired / 14日超のみ解放
+  const unpaidWithSession = await env.DB.prepare(
+    `SELECT order_id, stripe_session_id, created_at FROM orders
+     WHERE archived_at IS NULL
+       AND payment_status = '${PAYMENT_UNPAID}'
+       AND stripe_session_id IS NOT NULL
+       AND status = '${ORDER_STATUS_RESERVED}'
+       AND created_at < datetime('now', '+9 hours', ?)`
   ).bind(`-${STALE_STRIPE_ORDER_HOURS} hours`).all();
 
-  for (const row of staleRows.results ?? []) {
-    if (row.payment_status === PAYMENT_UNPAID) {
+  for (const row of unpaidWithSession.results ?? []) {
+    const pastAbsoluteLimit = await env.DB.prepare(
+      `SELECT 1 AS ok FROM orders
+       WHERE order_id = ?
+         AND created_at < datetime('now', '+9 hours', ?)`
+    ).bind(row.order_id, `-${BANK_TRANSFER_PENDING_MAX_HOURS} hours`).first();
+
+    if (pastAbsoluteLimit) {
       if (await markOrderFailedAndReleaseStock(env.DB, row.order_id)) {
         cleaned += 1;
       }
-    } else {
-      cleaned += (await env.DB.prepare(
-        `UPDATE orders SET status = ? WHERE order_id = ? AND status = ?`
-      ).bind(ORDER_STATUS_CANCELLED, row.order_id, ORDER_STATUS_RESERVED).run()).meta?.changes ?? 0;
+      continue;
+    }
+
+    const stripeMode = stripeModeFromResourceId(row.stripe_session_id)
+      ?? inventoryStripeMode(await fetchInventoryRow(env.DB));
+    if (!isStripeEnabledForMode(env, stripeMode)) {
+      continue;
+    }
+
+    let session = null;
+    try {
+      session = await stripeFetch(
+        env,
+        `/checkout/sessions/${encodeURIComponent(row.stripe_session_id)}`,
+        { method: 'GET' },
+        stripeMode,
+      );
+    } catch {
+      // 取得失敗時は絶対上限まで待つ（上で処理済み以外はスキップ）
+      continue;
+    }
+
+    // 銀行振込待ち: Session 完了・未払い → 在庫は確保したまま
+    if (session?.status === 'complete' && session?.payment_status !== 'paid') {
+      continue;
+    }
+
+    if (session?.status === 'expired' || session?.status === 'open') {
+      // open が長く残るケースは絶対上限で落とす。expired は即解放。
+      if (session.status === 'expired') {
+        if (await markOrderFailedAndReleaseStock(env.DB, row.order_id)) {
+          cleaned += 1;
+        }
+      }
     }
   }
 
