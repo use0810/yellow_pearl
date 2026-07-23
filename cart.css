@@ -217,23 +217,29 @@
   }
 
   .product-summary {
-    align-items: flex-start;
-    gap: 0.85rem;
-    padding: 1rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 1.25rem 1rem;
+    text-align: center;
   }
 
   .product-summary img {
-    width: 56px;
-    height: 56px;
+    width: 72px;
+    height: 72px;
   }
 
   .summary-info {
     padding-right: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   .summary-title {
-    font-size: 0.95rem;
-    letter-spacing: 0.12em;
+    font-size: 1rem;
+    letter-spacing: 0.16em;
     white-space: nowrap;
   }
 
@@ -248,6 +254,7 @@
     transform: none;
     margin: 0.55rem 0 0;
     gap: 0.75rem;
+    justify-content: center;
   }
 
   .qty-btn {
