@@ -1,6 +1,7 @@
 /** 全公開ページ共通フッター */
 const FOOTER_HTML = `
   <div class="footer-logo">YELLOW PEARL</div>
+  <div class="footer-product">郷のきみイエローパール</div>
   <div class="footer-org">郷のきみの会</div>
   <div class="footer-sub">郷のきみ プレミアムライン ／ 青森県新郷村</div>
   <div class="footer-legal-row">

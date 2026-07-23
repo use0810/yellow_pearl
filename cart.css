@@ -120,13 +120,13 @@
 }
 
 .summary-title {
-  font-family: 'Noto Serif JP', 'Cinzel', serif;
-  font-size: 1.05rem;
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.2em;
 }
 
 .summary-limit {

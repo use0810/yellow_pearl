@@ -618,6 +618,14 @@ footer {
   background-clip: text;
 }
 
+.footer-product {
+  font-family: "Noto Serif JP", serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.18em;
+  color: rgba(232, 217, 176, 0.7);
+  text-align: center;
+}
+
 .footer-sub {
   font-size: 0.7rem;
   letter-spacing: 0.3em;
