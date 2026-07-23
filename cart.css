@@ -96,6 +96,7 @@
   border: 1px solid rgba(201, 168, 76, 0.2);
   background: rgba(201, 168, 76, 0.03);
   margin-bottom: 2.5rem;
+  position: relative;
 }
 
 .product-summary img {
@@ -104,10 +105,13 @@
   object-fit: cover;
   mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+  flex-shrink: 0;
 }
 
 .summary-info {
   flex: 1;
+  min-width: 0;
+  padding-right: 7rem;
 }
 
 .summary-name {
@@ -136,12 +140,16 @@
   margin-top: 0.3rem;
 }
 
-/* 数量セレクター */
+/* 数量セレクター（PCは右寄せ、スマホはタイトルと限定の間） */
 .qty-wrap {
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-shrink: 0;
+  position: absolute;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .qty-btn {
@@ -209,8 +217,8 @@
   }
 
   .product-summary {
-    flex-wrap: wrap;
-    gap: 0.85rem 0.75rem;
+    align-items: flex-start;
+    gap: 0.85rem;
     padding: 1rem;
   }
 
@@ -220,8 +228,7 @@
   }
 
   .summary-info {
-    min-width: 0;
-    flex: 1 1 0;
+    padding-right: 0;
   }
 
   .summary-title {
@@ -233,11 +240,13 @@
   .summary-limit {
     font-size: 0.65rem;
     letter-spacing: 0.06em;
+    margin-top: 0.45rem;
   }
 
   .qty-wrap {
-    width: 100%;
-    justify-content: flex-end;
+    position: static;
+    transform: none;
+    margin: 0.55rem 0 0;
     gap: 0.75rem;
   }
 
