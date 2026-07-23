@@ -120,13 +120,13 @@
 }
 
 .summary-title {
-  font-family: 'Cinzel', serif;
-  font-size: 1.1rem;
+  font-family: 'Noto Serif JP', 'Cinzel', serif;
+  font-size: 1.05rem;
   background: linear-gradient(135deg, var(--gold), var(--gold-bright));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.12em;
 }
 
 .summary-limit {
@@ -209,14 +209,13 @@
   }
 
   .product-summary {
-    flex-wrap: wrap;
-    gap: 1rem;
-    padding: 1.1rem;
+    gap: 0.75rem;
+    padding: 1rem;
   }
 
   .product-summary img {
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
   }
 
   .summary-info {
@@ -224,12 +223,29 @@
     flex: 1 1 0;
   }
 
+  .summary-title {
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+  }
+
+  .summary-limit {
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+  }
+
   .qty-wrap {
-    width: 100%;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding-top: 0.25rem;
-    border-top: 1px solid rgba(201, 168, 76, 0.15);
+    gap: 0.5rem;
+    align-self: center;
+  }
+
+  .qty-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .qty-num {
+    min-width: 1.5rem;
+    font-size: 1rem;
   }
 }
 
