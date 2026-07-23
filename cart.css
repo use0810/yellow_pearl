@@ -209,7 +209,8 @@
   }
 
   .product-summary {
-    gap: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.85rem 0.75rem;
     padding: 1rem;
   }
 
@@ -225,7 +226,8 @@
 
   .summary-title {
     font-size: 0.95rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
   }
 
   .summary-limit {
@@ -234,8 +236,9 @@
   }
 
   .qty-wrap {
-    gap: 0.5rem;
-    align-self: center;
+    width: 100%;
+    justify-content: flex-end;
+    gap: 0.75rem;
   }
 
   .qty-btn {
