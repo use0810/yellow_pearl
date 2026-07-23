@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ご予約 | Yellow Pearl</title>
-    <meta name="description" content="Yellow Pearl（イエローパール）のご予約フォーム。青森県新郷村産「郷のきみ」プレミアムライン。" />
+    <meta
+      name="description"
+      content="Yellow Pearl（イエローパール）のご予約フォーム。青森県新郷村産「郷のきみ」プレミアムライン。"
+    />
     <link rel="canonical" href="https://yellow-pearl.com/cart.html" />
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#0a0a0a" />
@@ -20,7 +23,9 @@
   </head>
   <body>
     <nav>
-      <a class="nav-logo" href="index.html" style="text-decoration: none;">YELLOW PEARL</a>
+      <a class="nav-logo" href="index.html" style="text-decoration: none"
+        >YELLOW PEARL</a
+      >
       <ul class="nav-links">
         <li><a href="index.html#story">STORY</a></li>
         <li><a href="index.html#product">PRODUCT</a></li>
@@ -33,7 +38,7 @@
       <div id="cart-screen">
         <div class="cart-header reveal">
           <span class="section-label">Reservation</span>
-          <div class="gold-line" style="margin: 0 auto 1.5rem;"></div>
+          <div class="gold-line" style="margin: 0 auto 1.5rem"></div>
           <h1>ご予約フォーム</h1>
           <p>Yellow Pearl — 2026 Limited</p>
         </div>
@@ -58,7 +63,10 @@
 
         <!-- 商品サマリー -->
         <div class="product-summary reveal">
-          <img src="assets/image/image-bg-kimi_v1.jpg" alt="郷のきみ イエローパール" />
+          <img
+            src="assets/image/image-bg-kimi_v1.jpg"
+            alt="郷のきみ イエローパール"
+          />
           <div class="summary-info">
             <p class="summary-name">郷のきみ<br />イエローパール</p>
             <p class="summary-title">Yellow Pearl</p>
@@ -67,7 +75,7 @@
               <span class="qty-num" id="qty-display">1</span>
               <button type="button" class="qty-btn" id="qty-plus">＋</button>
             </div>
-            <p class="summary-limit">年間1,000本限定 ／ 青森県新郷村</p>
+            <p class="summary-limit">1,000本限定 ／ 青森県新郷村</p>
           </div>
         </div>
 
@@ -78,27 +86,44 @@
             <div class="form-section-title">Customer Information</div>
 
             <div class="form-sub-label">お名前</div>
-            <div class="form-grid" style="margin-bottom: 1.5rem;">
+            <div class="form-grid" style="margin-bottom: 1.5rem">
               <div class="form-group">
                 <label>姓<span>*</span></label>
                 <input type="text" id="last-name" placeholder="山田" required />
               </div>
               <div class="form-group">
                 <label>名<span>*</span></label>
-                <input type="text" id="first-name" placeholder="太郎" required />
+                <input
+                  type="text"
+                  id="first-name"
+                  placeholder="太郎"
+                  required
+                />
               </div>
             </div>
 
             <div class="form-sub-label">フリガナ</div>
-            <div class="form-grid" style="margin-bottom: 1.5rem;">
+            <div class="form-grid" style="margin-bottom: 1.5rem">
               <div class="form-group">
                 <label>セイ<span>*</span></label>
-                <input type="text" id="last-name-kana" placeholder="ヤマダ" required inputmode="katakana" />
+                <input
+                  type="text"
+                  id="last-name-kana"
+                  placeholder="ヤマダ"
+                  required
+                  inputmode="katakana"
+                />
                 <span class="field-error" id="err-last-name-kana"></span>
               </div>
               <div class="form-group">
                 <label>メイ<span>*</span></label>
-                <input type="text" id="first-name-kana" placeholder="タロウ" required inputmode="katakana" />
+                <input
+                  type="text"
+                  id="first-name-kana"
+                  placeholder="タロウ"
+                  required
+                  inputmode="katakana"
+                />
                 <span class="field-error" id="err-first-name-kana"></span>
               </div>
             </div>
@@ -107,12 +132,22 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>メールアドレス<span>*</span></label>
-                <input type="email" id="email" placeholder="example@email.com" required />
+                <input
+                  type="email"
+                  id="email"
+                  placeholder="example@email.com"
+                  required
+                />
                 <span class="field-error" id="err-email"></span>
               </div>
               <div class="form-group">
                 <label>電話番号<span>*</span></label>
-                <input type="tel" id="phone" placeholder="090-0000-0000" required />
+                <input
+                  type="tel"
+                  id="phone"
+                  placeholder="090-0000-0000"
+                  required
+                />
                 <span class="field-error" id="err-phone"></span>
               </div>
             </div>
@@ -124,7 +159,15 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>郵便番号<span>*</span></label>
-                <input type="text" id="postal" placeholder="000-0000" maxlength="8" inputmode="numeric" autocomplete="postal-code" required />
+                <input
+                  type="text"
+                  id="postal"
+                  placeholder="000-0000"
+                  maxlength="8"
+                  inputmode="numeric"
+                  autocomplete="postal-code"
+                  required
+                />
                 <span class="field-error" id="err-postal"></span>
               </div>
               <div class="form-group">
@@ -135,15 +178,27 @@
               </div>
               <div class="form-group full">
                 <label>市区町村・番地<span>*</span></label>
-                <input type="text" id="address1" placeholder="○○市△△町1-2-3" required />
+                <input
+                  type="text"
+                  id="address1"
+                  placeholder="○○市△△町1-2-3"
+                  required
+                />
               </div>
               <div class="form-group full">
                 <label>建物名・部屋番号</label>
-                <input type="text" id="address2" placeholder="○○マンション 101号室" />
+                <input
+                  type="text"
+                  id="address2"
+                  placeholder="○○マンション 101号室"
+                />
               </div>
               <div class="form-group full">
                 <label>備考</label>
-                <textarea id="note" placeholder="ご要望があればご記入ください"></textarea>
+                <textarea
+                  id="note"
+                  placeholder="ご要望があればご記入ください"
+                ></textarea>
               </div>
             </div>
           </div>
@@ -156,35 +211,56 @@
             </div>
             <div class="order-row">
               <span class="key">送料（税込）</span>
-              <span class="val" id="summary-shipping">都道府県を選択してください</span>
+              <span class="val" id="summary-shipping"
+                >都道府県を選択してください</span
+              >
             </div>
             <div class="order-row order-row-total">
               <span class="key">お支払い合計</span>
               <span class="val" id="summary-total">—</span>
             </div>
-            <p class="order-summary-note">※ 表示は税込価格です。詳細はお支払い画面でもご確認いただけます。</p>
+            <p class="order-summary-note">
+              ※ 表示は税込価格です。詳細はお支払い画面でもご確認いただけます。
+            </p>
             <div class="order-row">
               <span class="key">発送期間</span>
               <span class="val">2026年9月1日 〜 9月30日</span>
             </div>
             <div class="order-row">
               <span class="key">お支払い</span>
-              <span class="val" id="summary-payment">クレジットカード / 銀行振込</span>
+              <span class="val" id="summary-payment"
+                >クレジットカード / 銀行振込</span
+              >
             </div>
           </div>
 
           <!-- 注意事項 -->
           <div class="caution reveal">
-            ※ 日付指定は行えません（選果基準が厳しく、収穫タイミングが限定されます）。<br />
+            ※
+            日付指定は行えません（選果基準が厳しく、収穫タイミングが限定されます）。<br />
             ※ 在庫数に達し次第、受付を終了いたします。<br />
             ※ 決済完了後、画面に予約番号が表示されます。必ず控えてください。
           </div>
 
-          <p id="sold-out-notice" class="field-error" style="display:none;text-align:center;margin-bottom:1rem;font-size:0.8rem;">
+          <p
+            id="sold-out-notice"
+            class="field-error"
+            style="
+              display: none;
+              text-align: center;
+              margin-bottom: 1rem;
+              font-size: 0.8rem;
+            "
+          >
             現在、予約の受付を終了しております。
           </p>
 
-          <button type="submit" class="submit-btn reveal" id="submit-btn" disabled>
+          <button
+            type="submit"
+            class="submit-btn reveal"
+            id="submit-btn"
+            disabled
+          >
             お支払いへ進む
           </button>
         </form>
@@ -209,15 +285,22 @@
     <script type="module" src="/shared/site-footer.js"></script>
 
     <script type="module">
-      import { calcOrderAmount, MAX_LEN, MAX_ORDER_QTY, PREFECTURES, validateReserveFields, reserveValidationFieldId } from '/shared/domain.js';
-      import { applyCartReceptionUI } from '/shared/reception-status.js';
+      import {
+        calcOrderAmount,
+        MAX_LEN,
+        MAX_ORDER_QTY,
+        PREFECTURES,
+        validateReserveFields,
+        reserveValidationFieldId,
+      } from "/shared/domain.js";
+      import { applyCartReceptionUI } from "/shared/reception-status.js";
 
       const WORKER_URL = window.location.origin;
 
       function initPrefectureSelect() {
-        const sel = document.getElementById('prefecture');
+        const sel = document.getElementById("prefecture");
         for (const pref of PREFECTURES) {
-          const opt = document.createElement('option');
+          const opt = document.createElement("option");
           opt.value = pref;
           opt.textContent = pref;
           sel.appendChild(opt);
@@ -237,71 +320,88 @@
       let submitting = false;
 
       function formatYen(n) {
-        return `¥${Number(n).toLocaleString('ja-JP')}`;
+        return `¥${Number(n).toLocaleString("ja-JP")}`;
       }
 
       function getShippingFee() {
-        const pref = document.getElementById('prefecture').value;
+        const pref = document.getElementById("prefecture").value;
         if (!pref) return null;
         return shippingMap[pref] ?? 0;
       }
 
       function updatePricingSummary() {
         const shippingExcl = getShippingFee();
-        const productEl = document.getElementById('summary-product');
-        const shipEl = document.getElementById('summary-shipping');
+        const productEl = document.getElementById("summary-product");
+        const shipEl = document.getElementById("summary-shipping");
 
         if (!unitPrice) {
-          productEl.textContent = '—';
+          productEl.textContent = "—";
           if (shippingExcl === null) {
-            shipEl.textContent = '都道府県を選択してください';
+            shipEl.textContent = "都道府県を選択してください";
           } else {
-            const ship = calcOrderAmount(0, 1, 0, shippingExcl, shippingTaxRate);
+            const ship = calcOrderAmount(
+              0,
+              1,
+              0,
+              shippingExcl,
+              shippingTaxRate,
+            );
             shipEl.textContent = formatYen(ship.shippingFeeIncl);
           }
-          document.getElementById('summary-total').textContent = '—';
+          document.getElementById("summary-total").textContent = "—";
           return;
         }
 
         const fee = shippingExcl ?? 0;
-        const amounts = calcOrderAmount(unitPrice, qty, taxRate, fee, shippingTaxRate);
+        const amounts = calcOrderAmount(
+          unitPrice,
+          qty,
+          taxRate,
+          fee,
+          shippingTaxRate,
+        );
         productEl.textContent = `Yellow Pearl × ${qty}本　${formatYen(amounts.subtotal + amounts.taxAmount)}`;
 
         if (shippingExcl === null) {
-          shipEl.textContent = '都道府県を選択してください';
-          document.getElementById('summary-total').textContent = '—';
+          shipEl.textContent = "都道府県を選択してください";
+          document.getElementById("summary-total").textContent = "—";
         } else {
           shipEl.textContent = formatYen(amounts.shippingFeeIncl);
-          document.getElementById('summary-total').textContent = formatYen(amounts.totalAmount);
+          document.getElementById("summary-total").textContent = formatYen(
+            amounts.totalAmount,
+          );
         }
       }
 
       function changeQty(delta) {
         qty = Math.min(maxStock, Math.max(1, qty + delta));
-        document.getElementById('qty-display').textContent = qty;
-        document.getElementById('qty-minus').disabled = soldOut || qty <= 1;
-        document.getElementById('qty-plus').disabled = soldOut || qty >= maxStock;
+        document.getElementById("qty-display").textContent = qty;
+        document.getElementById("qty-minus").disabled = soldOut || qty <= 1;
+        document.getElementById("qty-plus").disabled =
+          soldOut || qty >= maxStock;
         updatePricingSummary();
       }
 
       function applyReceptionUI(data) {
         const state = applyCartReceptionUI(data, {
-          submitBtn: document.getElementById('submit-btn'),
-          noticeEl: document.getElementById('sold-out-notice'),
-          qtyMinus: document.getElementById('qty-minus'),
-          qtyPlus: document.getElementById('qty-plus'),
+          submitBtn: document.getElementById("submit-btn"),
+          noticeEl: document.getElementById("sold-out-notice"),
+          qtyMinus: document.getElementById("qty-minus"),
+          qtyPlus: document.getElementById("qty-plus"),
           qty,
           maxStock,
         });
         soldOut = state.closed;
-        checkoutEnabled = state.key === 'open';
+        checkoutEnabled = state.key === "open";
       }
 
       async function loadStock() {
         try {
-          const res = await fetch(`${WORKER_URL}/api/stock`, { credentials: 'same-origin' });
+          const res = await fetch(`${WORKER_URL}/api/stock`, {
+            credentials: "same-origin",
+          });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || '在庫取得に失敗');
+          if (!res.ok) throw new Error(data.error || "在庫取得に失敗");
 
           unitPrice = data.unit_price ?? 0;
           taxRate = data.tax_rate ?? 10;
@@ -316,38 +416,45 @@
           maxStock = Math.min(MAX_QTY, data.stock);
           if (qty > maxStock) {
             qty = maxStock;
-            document.getElementById('qty-display').textContent = qty;
+            document.getElementById("qty-display").textContent = qty;
           }
           applyReceptionUI(data);
           changeQty(0);
         } catch (e) {
-          console.warn('在庫APIに接続できませんでした:', e);
+          console.warn("在庫APIに接続できませんでした:", e);
           applyReceptionUI({ _error: true });
         }
       }
 
-      document.getElementById('qty-minus').addEventListener('click', () => changeQty(-1));
-      document.getElementById('qty-plus').addEventListener('click', () => changeQty(1));
-      document.getElementById('prefecture').addEventListener('change', updatePricingSummary);
+      document
+        .getElementById("qty-minus")
+        .addEventListener("click", () => changeQty(-1));
+      document
+        .getElementById("qty-plus")
+        .addEventListener("click", () => changeQty(1));
+      document
+        .getElementById("prefecture")
+        .addEventListener("change", updatePricingSummary);
 
       function normalizePostal(raw) {
-        return raw.replace(/\D/g, '');
+        return raw.replace(/\D/g, "");
       }
 
       function formatPostal(digits) {
-        if (digits.length >= 7) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}`;
+        if (digits.length >= 7)
+          return `${digits.slice(0, 3)}-${digits.slice(3, 7)}`;
         return digits;
       }
 
       let postalLookupToken = 0;
 
       async function lookupAddressFromPostal() {
-        const postalEl = document.getElementById('postal');
-        const errEl = document.getElementById('err-postal');
+        const postalEl = document.getElementById("postal");
+        const errEl = document.getElementById("err-postal");
         const digits = normalizePostal(postalEl.value);
 
         if (digits.length !== 7) {
-          if (errEl) errEl.textContent = '';
+          if (errEl) errEl.textContent = "";
           return;
         }
 
@@ -355,55 +462,65 @@
         const token = ++postalLookupToken;
 
         try {
-          const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${digits}`);
+          const res = await fetch(
+            `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${digits}`,
+          );
           const data = await res.json();
           if (token !== postalLookupToken) return;
 
           if (data.status !== 200 || !data.results?.length) {
-            if (errEl) errEl.textContent = '郵便番号が見つかりません';
+            if (errEl) errEl.textContent = "郵便番号が見つかりません";
             return;
           }
 
           const r = data.results[0];
-          const prefEl = document.getElementById('prefecture');
-          const addrEl = document.getElementById('address1');
+          const prefEl = document.getElementById("prefecture");
+          const addrEl = document.getElementById("address1");
 
           prefEl.value = r.address1;
           addrEl.value = `${r.address2}${r.address3}`;
-          if (errEl) errEl.textContent = '';
-          postalEl.classList.remove('invalid');
-          prefEl.classList.remove('invalid');
-          addrEl.classList.remove('invalid');
+          if (errEl) errEl.textContent = "";
+          postalEl.classList.remove("invalid");
+          prefEl.classList.remove("invalid");
+          addrEl.classList.remove("invalid");
           updatePricingSummary();
         } catch {
           if (token === postalLookupToken && errEl) {
-            errEl.textContent = '住所の取得に失敗しました';
+            errEl.textContent = "住所の取得に失敗しました";
           }
         }
       }
 
-      document.getElementById('postal').addEventListener('input', () => {
-        if (normalizePostal(document.getElementById('postal').value).length === 7) {
+      document.getElementById("postal").addEventListener("input", () => {
+        if (
+          normalizePostal(document.getElementById("postal").value).length === 7
+        ) {
           lookupAddressFromPostal();
         }
       });
-      document.getElementById('postal').addEventListener('blur', lookupAddressFromPostal);
+      document
+        .getElementById("postal")
+        .addEventListener("blur", lookupAddressFromPostal);
 
       loadStock();
 
       function buildReservePayload() {
         return {
-          last_name: document.getElementById('last-name').value.trim(),
-          first_name: document.getElementById('first-name').value.trim(),
-          last_name_kana: document.getElementById('last-name-kana').value.trim(),
-          first_name_kana: document.getElementById('first-name-kana').value.trim(),
-          email: document.getElementById('email').value.trim(),
-          phone: document.getElementById('phone').value.trim(),
-          postal: document.getElementById('postal').value.trim(),
-          prefecture: document.getElementById('prefecture').value,
-          address1: document.getElementById('address1').value.trim(),
-          address2: document.getElementById('address2').value.trim(),
-          note: document.getElementById('note').value.trim(),
+          last_name: document.getElementById("last-name").value.trim(),
+          first_name: document.getElementById("first-name").value.trim(),
+          last_name_kana: document
+            .getElementById("last-name-kana")
+            .value.trim(),
+          first_name_kana: document
+            .getElementById("first-name-kana")
+            .value.trim(),
+          email: document.getElementById("email").value.trim(),
+          phone: document.getElementById("phone").value.trim(),
+          postal: document.getElementById("postal").value.trim(),
+          prefecture: document.getElementById("prefecture").value,
+          address1: document.getElementById("address1").value.trim(),
+          address2: document.getElementById("address2").value.trim(),
+          note: document.getElementById("note").value.trim(),
           quantity: qty,
         };
       }
@@ -411,15 +528,15 @@
       // バリデーション
       function validate() {
         const fields = [
-          { id: 'last-name',        label: '姓' },
-          { id: 'first-name',       label: '名' },
-          { id: 'last-name-kana',   label: 'フリガナ（姓）' },
-          { id: 'first-name-kana',  label: 'フリガナ（名）' },
-          { id: 'email',            label: 'メールアドレス' },
-          { id: 'phone',            label: '電話番号' },
-          { id: 'postal',           label: '郵便番号' },
-          { id: 'prefecture',       label: '都道府県' },
-          { id: 'address1',         label: '住所' },
+          { id: "last-name", label: "姓" },
+          { id: "first-name", label: "名" },
+          { id: "last-name-kana", label: "フリガナ（姓）" },
+          { id: "first-name-kana", label: "フリガナ（名）" },
+          { id: "email", label: "メールアドレス" },
+          { id: "phone", label: "電話番号" },
+          { id: "postal", label: "郵便番号" },
+          { id: "prefecture", label: "都道府県" },
+          { id: "address1", label: "住所" },
         ];
 
         let firstInvalid = null;
@@ -428,31 +545,31 @@
           const el = document.getElementById(id);
           const err = document.getElementById(`err-${id}`);
           if (!el.value.trim()) {
-            el.classList.add('invalid');
-            if (err) err.textContent = '必須項目です';
+            el.classList.add("invalid");
+            if (err) err.textContent = "必須項目です";
             if (!firstInvalid) firstInvalid = el;
           } else {
-            el.classList.remove('invalid');
-            if (err) err.textContent = '';
+            el.classList.remove("invalid");
+            if (err) err.textContent = "";
           }
         });
 
         [
-          { id: 'last-name', max: MAX_LEN.name },
-          { id: 'first-name', max: MAX_LEN.name },
-          { id: 'last-name-kana', max: MAX_LEN.name },
-          { id: 'first-name-kana', max: MAX_LEN.name },
-          { id: 'email', max: MAX_LEN.email },
-          { id: 'phone', max: MAX_LEN.phone },
-          { id: 'postal', max: MAX_LEN.postal },
-          { id: 'address1', max: MAX_LEN.address },
-          { id: 'address2', max: MAX_LEN.address },
-          { id: 'note', max: MAX_LEN.note },
+          { id: "last-name", max: MAX_LEN.name },
+          { id: "first-name", max: MAX_LEN.name },
+          { id: "last-name-kana", max: MAX_LEN.name },
+          { id: "first-name-kana", max: MAX_LEN.name },
+          { id: "email", max: MAX_LEN.email },
+          { id: "phone", max: MAX_LEN.phone },
+          { id: "postal", max: MAX_LEN.postal },
+          { id: "address1", max: MAX_LEN.address },
+          { id: "address2", max: MAX_LEN.address },
+          { id: "note", max: MAX_LEN.note },
         ].forEach(({ id, max }) => {
           const el = document.getElementById(id);
           if (!el || !el.value.trim()) return;
           if (el.value.trim().length > max) {
-            el.classList.add('invalid');
+            el.classList.add("invalid");
             const err = document.getElementById(`err-${id}`);
             if (err) err.textContent = `${max}文字以内で入力してください`;
             if (!firstInvalid) firstInvalid = el;
@@ -460,7 +577,7 @@
         });
 
         if (firstInvalid) {
-          firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
           firstInvalid.focus();
           return false;
         }
@@ -472,9 +589,9 @@
             const el = document.getElementById(fieldId);
             const err = document.getElementById(`err-${fieldId}`);
             if (el) {
-              el.classList.add('invalid');
+              el.classList.add("invalid");
               if (err) err.textContent = serverCheck.error;
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
               el.focus();
             }
           } else {
@@ -487,50 +604,52 @@
       }
 
       // フォーム送信
-      document.getElementById('reserve-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (submitting || soldOut || !checkoutEnabled) return;
-        if (!validate()) return;
+      document
+        .getElementById("reserve-form")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          if (submitting || soldOut || !checkoutEnabled) return;
+          if (!validate()) return;
 
-        const btn = document.getElementById('submit-btn');
-        submitting = true;
-        btn.disabled = true;
-        btn.textContent = '送信中...';
+          const btn = document.getElementById("submit-btn");
+          submitting = true;
+          btn.disabled = true;
+          btn.textContent = "送信中...";
 
-        const payload = buildReservePayload();
+          const payload = buildReservePayload();
 
-        try {
-          const endpoint = '/api/reserve';
-          const res = await fetch(`${WORKER_URL}${endpoint}`, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const data = await res.json();
+          try {
+            const endpoint = "/api/reserve";
+            const res = await fetch(`${WORKER_URL}${endpoint}`, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
 
-          if (res.ok && data.session_url) {
-            window.location.href = data.session_url;
-            return;
+            if (res.ok && data.session_url) {
+              window.location.href = data.session_url;
+              return;
+            }
+
+            alert(data.error || "送信に失敗しました。もう一度お試しください。");
+            submitting = false;
+            btn.disabled = false;
+            btn.textContent = "お支払いへ進む";
+          } catch {
+            alert("通信エラーが発生しました。もう一度お試しください。");
+            submitting = false;
+            btn.disabled = false;
+            btn.textContent = "お支払いへ進む";
           }
-
-          alert(data.error || '送信に失敗しました。もう一度お試しください。');
-          submitting = false;
-          btn.disabled = false;
-          btn.textContent = 'お支払いへ進む';
-        } catch {
-          alert('通信エラーが発生しました。もう一度お試しください。');
-          submitting = false;
-          btn.disabled = false;
-          btn.textContent = 'お支払いへ進む';
-        }
-      });
+        });
 
       async function handleCheckoutReturn(sessionId) {
         try {
           const res = await fetch(
             `${WORKER_URL}/api/stock?session_id=${encodeURIComponent(sessionId)}`,
-            { credentials: 'same-origin' },
+            { credentials: "same-origin" },
           );
           const data = await res.json();
 
@@ -539,68 +658,77 @@
           } else if (res.ok && data.ok) {
             showComplete(data.order_id, { pending: false });
           } else {
-            alert(data.message || data.error || '決済が完了していません。');
+            alert(data.message || data.error || "決済が完了していません。");
           }
         } catch {
-          alert('決済結果の確認に失敗しました。');
+          alert("決済結果の確認に失敗しました。");
         } finally {
           const url = new URL(window.location.href);
-          url.searchParams.delete('session_id');
-          history.replaceState(null, '', url.pathname + url.search);
+          url.searchParams.delete("session_id");
+          history.replaceState(null, "", url.pathname + url.search);
         }
       }
 
       (function initReturnHandler() {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('cancelled') === '1') {
-          const notice = document.getElementById('sold-out-notice');
+        if (params.get("cancelled") === "1") {
+          const notice = document.getElementById("sold-out-notice");
           if (notice) {
-            notice.style.display = 'block';
-            notice.textContent = 'お支払いは完了していません。必要であれば再度お申し込みください。';
+            notice.style.display = "block";
+            notice.textContent =
+              "お支払いは完了していません。必要であれば再度お申し込みください。";
           }
-          params.delete('cancelled');
-          history.replaceState(null, '', `${window.location.pathname}${params.toString() ? `?${params}` : ''}`);
+          params.delete("cancelled");
+          history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${params.toString() ? `?${params}` : ""}`,
+          );
         }
-        const sessionId = params.get('session_id');
+        const sessionId = params.get("session_id");
         if (sessionId) handleCheckoutReturn(sessionId);
       })();
 
       function showComplete(orderId, { pending = false } = {}) {
-        document.getElementById('step2').classList.add('done');
-        document.getElementById('step3').classList.add('active');
-        document.getElementById('cart-screen').style.display = 'none';
-        const complete = document.getElementById('complete-screen');
-        complete.style.display = 'block';
-        const textEl = document.getElementById('complete-text');
+        document.getElementById("step2").classList.add("done");
+        document.getElementById("step3").classList.add("active");
+        document.getElementById("cart-screen").style.display = "none";
+        const complete = document.getElementById("complete-screen");
+        complete.style.display = "block";
+        const textEl = document.getElementById("complete-text");
         if (textEl) {
           textEl.innerHTML = pending
             ? [
-                'ご予約ありがとうございます。<br />',
-                'お支払い画面の振込案内に従ってお支払いください。<br />',
-                '入金確認後に予約が確定し、確認メールをお送りします。<br />',
-                '予約番号を必ず控えてください。<br />',
-                '発送は2026年9月1日より順次行います。',
-              ].join('')
+                "ご予約ありがとうございます。<br />",
+                "お支払い画面の振込案内に従ってお支払いください。<br />",
+                "入金確認後に予約が確定し、確認メールをお送りします。<br />",
+                "予約番号を必ず控えてください。<br />",
+                "発送は2026年9月1日より順次行います。",
+              ].join("")
             : [
-                'ご予約ありがとうございます。<br />',
-                'お支払いが完了しました。<br />',
-                '予約番号を必ず控えてください。<br />',
-                '発送は2026年9月1日より順次行います。',
-              ].join('');
+                "ご予約ありがとうございます。<br />",
+                "お支払いが完了しました。<br />",
+                "予約番号を必ず控えてください。<br />",
+                "発送は2026年9月1日より順次行います。",
+              ].join("");
         }
         if (orderId) {
-          document.getElementById('complete-order-id').textContent = `予約番号：${orderId}`;
+          document.getElementById("complete-order-id").textContent =
+            `予約番号：${orderId}`;
         }
       }
 
       // Scroll reveal
       const observer = new IntersectionObserver(
-        (entries) => entries.forEach((e) => {
-          if (e.isIntersecting) e.target.classList.add('visible');
-        }),
-        { threshold: 0.1 }
+        (entries) =>
+          entries.forEach((e) => {
+            if (e.isIntersecting) e.target.classList.add("visible");
+          }),
+        { threshold: 0.1 },
       );
-      document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+      document
+        .querySelectorAll(".reveal")
+        .forEach((el) => observer.observe(el));
     </script>
   </body>
 </html>
