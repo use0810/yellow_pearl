@@ -56,7 +56,7 @@ function trackBankTransferPending({ orderId, value, quantity }) {
     currency: 'JPY',
     value: val,
     payment_type: 'bank_transfer',
-    items: [{ ...GA_ITEM, quantity: qty }],
+    items: [{ ...GA_ITEM, quantity: qty, price: qty > 0 ? Math.round(val / qty) : val }],
     transaction_id: orderId || undefined,
   });
 }
