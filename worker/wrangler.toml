@@ -6,8 +6,10 @@ account_id = "e1b3f72b4806b9ee6db348e090df9590"
 # Pages公開後にドメインを設定する（例: https://yellow-pearl.pages.dev）
 [vars]
 ALLOWED_ORIGINS = "https://yellow-pearl.com,https://www.yellow-pearl.com"
-# 管理画面にアクセスできるメール（カンマ区切り）。Access ポリシーと Worker の二重チェック
+# 管理画面ログイン許可（カンマ区切り）。Access ポリシーと Worker の二重チェック
 ADMIN_ALLOWED_EMAILS = "shingo.satokimi2021@gmail.com"
+# 購入通知メールの宛先（カンマ区切り）。ログイン許可とは別。未設定時は ADMIN_ALLOWED_EMAILS の先頭へ送る
+ADMIN_NOTIFY_EMAILS = "shingo.satokimi2021@gmail.com"
 
 [triggers]
 crons = ["0 18 * * *"]

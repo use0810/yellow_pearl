@@ -24,13 +24,26 @@ function isEmailEnabled(env) {
   return env.EMAIL && typeof env.EMAIL.send === 'function';
 }
 
-function adminEmails(env) {
-  const raw = env.ADMIN_ALLOWED_EMAILS || '';
+function parseEmailList(raw) {
+  if (!raw || typeof raw !== 'string') return [];
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+/** 管理画面ログイン許可メール */
+function adminLoginEmails(env) {
+  return parseEmailList(env.ADMIN_ALLOWED_EMAILS);
+}
+
+/** 購入通知の宛先（未設定ならログイン許可の先頭にフォールバック） */
+function adminNotifyEmails(env) {
+  const notify = parseEmailList(env.ADMIN_NOTIFY_EMAILS);
+  if (notify.length > 0) return notify;
+  const login = adminLoginEmails(env);
+  return login.length > 0 ? [login[0]] : [];
+}
+
 function replyToAddress(env) {
-  return adminEmails(env)[0] || FROM_EMAIL;
+  return adminNotifyEmails(env)[0] || adminLoginEmails(env)[0] || FROM_EMAIL;
 }
 
 function formatAddress(order) {
@@ -126,9 +139,9 @@ function buildAdminPurchaseBodies(order) {
   return { text, html };
 }
 
-/** 運営向け購入通知（冪等・ADMIN_ALLOWED_EMAILS 宛） */
+/** 運営向け購入通知（冪等・ADMIN_NOTIFY_EMAILS 宛） */
 async function maybeSendAdminPurchaseNotification(env, order) {
-  const recipients = adminEmails(env);
+  const recipients = adminNotifyEmails(env);
   if (recipients.length === 0) return { skipped: true, reason: 'no_admin' };
   if (await hasOrderEvent(env.DB, order.order_id, 'admin_purchase_email_sent')) {
     return { skipped: true, reason: 'already_sent' };
