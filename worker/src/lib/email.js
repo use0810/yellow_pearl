@@ -24,10 +24,13 @@ function isEmailEnabled(env) {
   return env.EMAIL && typeof env.EMAIL.send === 'function';
 }
 
-function replyToAddress(env) {
+function adminEmails(env) {
   const raw = env.ADMIN_ALLOWED_EMAILS || '';
-  const first = raw.split(',')[0]?.trim();
-  return first || FROM_EMAIL;
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function replyToAddress(env) {
+  return adminEmails(env)[0] || FROM_EMAIL;
 }
 
 function formatAddress(order) {
@@ -85,6 +88,70 @@ function buildConfirmationBodies(order) {
   `.trim();
 
   return { text, html };
+}
+
+function buildAdminPurchaseBodies(order) {
+  const name = `${order.last_name} ${order.first_name}`;
+  const text = [
+    '【購入通知】Yellow Pearl に新しい決済がありました。',
+    '',
+    `予約番号: ${order.order_id}`,
+    `お名前: ${name}`,
+    `メール: ${order.email}`,
+    `電話: ${order.phone}`,
+    `数量: ${order.quantity} 本`,
+    `合計: ${formatYen(order.total_amount)} 円（税込・送料込）`,
+    '',
+    '【お届け先】',
+    formatAddress(order),
+    '',
+    '管理画面の予約一覧で詳細を確認できます。',
+  ].join('\n');
+
+  const html = `
+    <p><strong>【購入通知】</strong>Yellow Pearl に新しい決済がありました。</p>
+    <ul>
+      <li><strong>予約番号:</strong> ${order.order_id}</li>
+      <li><strong>お名前:</strong> ${name}</li>
+      <li><strong>メール:</strong> ${order.email}</li>
+      <li><strong>電話:</strong> ${order.phone}</li>
+      <li><strong>数量:</strong> ${order.quantity} 本</li>
+      <li><strong>合計:</strong> ${formatYen(order.total_amount)} 円（税込・送料込）</li>
+    </ul>
+    <p><strong>お届け先</strong><br>
+    ${formatAddress(order)}</p>
+    <p style="color:#666;font-size:12px">管理画面の予約一覧で詳細を確認できます。</p>
+  `.trim();
+
+  return { text, html };
+}
+
+/** 運営向け購入通知（冪等・ADMIN_ALLOWED_EMAILS 宛） */
+async function maybeSendAdminPurchaseNotification(env, order) {
+  const recipients = adminEmails(env);
+  if (recipients.length === 0) return { skipped: true, reason: 'no_admin' };
+  if (await hasOrderEvent(env.DB, order.order_id, 'admin_purchase_email_sent')) {
+    return { skipped: true, reason: 'already_sent' };
+  }
+
+  const { text, html } = buildAdminPurchaseBodies(order);
+  const subject = `【購入】${order.quantity}本・${formatYen(order.total_amount)}円（${order.order_id}）`;
+  try {
+    for (const to of recipients) {
+      await env.EMAIL.send({
+        to,
+        from: { email: FROM_EMAIL, name: FROM_NAME },
+        subject,
+        text,
+        html,
+      });
+    }
+    await logOrderEvent(env.DB, order.order_id, 'admin_purchase_email_sent', recipients.join(','));
+    return { ok: true };
+  } catch (e) {
+    await logOrderEvent(env.DB, order.order_id, 'admin_purchase_email_failed', e.message || 'send failed');
+    return { error: e.message || '運営通知メールの送信に失敗しました' };
+  }
 }
 
 function buildCancellationBodies(order, { refunded = false } = {}) {
@@ -145,7 +212,7 @@ export async function resendConfirmationEmail(env, orderId) {
   }
 }
 
-/** 決済確定後の予約確認メール（Webhook / 返却 URL 共通・冪等） */
+/** 決済確定後の予約確認メール（Webhook / 返却 URL 共通・冪等）＋運営通知 */
 export async function maybeSendConfirmationEmail(env, orderId) {
   if (!isEmailEnabled(env)) return { skipped: true, reason: 'no_binding' };
 
@@ -153,26 +220,31 @@ export async function maybeSendConfirmationEmail(env, orderId) {
   if (!order || order.payment_status !== PAYMENT_PAID) {
     return { skipped: true, reason: 'not_paid' };
   }
-  if (await hasOrderEvent(env.DB, orderId, 'confirmation_email_sent')) {
-    return { skipped: true, reason: 'already_sent' };
+
+  let customerResult = { skipped: true, reason: 'already_sent' };
+  if (!(await hasOrderEvent(env.DB, orderId, 'confirmation_email_sent'))) {
+    const { text, html } = buildConfirmationBodies(order);
+    try {
+      await env.EMAIL.send({
+        to: order.email,
+        from: { email: FROM_EMAIL, name: FROM_NAME },
+        replyTo: replyToAddress(env),
+        subject: `【Yellow Pearl】ご予約ありがとうございます（${order.order_id}）`,
+        text,
+        html,
+      });
+      await logOrderEvent(env.DB, orderId, 'confirmation_email_sent', order.email);
+      customerResult = { ok: true };
+    } catch (e) {
+      await logOrderEvent(env.DB, orderId, 'confirmation_email_failed', e.message || 'send failed');
+      customerResult = { error: e.message || 'メール送信に失敗しました' };
+    }
   }
 
-  const { text, html } = buildConfirmationBodies(order);
-  try {
-    await env.EMAIL.send({
-      to: order.email,
-      from: { email: FROM_EMAIL, name: FROM_NAME },
-      replyTo: replyToAddress(env),
-      subject: `【Yellow Pearl】ご予約ありがとうございます（${order.order_id}）`,
-      text,
-      html,
-    });
-    await logOrderEvent(env.DB, orderId, 'confirmation_email_sent', order.email);
-    return { ok: true };
-  } catch (e) {
-    await logOrderEvent(env.DB, orderId, 'confirmation_email_failed', e.message || 'send failed');
-    return { error: e.message || 'メール送信に失敗しました' };
-  }
+  // お客さまメールの成否に関わらず、運営通知は別途冪等で送る
+  await maybeSendAdminPurchaseNotification(env, order);
+  if (customerResult.error) return customerResult;
+  return { ok: true };
 }
 
 /** 管理画面キャンセル後の通知メール（冪等） */
