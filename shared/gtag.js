@@ -9,6 +9,8 @@ gtag('config', 'G-WR46VTNMV6');
 const GA_ITEM = {
   item_id: 'yellow-pearl',
   item_name: '郷のきみイエローパール',
+  item_brand: 'Yellow Pearl',
+  item_category: 'トウモロコシ',
 };
 
 function trackEvent(name, params) {
