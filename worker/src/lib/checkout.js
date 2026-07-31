@@ -238,6 +238,14 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
   const orderId = stripeOrderId(session);
   if (!orderId) return json({ error: '注文情報が見つかりません' }, 404, CORS);
 
+  const orderRow = await env.DB.prepare(
+    `SELECT quantity, total_amount FROM orders WHERE order_id = ? AND archived_at IS NULL`
+  ).bind(orderId).first();
+  const tracking = {
+    quantity: orderRow?.quantity ?? null,
+    total_amount: orderRow?.total_amount ?? null,
+  };
+
   if (isStripeSessionPaid(session)) {
     const result = await confirmOrderPayment(env, orderId, {
       sessionId: session.id,
@@ -249,6 +257,7 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
       order_id: orderId,
       payment_status: PAYMENT_PAID,
       session_status: session.status,
+      ...tracking,
     }, 200, CORS);
   }
 
@@ -259,6 +268,7 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
       order_id: orderId,
       payment_status: PAYMENT_FAILED,
       session_status: session.status,
+      ...tracking,
     }, 200, CORS);
   }
 
@@ -271,6 +281,7 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
       payment_status: PAYMENT_UNPAID,
       session_status: session.status,
       message: '振込案内に従ってお支払いください。入金確認後に予約が確定し、確認メールをお送りします。',
+      ...tracking,
     }, 200, CORS);
   }
 
@@ -280,6 +291,7 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
     payment_status: PAYMENT_UNPAID,
     session_status: session.status,
     message: '決済が完了していません。もう一度お試しください。',
+    ...tracking,
   }, 200, CORS);
 }
 

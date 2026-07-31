@@ -633,6 +633,13 @@
             const data = await res.json();
 
             if (res.ok && data.session_url) {
+              if (window.ypTrack?.beginCheckout) {
+                window.ypTrack.beginCheckout({
+                  orderId: data.order_id,
+                  value: data.total_amount,
+                  quantity: payload.quantity,
+                });
+              }
               window.location.href = data.session_url;
               return;
             }
@@ -659,8 +666,22 @@
 
           if (res.ok && data.ok && data.pending) {
             showComplete(data.order_id, { pending: true });
+            if (window.ypTrack?.bankTransferPending) {
+              window.ypTrack.bankTransferPending({
+                orderId: data.order_id,
+                value: data.total_amount,
+                quantity: data.quantity,
+              });
+            }
           } else if (res.ok && data.ok) {
             showComplete(data.order_id, { pending: false });
+            if (window.ypTrack?.purchase) {
+              window.ypTrack.purchase({
+                orderId: data.order_id,
+                value: data.total_amount,
+                quantity: data.quantity,
+              });
+            }
           } else {
             alert(data.message || data.error || "決済が完了していません。");
           }
