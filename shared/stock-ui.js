@@ -1,6 +1,27 @@
 /** トップページ用: 在庫 API 取得と予約ボタン制御 */
 
+import { calcOrderAmount } from './domain.js';
 import { resolveReceptionStatus } from './reception-status.js';
+
+function formatYen(n) {
+  return Number(n ?? 0).toLocaleString('ja-JP');
+}
+
+function applyLandingPrice(data, priceEl) {
+  if (!priceEl) return;
+  if (data?._error) {
+    priceEl.textContent = '—';
+    return;
+  }
+  const unitPrice = Number(data?.unit_price ?? 0);
+  const taxRate = Number(data?.tax_rate ?? 0);
+  if (unitPrice <= 0) {
+    priceEl.textContent = '—';
+    return;
+  }
+  const { subtotal, taxAmount } = calcOrderAmount(unitPrice, 1, taxRate, 0, 0);
+  priceEl.textContent = `${formatYen(subtotal + taxAmount)}円(税込・送料別途)`;
+}
 
 function disableReserveButtons(btns, label) {
   btns.forEach((btn) => {
@@ -14,9 +35,10 @@ function disableReserveButtons(btns, label) {
 
 /**
  * @param {object} data - /api/stock レスポンス
- * @param {{ displayEl: HTMLElement, remainingEl: HTMLElement, buttons: HTMLElement[] }} ui
+ * @param {{ displayEl: HTMLElement, remainingEl: HTMLElement, buttons: HTMLElement[], priceEl?: HTMLElement }} ui
  */
-export function applyLandingStockUI(data, { displayEl, remainingEl, buttons }) {
+export function applyLandingStockUI(data, { displayEl, remainingEl, buttons, priceEl }) {
+  applyLandingPrice(data, priceEl);
   const state = resolveReceptionStatus(data);
 
   if (state.key === 'open') {

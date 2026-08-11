@@ -213,6 +213,10 @@
 
             <div class="product-specs">
               <div class="spec-row">
+                <span class="spec-key">価格</span>
+                <span class="spec-val" id="product-price">—</span>
+              </div>
+              <div class="spec-row">
                 <span class="spec-key">発送期間</span>
                 <span class="spec-val">9月1日 〜 9月30日</span>
               </div>
@@ -319,6 +323,7 @@
       loadLandingStock(window.location.origin, {
         displayEl: document.getElementById("stock-display"),
         remainingEl: document.getElementById("stock-remaining"),
+        priceEl: document.getElementById("product-price"),
         buttons: [
           document.getElementById("reserve-btn"),
           document.getElementById("reserve-btn-2"),
