@@ -20,7 +20,7 @@ function applyLandingPrice(data, priceEl) {
     return;
   }
   const { subtotal, taxAmount } = calcOrderAmount(unitPrice, 1, taxRate, 0, 0);
-  priceEl.textContent = `${formatYen(subtotal + taxAmount)}円(税込・送料別途)`;
+  priceEl.textContent = `${formatYen(subtotal + taxAmount)}円 (税込・送料別途)`;
 }
 
 function disableReserveButtons(btns, label) {
