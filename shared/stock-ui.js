@@ -3,6 +3,21 @@
 import { calcOrderAmount } from './domain.js';
 import { resolveReceptionStatus } from './reception-status.js';
 
+/** ローカルで Worker 未起動時の見た目確認用（本番の現行価格に合わせる） */
+const LOCAL_PREVIEW_STOCK = {
+  stock: 1000,
+  sold_out: false,
+  unit_price: 4630,
+  tax_rate: 8,
+  checkout_enabled: true,
+};
+
+function isLocalPreviewHost() {
+  if (typeof location === 'undefined') return false;
+  if (location.protocol === 'file:') return true;
+  return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname);
+}
+
 function formatYen(n) {
   return Number(n ?? 0).toLocaleString('ja-JP');
 }
@@ -62,6 +77,11 @@ export async function loadLandingStock(origin, ui) {
     applyLandingStockUI(data, ui);
   } catch (e) {
     console.warn('在庫APIに接続できませんでした:', e);
+    if (isLocalPreviewHost()) {
+      console.info('ローカル確認用の仮データを表示しています（Worker 未接続）');
+      applyLandingStockUI(LOCAL_PREVIEW_STOCK, ui);
+      return;
+    }
     applyLandingStockUI({ _error: true }, ui);
   }
 }
