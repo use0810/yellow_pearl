@@ -103,6 +103,55 @@ function buildConfirmationBodies(order) {
   return { text, html };
 }
 
+/** アクセス集中による確認メール遅延のお詫び＋予約内容（一括再送用） */
+function buildDelayedConfirmationBodies(order) {
+  const name = `${order.last_name} ${order.first_name} 様`;
+  const text = [
+    `${name}`,
+    '',
+    'この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。',
+    '',
+    'アクセスが集中した影響により、予約確認メールのお届けが遅れましたこと、深くお詫び申し上げます。',
+    'お支払いおよびご予約は正常に完了しておりますので、ご安心ください。',
+    '',
+    '改めて、ご予約内容をご案内いたします。',
+    '',
+    `予約番号: ${order.order_id}`,
+    `商品: ${PRODUCT_NAME}`,
+    `数量: ${order.quantity} 本`,
+    `合計金額: ${formatYen(order.total_amount)} 円（税込・送料込）`,
+    '',
+    '【お届け先】',
+    formatAddress(order),
+    `TEL: ${order.phone}`,
+    '',
+    SHIPPING_NOTE,
+    '',
+    'ご不明点がございましたら、このメールにご返信ください。',
+  ].join('\n');
+
+  const html = `
+    <p>${name}</p>
+    <p>この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。</p>
+    <p>アクセスが集中した影響により、予約確認メールのお届けが遅れましたこと、深くお詫び申し上げます。<br>
+    お支払いおよびご予約は正常に完了しておりますので、ご安心ください。</p>
+    <p>改めて、ご予約内容をご案内いたします。</p>
+    <ul>
+      <li><strong>予約番号:</strong> ${order.order_id}</li>
+      <li><strong>商品:</strong> ${PRODUCT_NAME}</li>
+      <li><strong>数量:</strong> ${order.quantity} 本</li>
+      <li><strong>合計金額:</strong> ${formatYen(order.total_amount)} 円（税込・送料込）</li>
+    </ul>
+    <p><strong>お届け先</strong><br>
+    ${formatAddress(order)}<br>
+    TEL: ${order.phone}</p>
+    <p>${SHIPPING_NOTE}</p>
+    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
+  `.trim();
+
+  return { text, html };
+}
+
 function buildAdminPurchaseBodies(order) {
   const name = `${order.last_name} ${order.first_name}`;
   const text = [
@@ -226,8 +275,8 @@ export async function resendConfirmationEmail(env, orderId) {
 }
 
 /**
- * 送信失敗のまま成功記録がない決済済予約へ、お客様確認メールを再送する。
- * 日次クォータ回復後の cron 向け。運営通知は対象外。
+ * 送信失敗のまま成功記録がない決済済予約へ、遅延お詫び付き確認メールを再送する。
+ * 日次クォータ回復後の cron 向け。運営通知・お客様からの返信対応は対象外。
  */
 export async function retryFailedConfirmationEmails(env, { limit = 80 } = {}) {
   if (!isEmailEnabled(env)) {
@@ -256,15 +305,30 @@ export async function retryFailedConfirmationEmails(env, { limit = 80 } = {}) {
   let sent = 0;
   let failed = 0;
   for (const orderId of orderIds) {
-    const result = await resendConfirmationEmail(env, orderId);
-    if (result.ok) {
-      sent += 1;
+    const order = await fetchOrderForEmail(env.DB, orderId);
+    if (!order || order.payment_status !== PAYMENT_PAID) {
+      failed += 1;
       continue;
     }
-    failed += 1;
-    const msg = String(result.error || '');
-    if (/quota|daily|rate.?limit|throttl/i.test(msg)) {
-      break;
+    const { text, html } = buildDelayedConfirmationBodies(order);
+    try {
+      await env.EMAIL.send({
+        to: order.email,
+        from: { email: FROM_EMAIL, name: FROM_NAME },
+        replyTo: replyToAddress(env),
+        subject: `【Yellow Pearl】ご予約確認メール遅延のお詫び（${order.order_id}）`,
+        text,
+        html,
+      });
+      await logOrderEvent(env.DB, orderId, 'confirmation_email_resent', `delayed_apology:${order.email}`);
+      sent += 1;
+    } catch (e) {
+      const msg = e.message || 'send failed';
+      await logOrderEvent(env.DB, orderId, 'confirmation_email_resend_failed', msg);
+      failed += 1;
+      if (/quota|daily|rate.?limit|throttl/i.test(msg)) {
+        break;
+      }
     }
   }
 
