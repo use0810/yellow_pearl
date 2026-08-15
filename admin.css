@@ -623,6 +623,37 @@
         box-sizing: border-box;
       }
 
+      .order-edit-block.order-edit-locked input,
+      .order-edit-block.order-edit-locked select {
+        border-color: transparent;
+        background: transparent;
+        color: inherit;
+        cursor: default;
+        padding-left: 0;
+        padding-right: 0;
+        appearance: none;
+        pointer-events: none;
+      }
+
+      .order-edit-block.order-edit-active {
+        padding: 0.35rem;
+        border-radius: 6px;
+        background: #fffbeb;
+        outline: 1px solid #f59e0b;
+      }
+
+      .order-edit-block.order-edit-active input,
+      .order-edit-block.order-edit-active select {
+        border-color: #f59e0b;
+        background: #fff;
+        pointer-events: auto;
+      }
+
+      tr.is-editing-contact,
+      .order-card.is-editing-contact {
+        background: #fffdf5;
+      }
+
       .order-edit-note {
         font-size: 0.72rem;
         color: #888;

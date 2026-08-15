@@ -406,36 +406,65 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       }
 
       function renderEditableName(o) {
-        return `<div class="order-edit-block">
+        return `<div class="order-edit-block order-edit-locked">
           <div class="order-edit-row">
-            <input type="text" class="oe-last-name" value="${esc(o.last_name || '')}" placeholder="姓" aria-label="姓" />
-            <input type="text" class="oe-first-name" value="${esc(o.first_name || '')}" placeholder="名" aria-label="名" />
+            <input type="text" class="oe-last-name" value="${esc(o.last_name || '')}" placeholder="姓" aria-label="姓" readonly tabindex="-1" />
+            <input type="text" class="oe-first-name" value="${esc(o.first_name || '')}" placeholder="名" aria-label="名" readonly tabindex="-1" />
           </div>
           <div class="order-edit-row">
-            <input type="text" class="oe-last-name-kana" value="${esc(o.last_name_kana || '')}" placeholder="セイ" aria-label="セイ" />
-            <input type="text" class="oe-first-name-kana" value="${esc(o.first_name_kana || '')}" placeholder="メイ" aria-label="メイ" />
+            <input type="text" class="oe-last-name-kana" value="${esc(o.last_name_kana || '')}" placeholder="セイ" aria-label="セイ" readonly tabindex="-1" />
+            <input type="text" class="oe-first-name-kana" value="${esc(o.first_name_kana || '')}" placeholder="メイ" aria-label="メイ" readonly tabindex="-1" />
           </div>
         </div>`;
       }
 
       function renderEditableContact(o) {
-        return `<div class="order-edit-block">
-          <input type="email" class="oe-email" value="${esc(o.email || '')}" placeholder="メール" aria-label="メール" />
-          <input type="text" class="oe-phone" value="${esc(o.phone || '')}" placeholder="電話" aria-label="電話" />
+        return `<div class="order-edit-block order-edit-locked">
+          <input type="email" class="oe-email" value="${esc(o.email || '')}" placeholder="メール" aria-label="メール" readonly tabindex="-1" />
+          <input type="text" class="oe-phone" value="${esc(o.phone || '')}" placeholder="電話" aria-label="電話" readonly tabindex="-1" />
         </div>`;
       }
 
       function renderEditableAddress(o) {
         const note = o.note ? `<div class="order-edit-note">お客様備考: ${esc(o.note)}</div>` : '';
-        return `<div class="order-edit-block">
+        return `<div class="order-edit-block order-edit-locked">
           <div class="order-edit-row">
-            <input type="text" class="oe-postal" value="${esc(o.postal || '')}" placeholder="郵便番号" aria-label="郵便番号" />
-            <select class="oe-prefecture" aria-label="都道府県">${prefectureOptions(o.prefecture || '')}</select>
+            <input type="text" class="oe-postal" value="${esc(o.postal || '')}" placeholder="郵便番号" aria-label="郵便番号" readonly tabindex="-1" />
+            <select class="oe-prefecture" aria-label="都道府県" disabled tabindex="-1">${prefectureOptions(o.prefecture || '')}</select>
           </div>
-          <input type="text" class="oe-address1" value="${esc(o.address1 || '')}" placeholder="住所" aria-label="住所" />
-          <input type="text" class="oe-address2" value="${esc(o.address2 || '')}" placeholder="建物名など（任意）" aria-label="住所2" />
+          <input type="text" class="oe-address1" value="${esc(o.address1 || '')}" placeholder="住所" aria-label="住所" readonly tabindex="-1" />
+          <input type="text" class="oe-address2" value="${esc(o.address2 || '')}" placeholder="建物名など（任意）" aria-label="住所2" readonly tabindex="-1" />
           ${note}
         </div>`;
+      }
+
+      function setContactEditing(scope, editing) {
+        if (!scope) return;
+        scope.classList.toggle('is-editing-contact', editing);
+        scope.querySelectorAll('.order-edit-block').forEach((block) => {
+          block.classList.toggle('order-edit-locked', !editing);
+          block.classList.toggle('order-edit-active', editing);
+        });
+        scope.querySelectorAll('.order-edit-block input').forEach((el) => {
+          el.readOnly = !editing;
+          el.tabIndex = editing ? 0 : -1;
+        });
+        scope.querySelectorAll('.order-edit-block select').forEach((el) => {
+          el.disabled = !editing;
+          el.tabIndex = editing ? 0 : -1;
+        });
+        const ops = scope.querySelector('.ops-cell');
+        if (!ops) return;
+        const editBtn = ops.querySelector('.ops-edit-contact-btn');
+        const cancelBtn = ops.querySelector('.ops-cancel-contact-btn');
+        const hint = ops.querySelector('.ops-contact-hint');
+        if (editBtn) editBtn.hidden = editing;
+        if (cancelBtn) cancelBtn.hidden = !editing;
+        if (hint) {
+          hint.textContent = editing
+            ? '発送先を編集中。保存で反映（送料・合計は変わりません）'
+            : '発送先を変えるときは「発送先を編集」→「保存」';
+        }
       }
 
       function collectContactFields(scope) {
@@ -522,8 +551,10 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           <p class="ops-status-hint">発送ステータス（手動）</p>
           <select class="ops-status" aria-label="予約ステータス">${options}</select>
           <textarea class="ops-note" placeholder="特記事項（管理者用）">${esc(o.admin_note || '')}</textarea>
-          <p class="ops-contact-hint">発送先のみ更新。送料・合計は変わりません</p>
+          <p class="ops-contact-hint">発送先を変えるときは「発送先を編集」→「保存」</p>
           <div class="ops-actions">
+            <button type="button" class="btn ops-edit-contact-btn" data-order-id="${esc(o.order_id)}">発送先を編集</button>
+            <button type="button" class="btn ops-cancel-contact-btn" data-order-id="${esc(o.order_id)}" hidden>やめる</button>
             <button type="button" class="btn ops-save ops-save-btn" data-order-id="${esc(o.order_id)}">保存</button>
             ${resendEmailBtn}
             ${stripeLink}
@@ -683,7 +714,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           if (!ok) return;
         }
         const scope = container.closest('tr, .order-card');
-        const contact = scope?.querySelector('.oe-last-name')
+        const editingContact = scope?.classList.contains('is-editing-contact');
+        const contact = editingContact && scope?.querySelector('.oe-last-name')
           ? collectContactFields(scope)
           : null;
         const body = { status, admin_note: adminNote };
@@ -766,6 +798,18 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const resendBtn = e.target.closest('.ops-resend-email-btn');
         if (resendBtn) {
           resendOrderConfirmationEmail(resendBtn).catch((err) => alert(err.message));
+          return;
+        }
+        const editContactBtn = e.target.closest('.ops-edit-contact-btn');
+        if (editContactBtn) {
+          const scope = editContactBtn.closest('tr, .order-card');
+          setContactEditing(scope, true);
+          scope?.querySelector('.oe-last-name')?.focus();
+          return;
+        }
+        const cancelContactBtn = e.target.closest('.ops-cancel-contact-btn');
+        if (cancelContactBtn) {
+          loadOrders().catch((err) => alert(err.message));
           return;
         }
         const saveBtn = e.target.closest('.ops-save-btn');
