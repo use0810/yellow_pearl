@@ -160,8 +160,8 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    // 09:05 JST (= 00:05 UTC): 日次クォータ回復後に未送信のお客様確認メールを再送
-    if (event.cron === '5 0 * * *') {
+    // 09:20 JST (= 00:20 UTC): 日次クォータ回復後に未送信のお客様確認メールを再送
+    if (event.cron === '20 0 * * *') {
       ctx.waitUntil(retryFailedConfirmationEmails(env));
       return;
     }
