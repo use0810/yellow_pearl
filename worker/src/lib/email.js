@@ -80,7 +80,7 @@ function buildConfirmationBodies(order) {
     '',
     SHIPPING_NOTE,
     '',
-    'ご不明点がございましたら、このメールに返信してください。',
+    'ご不明点がございましたら、このメールにご返信ください。',
   ].join('\n');
 
   const html = `
@@ -97,7 +97,7 @@ function buildConfirmationBodies(order) {
     ${formatAddress(order)}<br>
     TEL: ${order.phone}</p>
     <p>${SHIPPING_NOTE}</p>
-    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールに返信してください。</p>
+    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
   `.trim();
 
   return { text, html };
@@ -181,7 +181,7 @@ function buildCancellationBodies(order, { refunded = false } = {}) {
     `予約番号: ${order.order_id}`,
     refundLine,
     '',
-    'ご不明点がございましたら、このメールに返信してください。',
+    'ご不明点がございましたら、このメールにご返信ください。',
   ].join('\n');
 
   const html = `
@@ -189,7 +189,7 @@ function buildCancellationBodies(order, { refunded = false } = {}) {
     <p>以下のご予約をキャンセルしました。</p>
     <p><strong>予約番号:</strong> ${order.order_id}</p>
     <p>${refundLine}</p>
-    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールに返信してください。</p>
+    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
   `.trim();
 
   return { text, html };
