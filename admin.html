@@ -156,10 +156,10 @@
               <strong>決済</strong>（未決済／決済済など）は Stripe 連携で自動更新されます。
               <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。発送済にすると「未発送」一覧から消え、「発送済」一覧に移ります。
             </p>
-            <form class="orders-search" id="orders-search-form" autocomplete="off">
+            <form class="orders-search" id="orders-search-form" autocomplete="off" onsubmit="return false;">
               <label class="orders-search-field">
                 <span class="visually-hidden">名前・予約番号</span>
-                <input type="search" id="orders-search-name" placeholder="名前・カナ・予約番号" maxlength="40" />
+                <input type="text" id="orders-search-name" placeholder="名前・カナ・予約番号" maxlength="40" enterkeyhint="search" />
               </label>
               <label class="orders-search-field">
                 <span class="visually-hidden">都道府県</span>
@@ -167,7 +167,7 @@
                   <option value="">都道府県（すべて）</option>
                 </select>
               </label>
-              <button type="submit" class="btn btn-primary" id="orders-search-btn">絞り込み</button>
+              <button type="button" class="btn btn-primary" id="orders-search-btn">絞り込み</button>
               <button type="button" class="btn" id="orders-search-clear">クリア</button>
             </form>
             <div class="table-wrap">

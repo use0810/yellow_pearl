@@ -317,6 +317,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       function switchScreen(name) {
         activeScreen = name;
+        try { sessionStorage.setItem('adminActiveScreen', name); } catch { /* ignore */ }
         document.querySelectorAll('.screen').forEach((el) => {
           el.classList.toggle('active', el.id === `screen-${name}`);
         });
@@ -714,7 +715,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         if (prefEl) prefEl.value = orderSearchPrefecture;
       }
 
-      async function loadOrders() {
+      async function loadOrders({ preserveScroll = true } = {}) {
+        const scrollY = preserveScroll ? window.scrollY : 0;
         const params = new URLSearchParams({
           filter: orderFilter,
           page: String(orderPage),
@@ -730,6 +732,18 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         updateOrdersPagerUI(data);
         syncOrdersSearchUI();
         renderOrders(data.orders ?? []);
+        if (preserveScroll) {
+          requestAnimationFrame(() => {
+            window.scrollTo(0, scrollY);
+          });
+        }
+      }
+
+      function applyOrdersSearch() {
+        orderSearchName = document.getElementById('orders-search-name').value.trim();
+        orderSearchPrefecture = document.getElementById('orders-search-prefecture').value;
+        orderPage = 1;
+        return loadOrders();
       }
 
       async function saveOrder(orderId, container) {
@@ -1019,15 +1033,22 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         });
       });
 
-      document.getElementById('orders-search-form').addEventListener('submit', (e) => {
+      document.getElementById('orders-search-form')?.addEventListener('submit', (e) => {
         e.preventDefault();
-        orderSearchName = document.getElementById('orders-search-name').value.trim();
-        orderSearchPrefecture = document.getElementById('orders-search-prefecture').value;
-        orderPage = 1;
-        loadOrders().catch((err) => alert(err.message));
+        applyOrdersSearch().catch((err) => alert(err.message));
       });
 
-      document.getElementById('orders-search-clear').addEventListener('click', () => {
+      document.getElementById('orders-search-btn')?.addEventListener('click', () => {
+        applyOrdersSearch().catch((err) => alert(err.message));
+      });
+
+      document.getElementById('orders-search-name')?.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        applyOrdersSearch().catch((err) => alert(err.message));
+      });
+
+      document.getElementById('orders-search-clear')?.addEventListener('click', () => {
         orderSearchName = '';
         orderSearchPrefecture = '';
         orderPage = 1;
@@ -1081,6 +1102,11 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           await checkAdminSession();
           showApp();
           await loadDashboard();
+          let savedScreen = 'products';
+          try { savedScreen = sessionStorage.getItem('adminActiveScreen') || 'products'; } catch { /* ignore */ }
+          if (savedScreen !== 'products' && SCREEN_TITLES[savedScreen]) {
+            switchScreen(savedScreen);
+          }
         } catch (err) {
           showAuthError(err.message || '認証の確認に失敗しました');
         }
