@@ -282,7 +282,7 @@ export async function resendConfirmationEmail(env, orderId) {
  * 送信失敗のまま成功記録がない決済済予約へ、遅延お詫び付き確認メールを再送する。
  * 日次クォータ回復後の cron 向け。運営通知・お客様からの返信対応は対象外。
  */
-export async function retryFailedConfirmationEmails(env, { limit = 80 } = {}) {
+export async function retryFailedConfirmationEmails(env, { limit = 200 } = {}) {
   if (!isEmailEnabled(env)) {
     return { skipped: true, reason: 'no_binding' };
   }
