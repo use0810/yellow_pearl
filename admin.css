@@ -566,6 +566,50 @@
         font-weight: 600;
       }
 
+      .orders-search {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        margin: 0 0 1rem;
+      }
+
+      .orders-search-field {
+        flex: 1 1 10rem;
+        min-width: 0;
+        margin: 0;
+      }
+
+      .orders-search-field input,
+      .orders-search-field select {
+        width: 100%;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.55rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: inherit;
+        box-sizing: border-box;
+        background: #fff;
+      }
+
+      .orders-search .btn {
+        font-size: 0.78rem;
+        padding: 0.4rem 0.75rem;
+        flex: 0 0 auto;
+      }
+
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
       .ops-cell { min-width: 180px; }
 
       .ops-cell select,

@@ -11,6 +11,7 @@ import {
   PAYMENT_PAID,
   PAYMENT_REFUNDED,
   PAYMENT_UNPAID,
+  PREFECTURES,
   orderHoldsStock,
   getShippingRegionsFromMap,
   validateOrderContactFields,
@@ -88,12 +89,23 @@ export async function handleAdminDashboard(env, CORS) {
   }, 200, CORS);
 }
 
+function likePattern(raw) {
+  const cleaned = String(raw || '')
+    .trim()
+    .slice(0, 40)
+    .replace(/[%_\\]/g, '');
+  return cleaned ? `%${cleaned}%` : '';
+}
+
 export async function handleAdminOrders(env, CORS, url) {
   const filter = url.searchParams.get('filter') || 'pending';
   const limitRaw = parseInt(url.searchParams.get('limit') || '50', 10);
   const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
   const limit = Number.isNaN(limitRaw) ? 50 : Math.min(Math.max(limitRaw, 1), 100);
   const page = Number.isNaN(pageRaw) ? 1 : Math.max(pageRaw, 1);
+  const nameLike = likePattern(url.searchParams.get('name') || '');
+  const prefectureRaw = (url.searchParams.get('prefecture') || '').trim();
+  const prefecture = PREFECTURES.includes(prefectureRaw) ? prefectureRaw : '';
 
   let where;
   if (filter === 'cancelled') {
@@ -104,9 +116,25 @@ export async function handleAdminOrders(env, CORS, url) {
     where = `status = '${ORDER_STATUS_RESERVED}' AND ${ORDER_NOT_ARCHIVED}`;
   }
 
+  const binds = [];
+  if (nameLike) {
+    where += ` AND (
+      last_name LIKE ? OR first_name LIKE ?
+      OR last_name_kana LIKE ? OR first_name_kana LIKE ?
+      OR (last_name || first_name) LIKE ?
+      OR (last_name || ' ' || first_name) LIKE ?
+      OR order_id LIKE ?
+    )`;
+    binds.push(nameLike, nameLike, nameLike, nameLike, nameLike, nameLike, nameLike);
+  }
+  if (prefecture) {
+    where += ' AND prefecture = ?';
+    binds.push(prefecture);
+  }
+
   const countRow = await env.DB.prepare(
     `SELECT COUNT(*) AS total FROM orders WHERE ${where}`
-  ).first();
+  ).bind(...binds).first();
   const total = countRow?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const safePage = Math.min(page, totalPages);
@@ -114,11 +142,13 @@ export async function handleAdminOrders(env, CORS, url) {
 
   const rows = await env.DB.prepare(
     `SELECT ${ORDER_SELECT} FROM orders WHERE ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
-  ).bind(limit, offset).all();
+  ).bind(...binds, limit, offset).all();
 
   return json({
     orders: rows.results ?? [],
     filter,
+    name: nameLike ? nameLike.slice(1, -1) : '',
+    prefecture,
     page: safePage,
     limit,
     total,

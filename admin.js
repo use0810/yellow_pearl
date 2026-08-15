@@ -29,6 +29,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       let orderPage = 1;
       const ORDERS_PAGE_SIZE = 50;
       let orderTotalPages = 1;
+      let orderSearchName = '';
+      let orderSearchPrefecture = '';
       let activeScreen = 'products';
       let accessLogoutUrl = null;
       let bookkeepingData = null;
@@ -570,7 +572,10 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           shipped: '発送済みの予約なし',
           cancelled: 'キャンセルなし',
         };
-        const emptyLabel = emptyLabels[orderFilter] || '予約なし';
+        let emptyLabel = emptyLabels[orderFilter] || '予約なし';
+        if (orderSearchName || orderSearchPrefecture) {
+          emptyLabel = '条件に一致する予約なし';
+        }
 
         if (!orders.length) {
           tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">${emptyLabel}</td></tr>`;
@@ -691,15 +696,39 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         next.disabled = orderPage >= orderTotalPages;
       }
 
+      function initOrdersSearchPrefecture() {
+        const sel = document.getElementById('orders-search-prefecture');
+        if (!sel || sel.options.length > 1) return;
+        for (const p of PREFECTURES) {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p;
+          sel.appendChild(opt);
+        }
+      }
+
+      function syncOrdersSearchUI() {
+        const nameEl = document.getElementById('orders-search-name');
+        const prefEl = document.getElementById('orders-search-prefecture');
+        if (nameEl) nameEl.value = orderSearchName;
+        if (prefEl) prefEl.value = orderSearchPrefecture;
+      }
+
       async function loadOrders() {
-        const data = await api(
-          `/api/admin/orders?filter=${encodeURIComponent(orderFilter)}&page=${orderPage}&limit=${ORDERS_PAGE_SIZE}`,
-        );
+        const params = new URLSearchParams({
+          filter: orderFilter,
+          page: String(orderPage),
+          limit: String(ORDERS_PAGE_SIZE),
+        });
+        if (orderSearchName) params.set('name', orderSearchName);
+        if (orderSearchPrefecture) params.set('prefecture', orderSearchPrefecture);
+        const data = await api(`/api/admin/orders?${params}`);
         if (data.page && data.page !== orderPage) {
           orderPage = data.page;
         }
         updateOrdersFilterUI();
         updateOrdersPagerUI(data);
+        syncOrdersSearchUI();
         renderOrders(data.orders ?? []);
       }
 
@@ -990,6 +1019,22 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         });
       });
 
+      document.getElementById('orders-search-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        orderSearchName = document.getElementById('orders-search-name').value.trim();
+        orderSearchPrefecture = document.getElementById('orders-search-prefecture').value;
+        orderPage = 1;
+        loadOrders().catch((err) => alert(err.message));
+      });
+
+      document.getElementById('orders-search-clear').addEventListener('click', () => {
+        orderSearchName = '';
+        orderSearchPrefecture = '';
+        orderPage = 1;
+        syncOrdersSearchUI();
+        loadOrders().catch((err) => alert(err.message));
+      });
+
       document.getElementById('orders-page-prev').addEventListener('click', () => {
         if (orderPage <= 1) return;
         orderPage -= 1;
@@ -1014,6 +1059,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       });
 
       initBookkeepingYearSelect();
+      initOrdersSearchPrefecture();
       document.getElementById('bk-year').addEventListener('change', () => {
         loadBookkeeping().catch((err) => alert(err.message));
       });
