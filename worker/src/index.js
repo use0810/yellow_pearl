@@ -27,6 +27,7 @@ import {
   handleAdminBookkeepingExport,
 } from './lib/bookkeeping.js';
 import { handleIndexHtml, isIndexHtmlPath } from './lib/html-seo.js';
+import { retryFailedConfirmationEmails } from './lib/email.js';
 
 async function handleApi(request, env) {
   const url = new URL(request.url);
@@ -159,6 +160,11 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
+    // 09:05 JST (= 00:05 UTC): 日次クォータ回復後に未送信のお客様確認メールを再送
+    if (event.cron === '5 0 * * *') {
+      ctx.waitUntil(retryFailedConfirmationEmails(env));
+      return;
+    }
     ctx.waitUntil(cleanupStaleOrders(env));
   },
 };

@@ -12,7 +12,8 @@ ADMIN_ALLOWED_EMAILS = "shingo.satokimi2021@gmail.com,Nu.Balance.Tokyo@gmail.com
 ADMIN_NOTIFY_EMAILS = "shingo.satokimi2021@gmail.com"
 
 [triggers]
-crons = ["0 18 * * *"]
+# 03:00 JST 滞留予約掃除 / 09:05 JST 確認メール再送（日次枠回復後）
+crons = ["0 18 * * *", "5 0 * * *"]
 
 # Stripe Checkout（テスト）:
 #   wrangler secret put STRIPE_SECRET_KEY          # sk_test_...

@@ -225,6 +225,52 @@ export async function resendConfirmationEmail(env, orderId) {
   }
 }
 
+/**
+ * 送信失敗のまま成功記録がない決済済予約へ、お客様確認メールを再送する。
+ * 日次クォータ回復後の cron 向け。運営通知は対象外。
+ */
+export async function retryFailedConfirmationEmails(env, { limit = 80 } = {}) {
+  if (!isEmailEnabled(env)) {
+    return { skipped: true, reason: 'no_binding' };
+  }
+
+  const rows = await env.DB.prepare(
+    `SELECT o.order_id AS order_id
+     FROM orders o
+     WHERE o.payment_status = ?
+       AND o.archived_at IS NULL
+       AND EXISTS (
+         SELECT 1 FROM order_events e
+         WHERE e.order_id = o.order_id AND e.event_type = 'confirmation_email_failed'
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM order_events e
+         WHERE e.order_id = o.order_id
+           AND e.event_type IN ('confirmation_email_sent', 'confirmation_email_resent')
+       )
+     ORDER BY o.created_at ASC
+     LIMIT ?`
+  ).bind(PAYMENT_PAID, limit).all();
+
+  const orderIds = (rows.results ?? []).map((r) => r.order_id);
+  let sent = 0;
+  let failed = 0;
+  for (const orderId of orderIds) {
+    const result = await resendConfirmationEmail(env, orderId);
+    if (result.ok) {
+      sent += 1;
+      continue;
+    }
+    failed += 1;
+    const msg = String(result.error || '');
+    if (/quota|daily|rate.?limit|throttl/i.test(msg)) {
+      break;
+    }
+  }
+
+  return { ok: true, attempted: orderIds.length, sent, failed };
+}
+
 /** 決済確定後の予約確認メール（Webhook / 返却 URL 共通・冪等）＋運営通知 */
 export async function maybeSendConfirmationEmail(env, orderId) {
   if (!isEmailEnabled(env)) return { skipped: true, reason: 'no_binding' };
