@@ -128,6 +128,9 @@ function buildDelayedConfirmationBodies(order) {
     SHIPPING_NOTE,
     '',
     'ご不明点がございましたら、このメールにご返信ください。',
+    '',
+    '郷のきみイエローパール',
+    'サポート担当　湯川',
   ].join('\n');
 
   const html = `
@@ -147,6 +150,7 @@ function buildDelayedConfirmationBodies(order) {
     TEL: ${order.phone}</p>
     <p>${SHIPPING_NOTE}</p>
     <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
+    <p>郷のきみイエローパール<br>サポート担当　湯川</p>
   `.trim();
 
   return { text, html };
