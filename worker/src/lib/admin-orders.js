@@ -13,6 +13,7 @@ import {
   PAYMENT_UNPAID,
   orderHoldsStock,
   getShippingRegionsFromMap,
+  validateOrderContactFields,
 } from '../../../shared/domain.js';
 import { json } from './http.js';
 import {
@@ -30,10 +31,41 @@ const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_nam
   quantity, unit_price, shipping_fee, tax_amount, total_amount,
   status, payment_status, admin_note, stripe_session_id, stripe_payment_id, created_at`;
 
+const CONTACT_KEYS = [
+  'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
+  'email', 'phone', 'postal', 'prefecture', 'address1', 'address2',
+];
+
 async function logOrderEvent(db, orderId, eventType, detail = '') {
   await db.prepare(
     `INSERT INTO order_events (order_id, event_type, detail) VALUES (?, ?, ?)`
   ).bind(orderId, eventType, detail).run();
+}
+
+async function updateOrderContact(db, orderId, contact, previous) {
+  await db.prepare(
+    `UPDATE orders SET
+      last_name = ?, first_name = ?, last_name_kana = ?, first_name_kana = ?,
+      email = ?, phone = ?, postal = ?, prefecture = ?, address1 = ?, address2 = ?
+     WHERE order_id = ? AND ${ORDER_NOT_ARCHIVED}`
+  ).bind(
+    contact.last_name,
+    contact.first_name,
+    contact.last_name_kana,
+    contact.first_name_kana,
+    contact.email,
+    contact.phone,
+    contact.postal,
+    contact.prefecture,
+    contact.address1,
+    contact.address2,
+    orderId,
+  ).run();
+
+  const changed = CONTACT_KEYS.filter((k) => String(previous?.[k] ?? '') !== String(contact[k] ?? ''));
+  if (changed.length > 0) {
+    await logOrderEvent(db, orderId, 'contact_updated', changed.join(','));
+  }
 }
 
 export async function handleAdminDashboard(env, CORS) {
@@ -58,17 +90,40 @@ export async function handleAdminDashboard(env, CORS) {
 
 export async function handleAdminOrders(env, CORS, url) {
   const filter = url.searchParams.get('filter') || 'pending';
-  let query;
+  const limitRaw = parseInt(url.searchParams.get('limit') || '50', 10);
+  const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
+  const limit = Number.isNaN(limitRaw) ? 50 : Math.min(Math.max(limitRaw, 1), 100);
+  const page = Number.isNaN(pageRaw) ? 1 : Math.max(pageRaw, 1);
+
+  let where;
   if (filter === 'cancelled') {
-    query = `SELECT ${ORDER_SELECT} FROM orders WHERE status = '${ORDER_STATUS_CANCELLED}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`;
+    where = `status = '${ORDER_STATUS_CANCELLED}' AND ${ORDER_NOT_ARCHIVED}`;
   } else if (filter === 'shipped') {
-    query = `SELECT ${ORDER_SELECT} FROM orders WHERE status = '${ORDER_STATUS_DONE}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`;
+    where = `status = '${ORDER_STATUS_DONE}' AND ${ORDER_NOT_ARCHIVED}`;
   } else {
-    query = `SELECT ${ORDER_SELECT} FROM orders WHERE status = '${ORDER_STATUS_RESERVED}' AND ${ORDER_NOT_ARCHIVED} ORDER BY id DESC LIMIT 100`;
+    where = `status = '${ORDER_STATUS_RESERVED}' AND ${ORDER_NOT_ARCHIVED}`;
   }
 
-  const rows = await env.DB.prepare(query).all();
-  return json({ orders: rows.results ?? [], filter }, 200, CORS);
+  const countRow = await env.DB.prepare(
+    `SELECT COUNT(*) AS total FROM orders WHERE ${where}`
+  ).first();
+  const total = countRow?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, totalPages);
+  const offset = (safePage - 1) * limit;
+
+  const rows = await env.DB.prepare(
+    `SELECT ${ORDER_SELECT} FROM orders WHERE ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
+  ).bind(limit, offset).all();
+
+  return json({
+    orders: rows.results ?? [],
+    filter,
+    page: safePage,
+    limit,
+    total,
+    total_pages: totalPages,
+  }, 200, CORS);
 }
 
 export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
@@ -83,12 +138,26 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
     return json({ error: '特記事項が長すぎます' }, 400, CORS);
   }
 
+  const wantsContactUpdate = body.last_name !== undefined;
+  let contact = null;
+  if (wantsContactUpdate) {
+    const parsed = validateOrderContactFields(body);
+    if (parsed.error) return json({ error: parsed.error }, 400, CORS);
+    contact = parsed.data;
+  }
+
   const order = await env.DB.prepare(
-    `SELECT quantity, status, payment_status, stripe_session_id, stripe_payment_id
+    `SELECT quantity, status, payment_status, stripe_session_id, stripe_payment_id,
+      last_name, first_name, last_name_kana, first_name_kana,
+      email, phone, postal, prefecture, address1, address2
      FROM orders WHERE order_id = ? AND ${ORDER_NOT_ARCHIVED}`
   ).bind(orderId).first();
 
   if (!order) return json({ error: '予約が見つかりません' }, 404, CORS);
+
+  if (contact && order.status === ORDER_STATUS_CANCELLED) {
+    return json({ error: 'キャンセル済みの予約の連絡先は変更できません' }, 400, CORS);
+  }
 
   const oldStatus = order.status || ORDER_STATUS_RESERVED;
   const qty = order.quantity;
@@ -221,6 +290,10 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
     await env.DB.prepare(
       `UPDATE orders SET status = ?, admin_note = ? WHERE order_id = ? AND ${ORDER_NOT_ARCHIVED}`
     ).bind(status, adminNote, orderId).run();
+
+    if (contact) {
+      await updateOrderContact(env.DB, orderId, contact, order);
+    }
   }
 
   const updated = await env.DB.prepare(

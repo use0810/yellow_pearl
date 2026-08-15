@@ -584,6 +584,13 @@
         margin-top: 0.35rem;
       }
 
+      .ops-contact-hint {
+        margin: 0.45rem 0 0;
+        font-size: 0.7rem;
+        color: #64748b;
+        line-height: 1.4;
+      }
+
       .ops-save {
         font-size: 0.75rem;
         padding: 0.3rem 0.65rem;
@@ -591,6 +598,53 @@
 
       .ops-cell .ops-actions {
         margin-top: 0.35rem;
+      }
+
+      .order-edit-block {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 11rem;
+      }
+
+      .order-edit-row {
+        display: flex;
+        gap: 0.35rem;
+      }
+
+      .order-edit-block input,
+      .order-edit-block select {
+        width: 100%;
+        font-size: 0.78rem;
+        padding: 0.3rem 0.4rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: inherit;
+        box-sizing: border-box;
+      }
+
+      .order-edit-note {
+        font-size: 0.72rem;
+        color: #888;
+        line-height: 1.4;
+      }
+
+      .order-card-edit {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .order-edit-label {
+        margin: 0.35rem 0 0;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #64748b;
+      }
+
+      .order-card-dl-meta {
+        margin-top: 0.5rem;
       }
 
       .ops-actions {
@@ -602,6 +656,29 @@
       .ops-actions .btn {
         font-size: 0.75rem;
         padding: 0.35rem 0.75rem;
+      }
+
+      .orders-pager {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .orders-pager-info {
+        font-size: 0.85rem;
+        color: #475569;
+        min-width: 12rem;
+        text-align: center;
+      }
+
+      .orders-pager .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
       }
 
       .status-pill {

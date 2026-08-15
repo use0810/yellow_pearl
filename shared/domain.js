@@ -114,13 +114,20 @@ export function orderHoldsStock(paymentStatus) {
   return paymentStatus === PAYMENT_UNPAID || paymentStatus === PAYMENT_PAID;
 }
 
-/** 予約フォーム入力のサーバー／クライアント共通検証 */
-export function validateReserveFields(body) {
+/** 発送先・連絡先の検証（数量なし。管理画面の訂正用） */
+export function validateOrderContactFields(body) {
   if (!body || typeof body !== 'object') return { error: 'Invalid JSON' };
 
-  const { last_name, first_name, email, phone, postal, prefecture, address1, quantity = 1 } = body;
-  const lastNameKana = body.last_name_kana || '';
-  const firstNameKana = body.first_name_kana || '';
+  const last_name = typeof body.last_name === 'string' ? body.last_name.trim() : '';
+  const first_name = typeof body.first_name === 'string' ? body.first_name.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const postal = typeof body.postal === 'string' ? body.postal.trim() : '';
+  const prefecture = typeof body.prefecture === 'string' ? body.prefecture.trim() : '';
+  const address1 = typeof body.address1 === 'string' ? body.address1.trim() : '';
+  const address2 = typeof body.address2 === 'string' ? body.address2.trim() : '';
+  const lastNameKana = typeof body.last_name_kana === 'string' ? body.last_name_kana.trim() : '';
+  const firstNameKana = typeof body.first_name_kana === 'string' ? body.first_name_kana.trim() : '';
 
   if (!last_name || !first_name || !email || !phone || !postal || !prefecture || !address1) {
     return { error: '必須項目が不足しています' };
@@ -139,8 +146,7 @@ export function validateReserveFields(body) {
     lastNameKana.length > MAX_LEN.name || firstNameKana.length > MAX_LEN.name ||
     email.length > MAX_LEN.email || phone.length > MAX_LEN.phone ||
     postal.length > MAX_LEN.postal || address1.length > MAX_LEN.address ||
-    (body.address2 || '').length > MAX_LEN.address ||
-    (body.note || '').length > MAX_LEN.note
+    address2.length > MAX_LEN.address
   ) {
     return { error: '入力が長すぎます' };
   }
@@ -156,11 +162,6 @@ export function validateReserveFields(body) {
     return { error: '電話番号が正しくありません' };
   }
 
-  const qty = parseInt(quantity, 10);
-  if (isNaN(qty) || qty < 1 || qty > MAX_ORDER_QTY) {
-    return { error: '数量が不正です' };
-  }
-
   return {
     data: {
       last_name,
@@ -170,10 +171,33 @@ export function validateReserveFields(body) {
       postal,
       prefecture,
       address1,
-      address2: body.address2 || '',
-      note: body.note || '',
+      address2,
       last_name_kana: lastNameKana,
       first_name_kana: firstNameKana,
+    },
+  };
+}
+
+/** 予約フォーム入力のサーバー／クライアント共通検証 */
+export function validateReserveFields(body) {
+  if (!body || typeof body !== 'object') return { error: 'Invalid JSON' };
+
+  const contact = validateOrderContactFields(body);
+  if (contact.error) return contact;
+
+  if ((body.note || '').length > MAX_LEN.note) {
+    return { error: '入力が長すぎます' };
+  }
+
+  const qty = parseInt(body.quantity ?? 1, 10);
+  if (isNaN(qty) || qty < 1 || qty > MAX_ORDER_QTY) {
+    return { error: '数量が不正です' };
+  }
+
+  return {
+    data: {
+      ...contact.data,
+      note: body.note || '',
       qty,
     },
   };

@@ -9,6 +9,7 @@ import {
   PAYMENT_PAID,
   PAYMENT_REFUNDED,
   PAYMENT_UNPAID,
+  PREFECTURES,
   SHIPPING_REGIONS,
   calcOrderAmount,
   calcShippingMargin,
@@ -25,6 +26,9 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         bookkeeping: '帳簿・申告',
       };
       let orderFilter = 'pending';
+      let orderPage = 1;
+      const ORDERS_PAGE_SIZE = 50;
+      let orderTotalPages = 1;
       let activeScreen = 'products';
       let accessLogoutUrl = null;
       let bookkeepingData = null;
@@ -395,6 +399,60 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         return `${email}${phone}${kana}` || '—';
       }
 
+      function prefectureOptions(selected) {
+        return PREFECTURES.map((p) =>
+          `<option value="${esc(p)}"${p === selected ? ' selected' : ''}>${esc(p)}</option>`
+        ).join('');
+      }
+
+      function renderEditableName(o) {
+        return `<div class="order-edit-block">
+          <div class="order-edit-row">
+            <input type="text" class="oe-last-name" value="${esc(o.last_name || '')}" placeholder="姓" aria-label="姓" />
+            <input type="text" class="oe-first-name" value="${esc(o.first_name || '')}" placeholder="名" aria-label="名" />
+          </div>
+          <div class="order-edit-row">
+            <input type="text" class="oe-last-name-kana" value="${esc(o.last_name_kana || '')}" placeholder="セイ" aria-label="セイ" />
+            <input type="text" class="oe-first-name-kana" value="${esc(o.first_name_kana || '')}" placeholder="メイ" aria-label="メイ" />
+          </div>
+        </div>`;
+      }
+
+      function renderEditableContact(o) {
+        return `<div class="order-edit-block">
+          <input type="email" class="oe-email" value="${esc(o.email || '')}" placeholder="メール" aria-label="メール" />
+          <input type="text" class="oe-phone" value="${esc(o.phone || '')}" placeholder="電話" aria-label="電話" />
+        </div>`;
+      }
+
+      function renderEditableAddress(o) {
+        const note = o.note ? `<div class="order-edit-note">お客様備考: ${esc(o.note)}</div>` : '';
+        return `<div class="order-edit-block">
+          <div class="order-edit-row">
+            <input type="text" class="oe-postal" value="${esc(o.postal || '')}" placeholder="郵便番号" aria-label="郵便番号" />
+            <select class="oe-prefecture" aria-label="都道府県">${prefectureOptions(o.prefecture || '')}</select>
+          </div>
+          <input type="text" class="oe-address1" value="${esc(o.address1 || '')}" placeholder="住所" aria-label="住所" />
+          <input type="text" class="oe-address2" value="${esc(o.address2 || '')}" placeholder="建物名など（任意）" aria-label="住所2" />
+          ${note}
+        </div>`;
+      }
+
+      function collectContactFields(scope) {
+        return {
+          last_name: scope.querySelector('.oe-last-name')?.value.trim() ?? '',
+          first_name: scope.querySelector('.oe-first-name')?.value.trim() ?? '',
+          last_name_kana: scope.querySelector('.oe-last-name-kana')?.value.trim() ?? '',
+          first_name_kana: scope.querySelector('.oe-first-name-kana')?.value.trim() ?? '',
+          email: scope.querySelector('.oe-email')?.value.trim() ?? '',
+          phone: scope.querySelector('.oe-phone')?.value.trim() ?? '',
+          postal: scope.querySelector('.oe-postal')?.value.trim() ?? '',
+          prefecture: scope.querySelector('.oe-prefecture')?.value ?? '',
+          address1: scope.querySelector('.oe-address1')?.value.trim() ?? '',
+          address2: scope.querySelector('.oe-address2')?.value.trim() ?? '',
+        };
+      }
+
       function statusPillClass(status) {
         if (status === ORDER_STATUS_DONE) return 'done';
         if (status === ORDER_STATUS_CANCELLED) return 'cancelled';
@@ -464,6 +522,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           <p class="ops-status-hint">発送ステータス（手動）</p>
           <select class="ops-status" aria-label="予約ステータス">${options}</select>
           <textarea class="ops-note" placeholder="特記事項（管理者用）">${esc(o.admin_note || '')}</textarea>
+          <p class="ops-contact-hint">発送先のみ更新。送料・合計は変わりません</p>
           <div class="ops-actions">
             <button type="button" class="btn ops-save ops-save-btn" data-order-id="${esc(o.order_id)}">保存</button>
             ${resendEmailBtn}
@@ -489,12 +548,22 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         }
 
         tbody.innerHTML = orders.map((o) => {
-          const note = o.note ? `<br><span style="color:#888">お客様備考: ${esc(o.note)}</span>` : '';
+          const cancelled = (o.status || ORDER_STATUS_RESERVED) === ORDER_STATUS_CANCELLED;
+          const nameCell = cancelled
+            ? `${esc(o.last_name)} ${esc(o.first_name)}`
+            : renderEditableName(o);
+          const contactCell = cancelled ? formatContact(o) : renderEditableContact(o);
+          const note = o.note && cancelled
+            ? `<br><span style="color:#888">お客様備考: ${esc(o.note)}</span>`
+            : '';
+          const addressCell = cancelled
+            ? `${esc(formatAddress(o))}${note}`
+            : renderEditableAddress(o);
           return `<tr data-order-id="${esc(o.order_id)}">
             <td class="mono">${esc(o.order_id)}</td>
-            <td>${esc(o.last_name)} ${esc(o.first_name)}</td>
-            <td>${formatContact(o)}</td>
-            <td>${esc(formatAddress(o))}${note}</td>
+            <td>${nameCell}</td>
+            <td>${contactCell}</td>
+            <td>${addressCell}</td>
             <td>${o.quantity}本</td>
             <td class="num">${o.total_amount ? `¥${formatYen(o.total_amount)}` : '—'}</td>
             <td>${renderOrderStatusCell(o)}</td>
@@ -504,7 +573,9 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         }).join('');
 
         cards.innerHTML = orders.map((o) => {
-          return `
+          const cancelled = (o.status || ORDER_STATUS_RESERVED) === ORDER_STATUS_CANCELLED;
+          if (cancelled) {
+            return `
           <article class="order-card" data-order-id="${esc(o.order_id)}">
             <div class="order-card-head">
               <div>
@@ -528,6 +599,31 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             ${renderOpsCell(o)}
           </article>
         `;
+          }
+          return `
+          <article class="order-card" data-order-id="${esc(o.order_id)}">
+            <div class="order-card-head">
+              <div>
+                ${renderOrderStatusCell(o)}
+              </div>
+              <div class="order-card-id">${esc(o.order_id)}</div>
+            </div>
+            <div class="order-card-edit">
+              <p class="order-edit-label">お名前</p>
+              ${renderEditableName(o)}
+              <p class="order-edit-label">連絡先</p>
+              ${renderEditableContact(o)}
+              <p class="order-edit-label">住所</p>
+              ${renderEditableAddress(o)}
+              <dl class="order-card-dl order-card-dl-meta">
+                <dt>数量</dt><dd>${o.quantity}本</dd>
+                <dt>合計</dt><dd>${o.total_amount ? `¥${formatYen(o.total_amount)}` : '—'}</dd>
+                <dt>日時</dt><dd>${esc(o.created_at)}</dd>
+              </dl>
+            </div>
+            ${renderOpsCell(o)}
+          </article>
+        `;
         }).join('');
       }
 
@@ -545,9 +641,34 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         });
       }
 
+      function updateOrdersPagerUI({ page, total, total_pages: totalPages }) {
+        const pager = document.getElementById('orders-pager');
+        const info = document.getElementById('orders-pager-info');
+        const prev = document.getElementById('orders-page-prev');
+        const next = document.getElementById('orders-page-next');
+        orderTotalPages = totalPages || 1;
+        orderPage = page || 1;
+        if (!total) {
+          pager.hidden = true;
+          return;
+        }
+        pager.hidden = false;
+        const from = (orderPage - 1) * ORDERS_PAGE_SIZE + 1;
+        const to = Math.min(orderPage * ORDERS_PAGE_SIZE, total);
+        info.textContent = `${from}–${to} / ${total}件（${orderPage}/${orderTotalPages}ページ）`;
+        prev.disabled = orderPage <= 1;
+        next.disabled = orderPage >= orderTotalPages;
+      }
+
       async function loadOrders() {
-        const data = await api(`/api/admin/orders?filter=${orderFilter}`);
+        const data = await api(
+          `/api/admin/orders?filter=${encodeURIComponent(orderFilter)}&page=${orderPage}&limit=${ORDERS_PAGE_SIZE}`,
+        );
+        if (data.page && data.page !== orderPage) {
+          orderPage = data.page;
+        }
         updateOrdersFilterUI();
+        updateOrdersPagerUI(data);
         renderOrders(data.orders ?? []);
       }
 
@@ -561,9 +682,15 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           );
           if (!ok) return;
         }
+        const scope = container.closest('tr, .order-card');
+        const contact = scope?.querySelector('.oe-last-name')
+          ? collectContactFields(scope)
+          : null;
+        const body = { status, admin_note: adminNote };
+        if (contact) Object.assign(body, contact);
         await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
           method: 'PUT',
-          body: JSON.stringify({ status, admin_note: adminNote }),
+          body: JSON.stringify(body),
         });
         await loadOrders();
         await loadDashboard();
@@ -588,6 +715,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             }),
           });
           orderFilter = 'pending';
+          orderPage = 1;
           await loadOrders();
           await loadDashboard();
         } finally {
@@ -813,8 +941,21 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         btn.addEventListener('click', () => {
           if (orderFilter === btn.dataset.ordersFilter) return;
           orderFilter = btn.dataset.ordersFilter;
+          orderPage = 1;
           loadOrders().catch((err) => alert(err.message));
         });
+      });
+
+      document.getElementById('orders-page-prev').addEventListener('click', () => {
+        if (orderPage <= 1) return;
+        orderPage -= 1;
+        loadOrders().catch((err) => alert(err.message));
+      });
+
+      document.getElementById('orders-page-next').addEventListener('click', () => {
+        if (orderPage >= orderTotalPages) return;
+        orderPage += 1;
+        loadOrders().catch((err) => alert(err.message));
       });
 
       document.getElementById('orders-table-body').addEventListener('click', handleOrdersClick);
