@@ -170,6 +170,55 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         URL.revokeObjectURL(a.href);
       }
 
+      const RECONCILE_LABELS = {
+        bank_transfer_pending: '銀行振込待ち',
+        abandoned_expired: '離脱（Checkout失効）',
+        still_open: '決済ページ未完了',
+        paid: '入金済（要確認）',
+        stripe_error: 'Stripe照会失敗',
+        unknown: '判定不能',
+      };
+
+      /** Stripe の Checkout Session を照会し、振込待ちと離脱を切り分ける */
+      async function reconcileWithStripe() {
+        const scope = orderFilter === 'cancelled' ? 'cancelled' : 'unpaid';
+        const dry = await api(`/api/admin/orders/reconcile?scope=${scope}&limit=100`);
+
+        if (!dry.scanned) {
+          alert('照合対象の予約がありません。');
+          return;
+        }
+
+        const breakdown = Object.entries(dry.counts)
+          .map(([key, n]) => `・${RECONCILE_LABELS[key] || key}: ${n}件`)
+          .join('\n');
+        const head = scope === 'cancelled'
+          ? `キャンセル ${dry.scanned}件を Stripe と照合しました。`
+          : `振込待ち ${dry.scanned}件を Stripe と照合しました。`;
+        const items = dry.items ?? [];
+        const toFlag = items.filter((i) => i.action === 'would_flag').length;
+        const toRelease = items.filter((i) => i.action === 'would_release').length;
+        const toRestore = items.filter((i) => i.action === 'would_restore').length;
+
+        if (!toFlag && !toRelease && !toRestore) {
+          alert(`${head}\n\n${breakdown}\n\n更新が必要な予約はありません。`);
+          return;
+        }
+
+        const actions = [
+          toRestore ? `・${toRestore}件は実際には振込待ちなので予約に戻して在庫を再確保` : '',
+          toFlag ? `・${toFlag}件に振込待ちの記録を付ける` : '',
+          toRelease ? `・${toRelease}件は失効済みなのでキャンセルして在庫を戻す` : '',
+        ].filter(Boolean).join('\n');
+        if (!confirm(`${head}\n\n${breakdown}\n\n以下を実行します。\n${actions}`)) return;
+
+        const applied = await api(
+          `/api/admin/orders/reconcile?scope=${scope}&limit=100&apply=1`,
+        );
+        alert(`${applied.changed}件を更新しました。`);
+        await loadOrders();
+      }
+
       async function printBookkeepingPdf() {
         const year = getBookkeepingYear();
         let data;
@@ -591,6 +640,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const cards = document.getElementById('orders-cards');
         const emptyLabels = {
           pending: '未発送の予約なし',
+          bank_pending: '振込待ちの予約なし',
           shipped: '発送済みの予約なし',
           cancelled: 'キャンセルなし',
         };
@@ -688,6 +738,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       function updateOrdersFilterUI() {
         const titles = {
           pending: '未発送一覧',
+          bank_pending: '振込待ち一覧',
           shipped: '発送済一覧',
           cancelled: 'キャンセル一覧',
         };
@@ -1071,6 +1122,17 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       document.getElementById('orders-csv-btn')?.addEventListener('click', () => {
         downloadOrdersCsv().catch((err) => alert(err.message));
+      });
+      document.getElementById('orders-reconcile-btn')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = '照合中...';
+        reconcileWithStripe()
+          .catch((err) => alert(err.message))
+          .finally(() => {
+            btn.disabled = false;
+            btn.textContent = 'Stripe照合';
+          });
       });
       document.getElementById('orders-search-clear')?.addEventListener('click', () => {
         orderSearchName = '';

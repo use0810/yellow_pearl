@@ -787,6 +787,7 @@
 
       .order-status-summary.summary-paid-ready { color: #166534; }
       .order-status-summary.summary-unpaid { color: #92400e; }
+      .order-status-summary.summary-bank-pending { color: #075985; }
       .order-status-summary.summary-done { color: #1d4ed8; }
       .order-status-summary.summary-cancelled { color: #991b1b; }
       .order-status-summary.summary-refunded { color: #3730a3; }

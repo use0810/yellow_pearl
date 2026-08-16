@@ -23,8 +23,18 @@ import {
   getShippingMap,
   incrementStock,
   inventoryPublicFields,
+  inventoryStripeMode,
+  markBankTransferPending,
+  markOrderFailedAndReleaseStock,
 } from './inventory.js';
-import { expireStripeCheckoutSession, refundStripePayment, resolveStripeMode } from './stripe.js';
+import {
+  expireStripeCheckoutSession,
+  isStripeEnabledForMode,
+  refundStripePayment,
+  resolveStripeMode,
+  stripeFetch,
+  stripeModeFromResourceId,
+} from './stripe.js';
 import { maybeSendCancellationEmail, resendConfirmationEmail } from './email.js';
 
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
@@ -98,7 +108,9 @@ function likePattern(raw) {
 }
 
 function normalizeOrdersFilter(raw) {
-  if (raw === 'cancelled' || raw === 'shipped' || raw === 'pending') return raw;
+  if (raw === 'cancelled' || raw === 'shipped' || raw === 'pending' || raw === 'bank_pending') {
+    return raw;
+  }
   return 'pending';
 }
 
@@ -113,6 +125,10 @@ function buildOrdersListQuery(url) {
     where = `status = '${ORDER_STATUS_CANCELLED}' AND ${ORDER_NOT_ARCHIVED}`;
   } else if (filter === 'shipped') {
     where = `status = '${ORDER_STATUS_DONE}' AND ${ORDER_NOT_ARCHIVED}`;
+  } else if (filter === 'bank_pending') {
+    where = `status = '${ORDER_STATUS_RESERVED}'
+      AND payment_status = '${PAYMENT_UNPAID}'
+      AND ${ORDER_NOT_ARCHIVED}`;
   } else {
     where = `status = '${ORDER_STATUS_RESERVED}' AND ${ORDER_NOT_ARCHIVED}`;
   }
@@ -153,6 +169,7 @@ function buildOrdersCsv(orders, filter) {
     pending: '未発送',
     shipped: '発送済',
     cancelled: 'キャンセル',
+    bank_pending: '振込待ち',
   }[filter] || filter;
 
   const header = [
@@ -203,6 +220,42 @@ function buildOrdersCsv(orders, filter) {
   return lines.join('\r\n');
 }
 
+async function enrichOrdersWithPaymentFlags(db, orders) {
+  if (!orders.length) return orders;
+  const ids = orders.map((o) => o.order_id);
+  const placeholders = ids.map(() => '?').join(',');
+  const eventRows = await db.prepare(
+    `SELECT order_id, event_type FROM order_events
+     WHERE order_id IN (${placeholders})
+       AND event_type IN (
+         'bank_transfer_pending',
+         'payment_failed_expired',
+         'payment_failed_cleanup_limit',
+         'payment_failed_orphan',
+         'payment_failed_session_create',
+         'payment_failed_session_link',
+         'payment_async_failed_noted'
+       )
+     ORDER BY id DESC`
+  ).bind(...ids).all();
+
+  const bankPending = new Set();
+  const failReason = new Map();
+  for (const ev of eventRows.results ?? []) {
+    if (ev.event_type === 'bank_transfer_pending') {
+      bankPending.add(ev.order_id);
+    } else if (ev.event_type.startsWith('payment_failed_') && !failReason.has(ev.order_id)) {
+      failReason.set(ev.order_id, ev.event_type);
+    }
+  }
+
+  return orders.map((o) => ({
+    ...o,
+    bank_transfer_pending: bankPending.has(o.order_id),
+    payment_fail_reason: failReason.get(o.order_id) || null,
+  }));
+}
+
 export async function handleAdminOrders(env, CORS, url) {
   const limitRaw = parseInt(url.searchParams.get('limit') || '50', 10);
   const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
@@ -222,8 +275,10 @@ export async function handleAdminOrders(env, CORS, url) {
     `SELECT ${ORDER_SELECT} FROM orders WHERE ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
   ).bind(...binds, limit, offset).all();
 
+  const orders = await enrichOrdersWithPaymentFlags(env.DB, rows.results ?? []);
+
   return json({
-    orders: rows.results ?? [],
+    orders,
     filter,
     name: nameLike ? nameLike.slice(1, -1) : '',
     prefecture,
@@ -250,6 +305,137 @@ export async function handleAdminOrdersExport(env, CORS, url) {
       'Content-Disposition': `attachment; filename="yellow-pearl-orders-${filter}-${stamp}.csv"`,
     },
   });
+}
+
+/**
+ * Stripe の Checkout Session を照会して未決済／キャンセル注文の正体を判定する。
+ * complete かつ未払い = 銀行振込待ち、expired = 支払い前に離脱。
+ */
+function classifyStripeSession(session) {
+  if (!session) return 'stripe_error';
+  if (session.payment_status === 'paid') return 'paid';
+  if (session.status === 'complete') return 'bank_transfer_pending';
+  if (session.status === 'expired') return 'abandoned_expired';
+  if (session.status === 'open') return 'still_open';
+  return 'unknown';
+}
+
+/**
+ * scope=unpaid: 振込待ちフラグを補完。
+ * scope=cancelled: 誤ってキャンセルされた振込待ちを検出し、apply=1 で予約へ戻す。
+ */
+export async function handleAdminOrdersReconcile(env, CORS, url) {
+  const scope = url.searchParams.get('scope') === 'unpaid' ? 'unpaid' : 'cancelled';
+  const apply = url.searchParams.get('apply') === '1';
+  const limitRaw = parseInt(url.searchParams.get('limit') || '60', 10);
+  const limit = Number.isNaN(limitRaw) ? 60 : Math.min(Math.max(limitRaw, 1), 100);
+
+  const stateFilter = scope === 'unpaid'
+    ? `payment_status = '${PAYMENT_UNPAID}' AND status = '${ORDER_STATUS_RESERVED}'`
+    : `payment_status = '${PAYMENT_FAILED}' AND status = '${ORDER_STATUS_CANCELLED}'`;
+
+  const rows = await env.DB.prepare(
+    `SELECT order_id, email, quantity, total_amount, created_at, stripe_session_id
+     FROM orders
+     WHERE ${ORDER_NOT_ARCHIVED} AND ${stateFilter} AND stripe_session_id IS NOT NULL
+     ORDER BY created_at DESC
+     LIMIT ?`
+  ).bind(limit).all();
+
+  const fallbackMode = inventoryStripeMode(await fetchInventoryRow(env.DB));
+  const counts = {};
+  const items = [];
+  let changed = 0;
+
+  for (const row of rows.results ?? []) {
+    const mode = stripeModeFromResourceId(row.stripe_session_id) ?? fallbackMode;
+    let session = null;
+    if (isStripeEnabledForMode(env, mode)) {
+      try {
+        session = await stripeFetch(
+          env,
+          `/checkout/sessions/${encodeURIComponent(row.stripe_session_id)}`,
+          { method: 'GET' },
+          mode,
+        );
+      } catch {
+        session = null;
+      }
+    }
+
+    const classification = classifyStripeSession(session);
+    counts[classification] = (counts[classification] ?? 0) + 1;
+
+    let action = 'none';
+    if (classification === 'bank_transfer_pending') {
+      if (scope === 'unpaid') {
+        action = apply
+          ? (await markBankTransferPending(env.DB, row.order_id, session) ? 'flagged' : 'already_flagged')
+          : 'would_flag';
+      } else if (apply) {
+        action = await restoreBankTransferOrder(env.DB, row.order_id, row.quantity, session)
+          ? 'restored'
+          : 'restore_failed';
+      } else {
+        action = 'would_restore';
+      }
+    } else if (classification === 'abandoned_expired' && scope === 'unpaid') {
+      // 失効済みセッションが在庫を押さえたままなので、cron を待たずに解放する
+      action = apply
+        ? (await markOrderFailedAndReleaseStock(env.DB, row.order_id, 'payment_failed_expired')
+          ? 'released'
+          : 'release_failed')
+        : 'would_release';
+    }
+    if (action === 'flagged' || action === 'restored' || action === 'released') {
+      changed += 1;
+    }
+
+    items.push({
+      order_id: row.order_id,
+      email: row.email,
+      quantity: row.quantity,
+      total_amount: row.total_amount,
+      created_at: row.created_at,
+      session_status: session?.status ?? null,
+      session_payment_status: session?.payment_status ?? null,
+      payment_method_types: Array.isArray(session?.payment_method_types)
+        ? session.payment_method_types.join(',')
+        : null,
+      classification,
+      action,
+    });
+  }
+
+  return json({
+    scope,
+    apply,
+    scanned: items.length,
+    changed,
+    counts,
+    items,
+  }, 200, CORS);
+}
+
+/** 誤キャンセルされた振込待ちを未決済／予約へ戻し、在庫を再確保する */
+async function restoreBankTransferOrder(db, orderId, quantity, session) {
+  if (!(await decrementStock(db, quantity))) return false;
+
+  const restored = await db.prepare(
+    `UPDATE orders SET status = ?, payment_status = ?
+     WHERE order_id = ? AND status = ? AND payment_status = ? AND ${ORDER_NOT_ARCHIVED}`
+  ).bind(
+    ORDER_STATUS_RESERVED, PAYMENT_UNPAID, orderId, ORDER_STATUS_CANCELLED, PAYMENT_FAILED,
+  ).run();
+
+  if ((restored.meta?.changes ?? 0) === 0) {
+    await incrementStock(db, quantity);
+    return false;
+  }
+
+  await logOrderEvent(db, orderId, 'restored', 'reconcile:bank_transfer_pending');
+  await markBankTransferPending(db, orderId, session);
+  return true;
 }
 
 export async function handleAdminOrderUpdate(request, env, CORS, orderId) {

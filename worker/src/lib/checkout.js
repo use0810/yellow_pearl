@@ -16,6 +16,7 @@ import {
   insertReservedOrder,
   inventoryStripeMode,
   loadPricing,
+  markBankTransferPending,
   markOrderFailedAndReleaseStock,
 } from './inventory.js';
 import { maybeSendConfirmationEmail } from './email.js';
@@ -33,6 +34,12 @@ import {
   stripePaymentIntentId,
   verifyStripeWebhookAny,
 } from './stripe.js';
+
+async function logOrderEvent(db, orderId, eventType, detail = '') {
+  await db.prepare(
+    `INSERT INTO order_events (order_id, event_type, detail) VALUES (?, ?, ?)`
+  ).bind(orderId, eventType, detail).run();
+}
 
 /** 決済確定: 在庫は Checkout 開始時に確保済み。payment_status のみ更新 */
 export async function confirmOrderPayment(env, orderId, { sessionId = null, paymentId = null } = {}) {
@@ -188,12 +195,12 @@ export async function handleCheckout(request, env, CORS) {
       shippingTaxAmount,
     }, stripeMode);
   } catch {
-    await markOrderFailedAndReleaseStock(env.DB, order_id);
+    await markOrderFailedAndReleaseStock(env.DB, order_id, 'payment_failed_session_create');
     return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
   }
 
   if (!session?.url || !session?.id) {
-    await markOrderFailedAndReleaseStock(env.DB, order_id);
+    await markOrderFailedAndReleaseStock(env.DB, order_id, 'payment_failed_session_create');
     return json({ error: '決済セッションの作成に失敗しました' }, 502, CORS);
   }
 
@@ -206,7 +213,7 @@ export async function handleCheckout(request, env, CORS) {
     }
   } catch {
     await expireStripeCheckoutSession(env, session.id, { mode: stripeMode });
-    await markOrderFailedAndReleaseStock(env.DB, order_id);
+    await markOrderFailedAndReleaseStock(env.DB, order_id, 'payment_failed_session_link');
     return json({ error: '予約の更新に失敗しました' }, 500, CORS);
   }
 
@@ -262,7 +269,7 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
   }
 
   if (session.status === 'expired') {
-    await markOrderFailedAndReleaseStock(env.DB, orderId);
+    await markOrderFailedAndReleaseStock(env.DB, orderId, 'payment_failed_expired');
     return json({
       ok: false,
       order_id: orderId,
@@ -274,6 +281,9 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
 
   // 銀行振込など非同期決済: Session 完了後も unpaid のまま振込待ち
   if (session.status === 'complete' || session.status === 'open') {
+    if (session.status === 'complete' && session.payment_status !== 'paid') {
+      await markBankTransferPending(env.DB, orderId, session);
+    }
     return json({
       ok: true,
       pending: true,
@@ -320,28 +330,41 @@ export async function handleStripeWebhook(request, env) {
     (type === 'checkout.session.completed' || type === 'checkout.session.async_payment_succeeded')
     && session
   ) {
-    const result = await processPaidCheckoutSession(env, session);
-    if (result.error && !result.already) {
-      if (result.status !== 400 && result.status !== 404) {
-        return new Response(JSON.stringify({ error: result.error }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        });
+    if (type === 'checkout.session.completed' && !isStripeSessionPaid(session)) {
+      const orderId = stripeOrderId(session);
+      if (orderId) {
+        await markBankTransferPending(env.DB, orderId, session);
+      }
+    } else {
+      const result = await processPaidCheckoutSession(env, session);
+      if (result.error && !result.already) {
+        if (result.status !== 400 && result.status !== 404) {
+          return new Response(JSON.stringify({ error: result.error }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
       }
     }
   }
 
+  // 振込期限切れ等: 14日の cleanup まで在庫はキープ（即キャンセルしない）
   if (type === 'checkout.session.async_payment_failed' && session) {
     const orderId = stripeOrderId(session);
     if (orderId) {
-      await markOrderFailedAndReleaseStock(env.DB, orderId);
+      await logOrderEvent(
+        env.DB,
+        orderId,
+        'payment_async_failed_noted',
+        session.id ? `session=${session.id}` : '',
+      );
     }
   }
 
   if (type === 'checkout.session.expired' && session) {
     const orderId = stripeOrderId(session);
     if (orderId) {
-      await markOrderFailedAndReleaseStock(env.DB, orderId);
+      await markOrderFailedAndReleaseStock(env.DB, orderId, 'payment_failed_expired');
     }
   }
 

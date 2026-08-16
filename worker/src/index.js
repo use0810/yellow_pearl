@@ -13,6 +13,7 @@ import {
   handleAdminOrderDelete,
   handleAdminOrders,
   handleAdminOrdersExport,
+  handleAdminOrdersReconcile,
   handleAdminOrderUpdate,
   handleAdminResendConfirmationEmail,
   handleAdminStats,
@@ -127,6 +128,10 @@ async function handleApi(request, env) {
 
     if (url.pathname === '/api/admin/orders/export.csv' && request.method === 'GET') {
       return handleAdminOrdersExport(env, CORS, url);
+    }
+
+    if (url.pathname === '/api/admin/orders/reconcile' && request.method === 'GET') {
+      return handleAdminOrdersReconcile(env, CORS, url);
     }
 
     const resendEmailMatch = url.pathname.match(

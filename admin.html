@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>管理画面 | Yellow Pearl</title>
     <link rel="icon" href="/assets/image/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="admin.css?v=20260816a" />
+    <link rel="stylesheet" href="admin.css?v=20260816c" />
   </head>
   <body>
     <div id="auth-error">
@@ -148,13 +148,15 @@
               <div class="card-title" id="orders-list-title">未発送一覧</div>
               <div class="orders-filter-tabs" role="tablist" aria-label="予約一覧の表示">
                 <button type="button" class="orders-filter-btn active" data-orders-filter="pending" role="tab" aria-selected="true">未発送</button>
+                <button type="button" class="orders-filter-btn" data-orders-filter="bank_pending" role="tab" aria-selected="false">振込待ち</button>
                 <button type="button" class="orders-filter-btn" data-orders-filter="shipped" role="tab" aria-selected="false">発送済</button>
                 <button type="button" class="orders-filter-btn" data-orders-filter="cancelled" role="tab" aria-selected="false">キャンセル</button>
               </div>
             </div>
             <p class="card-note">
               <strong>決済</strong>（未決済／決済済など）は Stripe 連携で自動更新されます。
-              <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。発送済にすると「未発送」一覧から消え、「発送済」一覧に移ります。
+              <strong>振込待ち</strong>は銀行振込の入金待ち（最大14日）。Checkout 途中離脱は約24時間でキャンセルになります。
+              <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。
             </p>
             <form class="orders-search" id="orders-search-form" autocomplete="off" onsubmit="return false;">
               <label class="orders-search-field">
@@ -170,6 +172,7 @@
               <button type="submit" class="btn btn-primary" id="orders-search-btn">絞り込み</button>
               <button type="button" class="btn" id="orders-search-clear">クリア</button>
               <button type="button" class="btn" id="orders-csv-btn">CSV</button>
+              <button type="button" class="btn" id="orders-reconcile-btn">Stripe照合</button>
             </form>
             <div class="table-wrap">
               <table class="data-table">
@@ -350,6 +353,6 @@
         <button type="button" class="nav-btn" data-screen="bookkeeping">帳簿</button>
       </nav>
     </div>
-    <script type="module" src="admin.js?v=20260816a"></script>
+    <script type="module" src="admin.js?v=20260816c"></script>
   </body>
 </html>

@@ -113,8 +113,39 @@ export async function incrementStock(db, qty) {
   ).bind(qty, qty, PRODUCT_ID).run();
 }
 
-/** 未決済 → 失敗 にし、Checkout 時確保した在庫を戻す */
-export async function markOrderFailedAndReleaseStock(db, orderId) {
+async function logOrderEvent(db, orderId, eventType, detail = '') {
+  await db.prepare(
+    `INSERT INTO order_events (order_id, event_type, detail) VALUES (?, ?, ?)`
+  ).bind(orderId, eventType, detail).run();
+}
+
+async function hasOrderEvent(db, orderId, eventType) {
+  const row = await db.prepare(
+    `SELECT 1 AS ok FROM order_events WHERE order_id = ? AND event_type = ? LIMIT 1`
+  ).bind(orderId, eventType).first();
+  return !!row?.ok;
+}
+
+/** 銀行振込待ちを明示（冪等） */
+export async function markBankTransferPending(db, orderId, session = null) {
+  if (!orderId) return false;
+  if (await hasOrderEvent(db, orderId, 'bank_transfer_pending')) return false;
+  const methods = Array.isArray(session?.payment_method_types)
+    ? session.payment_method_types.join(',')
+    : '';
+  const detail = [
+    session?.id ? `session=${session.id}` : '',
+    methods ? `methods=${methods}` : '',
+  ].filter(Boolean).join(';');
+  await logOrderEvent(db, orderId, 'bank_transfer_pending', detail);
+  return true;
+}
+
+/**
+ * 未決済 → 失敗 にし、Checkout 時確保した在庫を戻す。
+ * @param {string} [reason] order_events の event_type（例: payment_failed_expired）
+ */
+export async function markOrderFailedAndReleaseStock(db, orderId, reason = 'payment_failed') {
   const order = await db.prepare(
     'SELECT quantity, payment_status FROM orders WHERE order_id = ? AND archived_at IS NULL'
   ).bind(orderId).first();
@@ -126,6 +157,9 @@ export async function markOrderFailedAndReleaseStock(db, orderId) {
 
   if ((result.meta?.changes ?? 0) > 0) {
     await incrementStock(db, order.quantity);
+    if (reason) {
+      await logOrderEvent(db, orderId, reason, '');
+    }
     return true;
   }
   return false;
@@ -149,7 +183,7 @@ export async function cleanupStaleOrders(env) {
     `SELECT order_id FROM orders WHERE ${orphanFilter}`
   ).all();
   for (const row of orphanRows.results ?? []) {
-    if (await markOrderFailedAndReleaseStock(env.DB, row.order_id)) {
+    if (await markOrderFailedAndReleaseStock(env.DB, row.order_id, 'payment_failed_orphan')) {
       cleaned += 1;
     }
   }
@@ -186,7 +220,7 @@ export async function cleanupStaleOrders(env) {
     ).bind(row.order_id, `-${BANK_TRANSFER_PENDING_MAX_HOURS} hours`).first();
 
     if (pastAbsoluteLimit) {
-      if (await markOrderFailedAndReleaseStock(env.DB, row.order_id)) {
+      if (await markOrderFailedAndReleaseStock(env.DB, row.order_id, 'payment_failed_cleanup_limit')) {
         cleaned += 1;
       }
       continue;
@@ -211,15 +245,16 @@ export async function cleanupStaleOrders(env) {
       continue;
     }
 
-    // 銀行振込待ち: Session 完了・未払い → 在庫は確保したまま
+    // 銀行振込待ち: Session 完了・未払い → 在庫は確保したまま（フラグも補完）
     if (session?.status === 'complete' && session?.payment_status !== 'paid') {
+      await markBankTransferPending(env.DB, row.order_id, session);
       continue;
     }
 
     if (session?.status === 'expired' || session?.status === 'open') {
       // open が長く残るケースは絶対上限で落とす。expired は即解放。
       if (session.status === 'expired') {
-        if (await markOrderFailedAndReleaseStock(env.DB, row.order_id)) {
+        if (await markOrderFailedAndReleaseStock(env.DB, row.order_id, 'payment_failed_expired')) {
           cleaned += 1;
         }
       }

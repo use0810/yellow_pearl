@@ -212,7 +212,17 @@ export function summarizeOrderState(order) {
     if (pay === PAYMENT_REFUNDED) return { text: 'キャンセル（返金済）', className: 'summary-refunded' };
     if (pay === PAYMENT_PAID) return { text: 'キャンセル（入金済・要確認）', className: 'summary-cancelled' };
     if (pay === PAYMENT_CANCELLED) return { text: 'キャンセル（管理者）', className: 'summary-cancelled' };
-    if (pay === PAYMENT_FAILED) return { text: 'キャンセル（未入金）', className: 'summary-cancelled' };
+    if (pay === PAYMENT_FAILED) {
+      const reasonHint = {
+        payment_failed_expired: 'Checkout失効',
+        payment_failed_cleanup_limit: '振込期限超過',
+        payment_failed_orphan: 'セッション未作成',
+      }[order?.payment_fail_reason];
+      return {
+        text: reasonHint ? `キャンセル（未入金・${reasonHint}）` : 'キャンセル（未入金）',
+        className: 'summary-cancelled',
+      };
+    }
     return { text: 'キャンセル', className: 'summary-cancelled' };
   }
   if (pay === PAYMENT_PAID && status === ORDER_STATUS_RESERVED) {
@@ -222,7 +232,10 @@ export function summarizeOrderState(order) {
     return { text: '入金済・発送済', className: 'summary-done' };
   }
   if (pay === PAYMENT_UNPAID && status === ORDER_STATUS_RESERVED) {
-    return { text: '未入金（決済待ち）', className: 'summary-unpaid' };
+    return {
+      text: order?.bank_transfer_pending ? '振込待ち（確認済・最大14日）' : '振込待ち（最大14日）',
+      className: 'summary-bank-pending',
+    };
   }
   if (pay === PAYMENT_FAILED) {
     return { text: '決済未完了', className: 'summary-cancelled' };
