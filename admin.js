@@ -200,11 +200,13 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           ? `キャンセル ${dry.scanned}件を Stripe と照合しました。`
           : `振込待ち ${dry.scanned}件を Stripe と照合しました。`;
         const items = dry.items ?? [];
-        const toFlag = items.filter((i) => i.action === 'would_flag').length;
-        const toRelease = items.filter((i) => i.action === 'would_release').length;
-        const toRestore = items.filter((i) => i.action === 'would_restore').length;
+        const countOf = (action) => items.filter((i) => i.action === action).length;
+        const toRestore = countOf('would_restore');
+        const toFlag = countOf('would_flag');
+        const toRelease = countOf('would_release');
+        const toLabel = countOf('would_label');
 
-        if (!toFlag && !toRelease && !toRestore) {
+        if (!toRestore && !toFlag && !toRelease && !toLabel) {
           alert(`${head}\n\n${breakdown}\n\n更新が必要な予約はありません。`);
           return;
         }
@@ -213,6 +215,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           toRestore ? `・${toRestore}件は実際には振込待ちなので予約に戻して在庫を再確保` : '',
           toFlag ? `・${toFlag}件に振込待ちの記録を付ける` : '',
           toRelease ? `・${toRelease}件は失効済みなのでキャンセルして在庫を戻す` : '',
+          toLabel ? `・${toLabel}件にキャンセル理由を書き込む` : '',
         ].filter(Boolean).join('\n');
         if (!confirm(`${head}\n\n${breakdown}\n\n以下を実行します。\n${actions}`)) return;
 
