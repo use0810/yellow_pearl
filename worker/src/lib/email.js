@@ -3,18 +3,6 @@ import { PAYMENT_PAID, PRODUCT_NAME } from '../../../shared/domain.js';
 const FROM_EMAIL = 'info@yellow-pearl.com';
 const FROM_NAME = 'Yellow Pearl';
 const SHIPPING_NOTE = '発送は2026年9月1日より順次行います。';
-const SUPPORT_PHONE = '050-8893-2144';
-const SUPPORT_SIGN_OFF_LINES = [
-  'ご不明点がございましたら、このメールにご返信ください。',
-  '',
-  '郷のきみイエローパール',
-  'サポート担当　湯川',
-  `電話：${SUPPORT_PHONE}`,
-];
-const SUPPORT_SIGN_OFF_HTML = `
-    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
-    <p>郷のきみイエローパール<br>サポート担当　湯川<br>電話：${SUPPORT_PHONE}</p>
-  `.trim();
 
 const ORDER_EMAIL_SELECT = `order_id, last_name, first_name, email, phone, postal, prefecture,
   address1, address2, quantity, total_amount, payment_status, status, created_at`;
@@ -92,7 +80,7 @@ function buildConfirmationBodies(order) {
     '',
     SHIPPING_NOTE,
     '',
-    ...SUPPORT_SIGN_OFF_LINES,
+    'ご不明点がございましたら、このメールにご返信ください。',
   ].join('\n');
 
   const html = `
@@ -109,7 +97,7 @@ function buildConfirmationBodies(order) {
     ${formatAddress(order)}<br>
     TEL: ${order.phone}</p>
     <p>${SHIPPING_NOTE}</p>
-    ${SUPPORT_SIGN_OFF_HTML}
+    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
   `.trim();
 
   return { text, html };
@@ -139,7 +127,10 @@ function buildDelayedConfirmationBodies(order) {
     '',
     SHIPPING_NOTE,
     '',
-    ...SUPPORT_SIGN_OFF_LINES,
+    'ご不明点がございましたら、このメールにご返信ください。',
+    '',
+    '郷のきみイエローパール',
+    'サポート担当　湯川',
   ].join('\n');
 
   const html = `
@@ -158,7 +149,8 @@ function buildDelayedConfirmationBodies(order) {
     ${formatAddress(order)}<br>
     TEL: ${order.phone}</p>
     <p>${SHIPPING_NOTE}</p>
-    ${SUPPORT_SIGN_OFF_HTML}
+    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
+    <p>郷のきみイエローパール<br>サポート担当　湯川</p>
   `.trim();
 
   return { text, html };
@@ -242,7 +234,7 @@ function buildCancellationBodies(order, { refunded = false } = {}) {
     `予約番号: ${order.order_id}`,
     refundLine,
     '',
-    ...SUPPORT_SIGN_OFF_LINES,
+    'ご不明点がございましたら、このメールにご返信ください。',
   ].join('\n');
 
   const html = `
@@ -250,7 +242,7 @@ function buildCancellationBodies(order, { refunded = false } = {}) {
     <p>以下のご予約をキャンセルしました。</p>
     <p><strong>予約番号:</strong> ${order.order_id}</p>
     <p>${refundLine}</p>
-    ${SUPPORT_SIGN_OFF_HTML}
+    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
   `.trim();
 
   return { text, html };
