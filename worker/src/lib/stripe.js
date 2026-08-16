@@ -144,7 +144,8 @@ function buildStripeCheckoutParams({
   const params = new URLSearchParams();
   params.append('mode', 'payment');
   params.append('success_url', `${origin}/cart.html?session_id={CHECKOUT_SESSION_ID}`);
-  params.append('cancel_url', `${origin}/cart.html?cancelled=1`);
+  // 中断したセッションを cart 側から通知させ、在庫を 24 時間待たずに戻す
+  params.append('cancel_url', `${origin}/cart.html?cancelled=1&abort_session={CHECKOUT_SESSION_ID}`);
   params.append('customer', customerId);
   params.append('client_reference_id', orderId);
   params.append('metadata[order_id]', orderId);

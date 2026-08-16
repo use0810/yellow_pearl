@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>管理画面 | Yellow Pearl</title>
     <link rel="icon" href="/assets/image/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="admin.css?v=20260816c" />
+    <link rel="stylesheet" href="admin.css?v=20260816d" />
   </head>
   <body>
     <div id="auth-error">
@@ -155,7 +155,9 @@
             </div>
             <p class="card-note">
               <strong>決済</strong>（未決済／決済済など）は Stripe 連携で自動更新されます。
-              <strong>振込待ち</strong>は銀行振込の入金待ち（最大14日）。Checkout 途中離脱は約24時間でキャンセルになります。
+              <strong>振込待ち</strong>は銀行振込の入金待ち（最大14日）。
+              <strong>キャンセル</strong>は括弧内に理由が出ます（管理者が取消／お客様が決済を中断／決済ページの期限切れ／振込期限切れ など）。
+              理由が「不明」のものは<strong>Stripe照合</strong>を押すと後から埋まります。
               <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。
             </p>
             <form class="orders-search" id="orders-search-form" autocomplete="off" onsubmit="return false;">
@@ -353,6 +355,6 @@
         <button type="button" class="nav-btn" data-screen="bookkeeping">帳簿</button>
       </nav>
     </div>
-    <script type="module" src="admin.js?v=20260816c"></script>
+    <script type="module" src="admin.js?v=20260816d"></script>
   </body>
 </html>

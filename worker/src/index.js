@@ -2,6 +2,7 @@ import { buildCors, clientIp, json } from './lib/http.js';
 import { handleAdminSessionCheck, verifyAdminAuth } from './lib/auth.js';
 import {
   handleCheckout,
+  handleCheckoutAbort,
   handleCheckoutReturn,
   handleStripeWebhook,
 } from './lib/checkout.js';
@@ -68,6 +69,13 @@ async function handleApi(request, env) {
     const sessionId = url.searchParams.get('session_id');
     if (sessionId) return handleCheckoutReturn(env, CORS, sessionId);
     return handleStock(env, CORS);
+  }
+
+  if (url.pathname === '/api/checkout/abort' && request.method === 'POST') {
+    if (await isRateLimited(env, 'abort', ip, 20, 1)) {
+      return json({ error: 'リクエストが多すぎます' }, 429, CORS);
+    }
+    return handleCheckoutAbort(env, CORS, url.searchParams.get('session_id'));
   }
 
   if (url.pathname === '/api/reserve' && request.method === 'POST') {

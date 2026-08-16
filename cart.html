@@ -694,6 +694,18 @@
         }
       }
 
+      /** 決済を中断した予約を解放し、在庫を他のお客様へ戻す */
+      async function notifyCheckoutAbort(sessionId) {
+        try {
+          await fetch(
+            `${WORKER_URL}/api/checkout/abort?session_id=${encodeURIComponent(sessionId)}`,
+            { method: "POST", credentials: "same-origin" },
+          );
+        } catch {
+          // 通知できなくても Checkout の失効で回収されるため画面には出さない
+        }
+      }
+
       (function initReturnHandler() {
         const params = new URLSearchParams(window.location.search);
         if (params.get("cancelled") === "1") {
@@ -703,7 +715,10 @@
             notice.textContent =
               "お支払いは完了していません。必要であれば再度お申し込みください。";
           }
+          const abortSession = params.get("abort_session");
+          if (abortSession) notifyCheckoutAbort(abortSession);
           params.delete("cancelled");
+          params.delete("abort_session");
           history.replaceState(
             null,
             "",

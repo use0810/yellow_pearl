@@ -204,26 +204,36 @@ export function validateReserveFields(body) {
 }
 
 /** 管理画面: 決済×予約ステータスの要約ラベル */
+/** 自動キャンセルの理由（order_events の event_type → 管理画面の表示） */
+export const CANCEL_REASON_LABELS = {
+  payment_failed_customer_abort: 'お客様が決済を中断',
+  payment_failed_expired: '決済ページの期限切れ',
+  payment_failed_async: '振込が不成立',
+  payment_failed_cleanup_limit: '振込期限切れ・14日経過',
+  payment_failed_orphan: 'システムエラー・決済が始まらず',
+  payment_failed_session_create: 'システムエラー・決済ページ作成失敗',
+  payment_failed_session_link: 'システムエラー・予約の更新失敗',
+};
+
+/** 誰の操作・どの経路でキャンセルされたかを一言で返す */
+export function cancelReasonLabel(order) {
+  const pay = order?.payment_status;
+  if (pay === PAYMENT_REFUNDED) return '管理者が取消・返金済';
+  if (pay === PAYMENT_CANCELLED) return '管理者が取消';
+  if (pay === PAYMENT_PAID) return '入金済のまま取消・要確認';
+  if (pay === PAYMENT_FAILED) {
+    return CANCEL_REASON_LABELS[order?.payment_fail_reason] || '理由不明・未入金';
+  }
+  return '';
+}
+
 export function summarizeOrderState(order) {
   const status = order?.status || ORDER_STATUS_RESERVED;
   const pay = order?.payment_status || PAYMENT_UNPAID;
 
   if (status === ORDER_STATUS_CANCELLED) {
-    if (pay === PAYMENT_REFUNDED) return { text: 'キャンセル（返金済）', className: 'summary-refunded' };
-    if (pay === PAYMENT_PAID) return { text: 'キャンセル（入金済・要確認）', className: 'summary-cancelled' };
-    if (pay === PAYMENT_CANCELLED) return { text: 'キャンセル（管理者）', className: 'summary-cancelled' };
-    if (pay === PAYMENT_FAILED) {
-      const reasonHint = {
-        payment_failed_expired: 'Checkout失効',
-        payment_failed_cleanup_limit: '振込期限超過',
-        payment_failed_orphan: 'セッション未作成',
-      }[order?.payment_fail_reason];
-      return {
-        text: reasonHint ? `キャンセル（未入金・${reasonHint}）` : 'キャンセル（未入金）',
-        className: 'summary-cancelled',
-      };
-    }
-    return { text: 'キャンセル', className: 'summary-cancelled' };
+    const className = pay === PAYMENT_REFUNDED ? 'summary-refunded' : 'summary-cancelled';
+    return { text: `キャンセル（${cancelReasonLabel(order) || '詳細不明'}）`, className };
   }
   if (pay === PAYMENT_PAID && status === ORDER_STATUS_RESERVED) {
     return { text: '入金済・未発送', className: 'summary-paid-ready' };

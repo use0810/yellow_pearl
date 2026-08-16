@@ -15,7 +15,7 @@ import {
   calcShippingMargin,
   summarizeOrderState,
   stripeLiveDashboardPaymentUrl,
-} from '/shared/domain.js';
+} from '/shared/domain.js?v=20260816d';
 import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       const WORKER_URL = window.location.origin;

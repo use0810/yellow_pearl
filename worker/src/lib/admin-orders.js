@@ -13,6 +13,7 @@ import {
   PAYMENT_UNPAID,
   PREFECTURES,
   orderHoldsStock,
+  cancelReasonLabel,
   getShippingRegionsFromMap,
   validateOrderContactFields,
 } from '../../../shared/domain.js';
@@ -188,6 +189,7 @@ function buildOrdersCsv(orders, filter) {
     '合計金額',
     '決済',
     '予約ステータス',
+    'キャンセル理由',
     'お客様備考',
     '管理メモ',
     '予約日時',
@@ -212,6 +214,7 @@ function buildOrdersCsv(orders, filter) {
       o.total_amount,
       o.payment_status,
       o.status,
+      o.status === ORDER_STATUS_CANCELLED ? cancelReasonLabel(o) : '',
       o.note,
       o.admin_note,
       o.created_at,
@@ -227,15 +230,7 @@ async function enrichOrdersWithPaymentFlags(db, orders) {
   const eventRows = await db.prepare(
     `SELECT order_id, event_type FROM order_events
      WHERE order_id IN (${placeholders})
-       AND event_type IN (
-         'bank_transfer_pending',
-         'payment_failed_expired',
-         'payment_failed_cleanup_limit',
-         'payment_failed_orphan',
-         'payment_failed_session_create',
-         'payment_failed_session_link',
-         'payment_async_failed_noted'
-       )
+       AND (event_type = 'bank_transfer_pending' OR event_type LIKE 'payment_failed_%')
      ORDER BY id DESC`
   ).bind(...ids).all();
 
@@ -295,7 +290,8 @@ export async function handleAdminOrdersExport(env, CORS, url) {
     `SELECT ${ORDER_SELECT} FROM orders WHERE ${where} ORDER BY id DESC`
   ).bind(...binds).all();
 
-  const csv = buildOrdersCsv(rows.results ?? [], filter);
+  const orders = await enrichOrdersWithPaymentFlags(env.DB, rows.results ?? []);
+  const csv = buildOrdersCsv(orders, filter);
   const stamp = new Date().toISOString().slice(0, 10);
   return new Response(csv, {
     status: 200,
@@ -335,10 +331,13 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
     : `payment_status = '${PAYMENT_FAILED}' AND status = '${ORDER_STATUS_CANCELLED}'`;
 
   const rows = await env.DB.prepare(
-    `SELECT order_id, email, quantity, total_amount, created_at, stripe_session_id
-     FROM orders
-     WHERE ${ORDER_NOT_ARCHIVED} AND ${stateFilter} AND stripe_session_id IS NOT NULL
-     ORDER BY created_at DESC
+    `SELECT o.order_id, o.email, o.quantity, o.total_amount, o.created_at, o.stripe_session_id,
+       (SELECT e.event_type FROM order_events e
+        WHERE e.order_id = o.order_id AND e.event_type LIKE 'payment_failed_%'
+        ORDER BY e.id DESC LIMIT 1) AS payment_fail_reason
+     FROM orders o
+     WHERE o.${ORDER_NOT_ARCHIVED} AND ${stateFilter} AND o.stripe_session_id IS NOT NULL
+     ORDER BY o.created_at DESC
      LIMIT ?`
   ).bind(limit).all();
 
@@ -386,8 +385,21 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
           ? 'released'
           : 'release_failed')
         : 'would_release';
+    } else if (scope === 'cancelled' && !row.payment_fail_reason) {
+      // 記録が入る前にキャンセルされた分の理由を Stripe の状態から埋める
+      const backfill = {
+        abandoned_expired: 'payment_failed_expired',
+        still_open: 'payment_failed_expired',
+      }[classification];
+      if (backfill) {
+        action = 'would_label';
+        if (apply) {
+          await logOrderEvent(env.DB, row.order_id, backfill, 'backfill:reconcile');
+          action = 'labeled';
+        }
+      }
     }
-    if (action === 'flagged' || action === 'restored' || action === 'released') {
+    if (action === 'flagged' || action === 'restored' || action === 'released' || action === 'labeled') {
       changed += 1;
     }
 

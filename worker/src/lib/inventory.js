@@ -220,7 +220,11 @@ export async function cleanupStaleOrders(env) {
     ).bind(row.order_id, `-${BANK_TRANSFER_PENDING_MAX_HOURS} hours`).first();
 
     if (pastAbsoluteLimit) {
-      if (await markOrderFailedAndReleaseStock(env.DB, row.order_id, 'payment_failed_cleanup_limit')) {
+      // 振込不成立の通知が来ていた場合はそちらを理由として残す
+      const reason = await hasOrderEvent(env.DB, row.order_id, 'payment_async_failed_noted')
+        ? 'payment_failed_async'
+        : 'payment_failed_cleanup_limit';
+      if (await markOrderFailedAndReleaseStock(env.DB, row.order_id, reason)) {
         cleaned += 1;
       }
       continue;

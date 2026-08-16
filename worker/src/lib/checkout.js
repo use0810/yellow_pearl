@@ -224,6 +224,46 @@ export async function handleCheckout(request, env, CORS) {
   }, 200, CORS);
 }
 
+/**
+ * Stripe の決済画面で「戻る」を押した時に cart 側から呼ばれる。
+ * セッションを失効させて在庫を即座に戻し、お客様都合の中断として記録する。
+ */
+export async function handleCheckoutAbort(env, CORS, sessionId) {
+  if (!sessionId) return json({ error: 'session_id が必要です' }, 400, CORS);
+
+  const stripeMode = stripeModeFromResourceId(sessionId)
+    ?? inventoryStripeMode(await fetchInventoryRow(env.DB));
+  if (!isStripeEnabledForMode(env, stripeMode)) {
+    return json({ error: '決済は現在利用できません' }, 503, CORS);
+  }
+
+  let session;
+  try {
+    session = await stripeFetch(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'GET',
+    }, stripeMode);
+  } catch {
+    return json({ error: '決済情報の取得に失敗しました' }, 502, CORS);
+  }
+
+  const orderId = stripeOrderId(session);
+  if (!orderId) return json({ error: '注文情報が見つかりません' }, 404, CORS);
+
+  // 支払い済み・振込案内済み（complete）は中断ではないので触らない
+  if (isStripeSessionPaid(session) || session.status === 'complete') {
+    return json({ ok: true, aborted: false, order_id: orderId }, 200, CORS);
+  }
+
+  if (session.status === 'open') {
+    await expireStripeCheckoutSession(env, sessionId, { mode: stripeMode });
+  }
+  const aborted = await markOrderFailedAndReleaseStock(
+    env.DB, orderId, 'payment_failed_customer_abort',
+  );
+
+  return json({ ok: true, aborted, order_id: orderId }, 200, CORS);
+}
+
 export async function handleCheckoutReturn(env, CORS, sessionId) {
   if (!sessionId) return json({ error: 'session_id が必要です' }, 400, CORS);
 
