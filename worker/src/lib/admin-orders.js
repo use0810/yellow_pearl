@@ -326,9 +326,18 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
   const limitRaw = parseInt(url.searchParams.get('limit') || '60', 10);
   const limit = Number.isNaN(limitRaw) ? 60 : Math.min(Math.max(limitRaw, 1), 100);
 
+  // 既に判定済みの予約は除外し、押すたびに残りだけを処理して収束させる
   const stateFilter = scope === 'unpaid'
-    ? `payment_status = '${PAYMENT_UNPAID}' AND status = '${ORDER_STATUS_RESERVED}'`
-    : `payment_status = '${PAYMENT_FAILED}' AND status = '${ORDER_STATUS_CANCELLED}'`;
+    ? `payment_status = '${PAYMENT_UNPAID}' AND status = '${ORDER_STATUS_RESERVED}'
+       AND NOT EXISTS (
+         SELECT 1 FROM order_events e
+         WHERE e.order_id = o.order_id AND e.event_type = 'bank_transfer_pending'
+       )`
+    : `payment_status = '${PAYMENT_FAILED}' AND status = '${ORDER_STATUS_CANCELLED}'
+       AND NOT EXISTS (
+         SELECT 1 FROM order_events e
+         WHERE e.order_id = o.order_id AND e.event_type LIKE 'payment_failed_%'
+       )`;
 
   const rows = await env.DB.prepare(
     `SELECT o.order_id, o.email, o.quantity, o.total_amount, o.created_at, o.stripe_session_id,

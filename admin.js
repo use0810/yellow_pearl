@@ -179,10 +179,14 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         unknown: '判定不能',
       };
 
+      const RECONCILE_BATCH = 25;
+
       /** Stripe の Checkout Session を照会し、振込待ちと離脱を切り分ける */
       async function reconcileWithStripe() {
         const scope = orderFilter === 'cancelled' ? 'cancelled' : 'unpaid';
-        const dry = await api(`/api/admin/orders/reconcile?scope=${scope}&limit=100`);
+        const dry = await api(
+          `/api/admin/orders/reconcile?scope=${scope}&limit=${RECONCILE_BATCH}`,
+        );
 
         if (!dry.scanned) {
           alert('照合対象の予約がありません。');
@@ -213,9 +217,12 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         if (!confirm(`${head}\n\n${breakdown}\n\n以下を実行します。\n${actions}`)) return;
 
         const applied = await api(
-          `/api/admin/orders/reconcile?scope=${scope}&limit=100&apply=1`,
+          `/api/admin/orders/reconcile?scope=${scope}&limit=${RECONCILE_BATCH}&apply=1`,
         );
-        alert(`${applied.changed}件を更新しました。`);
+        const rest = applied.scanned >= RECONCILE_BATCH
+          ? '\n\nまだ残りがあります。もう一度「Stripe照合」を押してください。'
+          : '';
+        alert(`${applied.changed}件を更新しました。${rest}`);
         await loadOrders();
       }
 
