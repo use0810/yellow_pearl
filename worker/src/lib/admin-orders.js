@@ -97,12 +97,13 @@ function likePattern(raw) {
   return cleaned ? `%${cleaned}%` : '';
 }
 
-export async function handleAdminOrders(env, CORS, url) {
-  const filter = url.searchParams.get('filter') || 'pending';
-  const limitRaw = parseInt(url.searchParams.get('limit') || '50', 10);
-  const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
-  const limit = Number.isNaN(limitRaw) ? 50 : Math.min(Math.max(limitRaw, 1), 100);
-  const page = Number.isNaN(pageRaw) ? 1 : Math.max(pageRaw, 1);
+function normalizeOrdersFilter(raw) {
+  if (raw === 'cancelled' || raw === 'shipped' || raw === 'pending') return raw;
+  return 'pending';
+}
+
+function buildOrdersListQuery(url) {
+  const filter = normalizeOrdersFilter(url.searchParams.get('filter') || 'pending');
   const nameLike = likePattern(url.searchParams.get('name') || '');
   const prefectureRaw = (url.searchParams.get('prefecture') || '').trim();
   const prefecture = PREFECTURES.includes(prefectureRaw) ? prefectureRaw : '';
@@ -132,6 +133,83 @@ export async function handleAdminOrders(env, CORS, url) {
     binds.push(prefecture);
   }
 
+  return {
+    filter,
+    nameLike,
+    prefecture,
+    where,
+    binds,
+  };
+}
+
+function csvEscape(value) {
+  const s = String(value ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function buildOrdersCsv(orders, filter) {
+  const filterLabel = {
+    pending: '未発送',
+    shipped: '発送済',
+    cancelled: 'キャンセル',
+  }[filter] || filter;
+
+  const header = [
+    '予約番号',
+    '姓',
+    '名',
+    'セイ',
+    'メイ',
+    '郵便番号',
+    '都道府県',
+    '住所1',
+    '住所2',
+    '電話',
+    'メール',
+    '数量',
+    '合計金額',
+    '決済',
+    '予約ステータス',
+    'お客様備考',
+    '管理メモ',
+    '予約日時',
+  ];
+
+  const lines = [
+    `\uFEFFYellow Pearl ${filterLabel}一覧`,
+    header.join(','),
+    ...orders.map((o) => [
+      o.order_id,
+      o.last_name,
+      o.first_name,
+      o.last_name_kana,
+      o.first_name_kana,
+      o.postal,
+      o.prefecture,
+      o.address1,
+      o.address2,
+      o.phone,
+      o.email,
+      o.quantity,
+      o.total_amount,
+      o.payment_status,
+      o.status,
+      o.note,
+      o.admin_note,
+      o.created_at,
+    ].map(csvEscape).join(',')),
+  ];
+  return lines.join('\r\n');
+}
+
+export async function handleAdminOrders(env, CORS, url) {
+  const limitRaw = parseInt(url.searchParams.get('limit') || '50', 10);
+  const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
+  const limit = Number.isNaN(limitRaw) ? 50 : Math.min(Math.max(limitRaw, 1), 100);
+  const page = Number.isNaN(pageRaw) ? 1 : Math.max(pageRaw, 1);
+  const { filter, nameLike, prefecture, where, binds } = buildOrdersListQuery(url);
+
   const countRow = await env.DB.prepare(
     `SELECT COUNT(*) AS total FROM orders WHERE ${where}`
   ).bind(...binds).first();
@@ -154,6 +232,24 @@ export async function handleAdminOrders(env, CORS, url) {
     total,
     total_pages: totalPages,
   }, 200, CORS);
+}
+
+export async function handleAdminOrdersExport(env, CORS, url) {
+  const { filter, where, binds } = buildOrdersListQuery(url);
+  const rows = await env.DB.prepare(
+    `SELECT ${ORDER_SELECT} FROM orders WHERE ${where} ORDER BY id DESC`
+  ).bind(...binds).all();
+
+  const csv = buildOrdersCsv(rows.results ?? [], filter);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return new Response(csv, {
+    status: 200,
+    headers: {
+      ...CORS,
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="yellow-pearl-orders-${filter}-${stamp}.csv"`,
+    },
+  });
 }
 
 export async function handleAdminOrderUpdate(request, env, CORS, orderId) {

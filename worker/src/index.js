@@ -12,6 +12,7 @@ import {
   handleAdminDashboard,
   handleAdminOrderDelete,
   handleAdminOrders,
+  handleAdminOrdersExport,
   handleAdminOrderUpdate,
   handleAdminResendConfirmationEmail,
   handleAdminStats,
@@ -122,6 +123,10 @@ async function handleApi(request, env) {
 
     if (url.pathname === '/api/admin/orders' && request.method === 'GET') {
       return handleAdminOrders(env, CORS, url);
+    }
+
+    if (url.pathname === '/api/admin/orders/export.csv' && request.method === 'GET') {
+      return handleAdminOrdersExport(env, CORS, url);
     }
 
     const resendEmailMatch = url.pathname.match(

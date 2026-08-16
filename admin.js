@@ -149,6 +149,27 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         URL.revokeObjectURL(a.href);
       }
 
+      async function downloadOrdersCsv() {
+        const params = new URLSearchParams({ filter: orderFilter });
+        if (orderSearchName) params.set('name', orderSearchName);
+        if (orderSearchPrefecture) params.set('prefecture', orderSearchPrefecture);
+        const res = await fetch(
+          `${WORKER_URL}/api/admin/orders/export.csv?${params}`,
+          { credentials: 'include' },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'CSV の取得に失敗しました');
+        }
+        const blob = await res.blob();
+        const stamp = new Date().toISOString().slice(0, 10);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `yellow-pearl-orders-${orderFilter}-${stamp}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
       async function printBookkeepingPdf() {
         const year = getBookkeepingYear();
         let data;
@@ -1048,6 +1069,9 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         applyOrdersSearch().catch((err) => alert(err.message));
       });
 
+      document.getElementById('orders-csv-btn')?.addEventListener('click', () => {
+        downloadOrdersCsv().catch((err) => alert(err.message));
+      });
       document.getElementById('orders-search-clear')?.addEventListener('click', () => {
         orderSearchName = '';
         orderSearchPrefecture = '';
