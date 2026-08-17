@@ -1,13 +1,20 @@
 /**
- * 銀行振込の口座案内メールを予約単位で送る。
- * 文面は Worker と同じ buildBankTransferBodies を使うので、本番送信と一致する。
+ * 銀行振込の口座案内メールを送る。文面は Worker と同じ buildBankTransferBodies を
+ * 使うので、自動送信される内容と一致する。
  *
- * 文面の確認だけ:
- *   node --experimental-default-type=module scripts/send-bank-transfer-mail.mjs --order YP-XXXX --dry-run
- * 自分宛にテスト送信（送信記録は残さない）:
- *   node --experimental-default-type=module scripts/send-bank-transfer-mail.mjs --order YP-XXXX --to me@example.com
- * お客様本人に送信（送信記録を残す）:
- *   node --experimental-default-type=module scripts/send-bank-transfer-mail.mjs --order YP-XXXX --send
+ * 対象の指定:
+ *   --order YP-XXXX   予約1件
+ *   --all             振込先が保存済みで、まだ案内を送っていない振込待ち全件
+ *   --limit N         --all の件数上限（既定 500）
+ *
+ * 動作の指定:
+ *   --dry-run         送らずに宛先と文面を表示
+ *   --to <addr>       指定アドレスにテスト送信（送信済みの記録は残さない）
+ *   --send            お客様本人に送信（送信済みの記録を残す）
+ *
+ * 例:
+ *   node --experimental-default-type=module scripts/send-bank-transfer-mail.mjs --all --limit 5 --to me@example.com
+ *   node --experimental-default-type=module scripts/send-bank-transfer-mail.mjs --all --send
  */
 import { execFileSync } from 'child_process';
 import fs from 'fs';
@@ -34,12 +41,15 @@ function arg(name, fallback = null) {
 const has = (name) => process.argv.includes(name);
 
 const ORDER_ID = arg('--order');
+const ALL = has('--all');
+const LIMIT = Number(arg('--limit', '500'));
 const TO_OVERRIDE = arg('--to');
 const DRY_RUN = has('--dry-run');
 const SEND_TO_CUSTOMER = has('--send');
+const DELAY_MS = Number(arg('--delay-ms', '400'));
 
-if (!ORDER_ID) {
-  console.error('--order YP-XXXX が必要です');
+if (!ORDER_ID && !ALL) {
+  console.error('--order YP-XXXX か --all を指定してください');
   process.exit(1);
 }
 if (!DRY_RUN && !TO_OVERRIDE && !SEND_TO_CUSTOMER) {
@@ -103,58 +113,103 @@ function api(method, apiPath, body, token) {
   });
 }
 
-const rows = d1Json(
-  `SELECT order_id, last_name, first_name, email, phone, postal, prefecture, address1, address2,
-     quantity, total_amount, payment_status, status, bank_transfer_info, created_at
-   FROM orders WHERE order_id = '${ORDER_ID.replace(/'/g, "''")}' AND archived_at IS NULL`,
-);
-const order = rows[0];
-if (!order) {
-  console.error(`予約が見つかりません: ${ORDER_ID}`);
-  process.exit(1);
-}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const info = parseBankTransferInfo(order);
-if (!info) {
-  console.error(
-    `振込先が未保存です: ${ORDER_ID}\n`
-    + '管理画面で「Stripe照合」を押して振込先を保存してから実行してください。',
+const SELECT = `order_id, last_name, first_name, email, phone, postal, prefecture, address1,
+  address2, quantity, total_amount, payment_status, status, bank_transfer_info, created_at`;
+
+function fetchOrders() {
+  if (ORDER_ID) {
+    return d1Json(
+      `SELECT ${SELECT} FROM orders
+       WHERE order_id = '${ORDER_ID.replace(/'/g, "''")}' AND archived_at IS NULL`,
+    );
+  }
+  // 期限が近い順に送る。既に案内済みの予約は除く
+  return d1Json(
+    `SELECT ${SELECT} FROM orders o
+     WHERE o.archived_at IS NULL
+       AND o.payment_status = '未決済'
+       AND o.status = '予約'
+       AND o.bank_transfer_info IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM order_events e
+         WHERE e.order_id = o.order_id AND e.event_type = 'bank_transfer_email_sent'
+       )
+     ORDER BY o.created_at ASC
+     LIMIT ${Number.isFinite(LIMIT) ? LIMIT : 500}`,
   );
-  process.exit(1);
 }
 
-const { text, html } = buildBankTransferBodies(order, info);
-const subject = `【Yellow Pearl】お振込先のご案内（${order.order_id}）`;
-const to = TO_OVERRIDE ?? order.email;
-
-if (DRY_RUN) {
-  console.log(`--- 宛先: ${to}`);
-  console.log(`--- 件名: ${subject}`);
-  console.log('---');
-  console.log(text);
+const orders = fetchOrders();
+if (orders.length === 0) {
+  console.log(JSON.stringify({ done: true, target: 0, note: '対象の予約がありません' }));
   process.exit(0);
 }
 
-const res = await api(
-  'POST',
-  `/client/v4/accounts/${ACCOUNT}/email/sending/send`,
-  { to, from: FROM, reply_to: { address: REPLY_TO }, subject, text, html },
-  oauthToken(),
-);
+console.log(JSON.stringify({
+  target: orders.length,
+  mode: DRY_RUN ? 'dry-run' : (TO_OVERRIDE ? `test:${TO_OVERRIDE}` : 'send-to-customer'),
+}));
 
-const ok = res.status >= 200 && res.status < 300 && res.json?.success !== false;
-if (!ok) {
-  const msg = res.json?.errors?.[0]?.message || JSON.stringify(res.json);
-  console.error(JSON.stringify({ ok: false, order_id: order.order_id, status: res.status, error: msg }));
-  process.exit(1);
-}
+const token = DRY_RUN ? null : oauthToken();
+let sent = 0;
+let failed = 0;
+let skipped = 0;
 
-// テスト送信はお客様に届いていないので、送信済みの記録は残さない
-if (!TO_OVERRIDE) {
-  d1Json(
-    `INSERT INTO order_events (order_id, event_type, detail)
-     VALUES ('${order.order_id}', 'bank_transfer_email_sent', '${to.replace(/'/g, "''")}')`,
+for (const order of orders) {
+  const info = parseBankTransferInfo(order);
+  if (!info) {
+    skipped += 1;
+    console.log(JSON.stringify({ skipped: order.order_id, reason: '振込先が未保存' }));
+    continue;
+  }
+
+  const { text, html } = buildBankTransferBodies(order, info);
+  const subject = `【Yellow Pearl】お振込先のご案内（${order.order_id}）`;
+  const to = TO_OVERRIDE ?? order.email;
+
+  if (DRY_RUN) {
+    console.log(`\n=== ${order.order_id} / ${order.last_name} ${order.first_name} → ${to}`);
+    console.log(`件名: ${subject}`);
+    console.log(text);
+    continue;
+  }
+
+  const res = await api(
+    'POST',
+    `/client/v4/accounts/${ACCOUNT}/email/sending/send`,
+    { to, from: FROM, reply_to: { address: REPLY_TO }, subject, text, html },
+    token,
   );
+
+  const ok = res.status >= 200 && res.status < 300 && res.json?.success !== false;
+  if (!ok) {
+    failed += 1;
+    const msg = res.json?.errors?.[0]?.message || JSON.stringify(res.json);
+    console.log(JSON.stringify({ ok: false, order_id: order.order_id, status: res.status, error: msg }));
+    if (/quota|throttl|daily|rate.?limit/i.test(String(msg))) {
+      console.log(JSON.stringify({ stopped: 'quota' }));
+      break;
+    }
+    if (DELAY_MS > 0) await sleep(DELAY_MS);
+    continue;
+  }
+
+  // テスト送信はお客様に届いていないので、送信済みの記録は残さない
+  if (!TO_OVERRIDE) {
+    d1Json(
+      `INSERT INTO order_events (order_id, event_type, detail)
+       VALUES ('${order.order_id}', 'bank_transfer_email_sent', '${to.replace(/'/g, "''")}')`,
+    );
+  }
+  sent += 1;
+  console.log(JSON.stringify({
+    ok: true, order_id: order.order_id, name: `${order.last_name}${order.first_name}`, to,
+  }));
+  if (DELAY_MS > 0) await sleep(DELAY_MS);
 }
 
-console.log(JSON.stringify({ ok: true, order_id: order.order_id, to, logged: !TO_OVERRIDE }));
+if (!DRY_RUN) {
+  console.log(JSON.stringify({ done: true, sent, failed, skipped, logged: !TO_OVERRIDE }));
+}
