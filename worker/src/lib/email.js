@@ -225,10 +225,26 @@ async function maybeSendAdminPurchaseNotification(env, order) {
   }
 }
 
-function buildBankTransferBodies(order, info) {
+/** 振込待ちの上限は予約日から14日（cleanupStaleOrders と揃える） */
+const BANK_TRANSFER_DEADLINE_DAYS = 14;
+
+/** 予約日から数えた振込期限を「YYYY年M月D日」で返す */
+function bankTransferDeadline(createdAt) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(createdAt || '');
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  d.setUTCDate(d.getUTCDate() + BANK_TRANSFER_DEADLINE_DAYS);
+  return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
+}
+
+export function buildBankTransferBodies(order, info) {
   const name = `${order.last_name} ${order.first_name} 様`;
   const amount = `${formatYen(order.total_amount)} 円`;
   const lines = bankTransferLines(info);
+  const deadline = bankTransferDeadline(order.created_at);
+  const deadlineText = deadline
+    ? `お振込の期限は ${deadline} です。`
+    : `お振込の期限はご予約から${BANK_TRANSFER_DEADLINE_DAYS}日間です。`;
 
   const text = [
     name,
@@ -247,7 +263,7 @@ function buildBankTransferBodies(order, info) {
     'この口座はお客様のご予約専用です。他のご予約分と合わせてのお振込はお受けできません。',
     '複数ご予約いただいている場合は、ご予約ごとに別々にお振込をお願いいたします。',
     '',
-    'お振込の期限は本メール送信日から14日間です。期限を過ぎますとご予約は自動的にキャンセルとなります。',
+    `${deadlineText}期限を過ぎますとご予約は自動的にキャンセルとなります。`,
     '振込手数料はお客様のご負担となります。あらかじめご了承ください。',
     '',
     '【お届け先】',
@@ -276,7 +292,7 @@ function buildBankTransferBodies(order, info) {
     ${lines.map(([label, value]) => `${label}: ${value}`).join('<br>')}</p>
     <p><strong>この口座はお客様のご予約専用です。</strong>他のご予約分と合わせてのお振込はお受けできません。
     複数ご予約いただいている場合は、ご予約ごとに別々にお振込をお願いいたします。</p>
-    <p>お振込の期限は本メール送信日から<strong>14日間</strong>です。期限を過ぎますとご予約は自動的にキャンセルとなります。<br>
+    <p><strong>${deadlineText}</strong>期限を過ぎますとご予約は自動的にキャンセルとなります。<br>
     振込手数料はお客様のご負担となります。あらかじめご了承ください。</p>
     <p><strong>お届け先</strong><br>
     ${formatAddress(order)}<br>
