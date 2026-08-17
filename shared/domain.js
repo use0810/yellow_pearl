@@ -227,6 +227,32 @@ export function cancelReasonLabel(order) {
   return '';
 }
 
+const ACCOUNT_TYPE_LABELS = { futsu: '普通', toza: '当座' };
+
+/** orders.bank_transfer_info（Stripe の振込手順 JSON）を読む */
+export function parseBankTransferInfo(order) {
+  if (!order?.bank_transfer_info) return null;
+  try {
+    const info = typeof order.bank_transfer_info === 'string'
+      ? JSON.parse(order.bank_transfer_info)
+      : order.bank_transfer_info;
+    return info?.account_number ? info : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 振込先を「項目: 値」の行にする（メール本文・管理画面で共用） */
+export function bankTransferLines(info) {
+  return [
+    ['銀行名', `${info.bank_name ?? '-'}${info.bank_code ? `（${info.bank_code}）` : ''}`],
+    ['支店名', `${info.branch_name ?? '-'}${info.branch_code ? `（${info.branch_code}）` : ''}`],
+    ['預金種目', ACCOUNT_TYPE_LABELS[info.account_type] ?? info.account_type ?? '普通'],
+    ['口座番号', info.account_number],
+    ['口座名義', info.account_holder_name ?? '-'],
+  ];
+}
+
 export function summarizeOrderState(order) {
   const status = order?.status || ORDER_STATUS_RESERVED;
   const pay = order?.payment_status || PAYMENT_UNPAID;

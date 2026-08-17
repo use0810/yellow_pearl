@@ -8,7 +8,15 @@ import {
   calcOrderAmount,
 } from '../../../shared/domain.js';
 import { json, nowIso } from './http.js';
-import { isStripeEnabledForMode, normalizeStripeMode, stripeFetch, stripeModeFromResourceId } from './stripe.js';
+import {
+  fetchBankTransferInstructions,
+  isStripeEnabledForMode,
+  normalizeStripeMode,
+  stripeCustomerId,
+  stripeFetch,
+  stripeModeFromResourceId,
+} from './stripe.js';
+import { maybeSendBankTransferEmail } from './email.js';
 import { ensureRateLimitTable } from './rate-limit.js';
 
 /** カード離脱などの安全網（Webhook が主経路） */
@@ -126,10 +134,52 @@ async function hasOrderEvent(db, orderId, eventType) {
   return !!row?.ok;
 }
 
-/** 銀行振込待ちを明示（冪等） */
-export async function markBankTransferPending(db, orderId, session = null) {
-  if (!orderId) return false;
-  if (await hasOrderEvent(db, orderId, 'bank_transfer_pending')) return false;
+/**
+ * 振込先はお客様ごとに異なる専用口座なので、取得できた時点で注文に保存する。
+ * 既に保存済みなら Stripe へ問い合わせない。
+ */
+async function storeBankTransferInstructions(env, orderId, session) {
+  const row = await env.DB.prepare(
+    `SELECT bank_transfer_info, stripe_session_id FROM orders
+     WHERE order_id = ? AND archived_at IS NULL`
+  ).bind(orderId).first();
+  if (!row || row.bank_transfer_info) return false;
+
+  const result = await fetchBankTransferInstructions(env, {
+    sessionId: session?.id ?? row.stripe_session_id,
+    customerId: stripeCustomerId(session),
+  });
+  if (!result.ok) {
+    // 取得できない予約を照合が毎回拾い直さないよう、一度だけ理由を残す
+    if (!(await hasOrderEvent(env.DB, orderId, 'bank_transfer_info_unavailable'))) {
+      await logOrderEvent(env.DB, orderId, 'bank_transfer_info_unavailable', result.reason);
+    }
+    return false;
+  }
+  const info = result.info;
+
+  await env.DB.prepare(
+    `UPDATE orders SET
+      bank_transfer_info = ?,
+      stripe_customer_id = COALESCE(?, stripe_customer_id)
+     WHERE order_id = ?`
+  ).bind(JSON.stringify(info), info.customer_id ?? null, orderId).run();
+  return true;
+}
+
+/** 銀行振込待ちを明示（冪等）。振込先の保存と案内メールもここで面倒を見る */
+export async function markBankTransferPending(env, orderId, session = null, { notify = false } = {}) {
+  if (!orderId) return { flagged: false, stored: false };
+  const db = env.DB;
+  const alreadyFlagged = await hasOrderEvent(db, orderId, 'bank_transfer_pending');
+
+  const stored = await storeBankTransferInstructions(env, orderId, session);
+  if (notify) {
+    await maybeSendBankTransferEmail(env, orderId);
+  }
+
+  if (alreadyFlagged) return { flagged: false, stored };
+
   const methods = Array.isArray(session?.payment_method_types)
     ? session.payment_method_types.join(',')
     : '';
@@ -138,7 +188,7 @@ export async function markBankTransferPending(db, orderId, session = null) {
     methods ? `methods=${methods}` : '',
   ].filter(Boolean).join(';');
   await logOrderEvent(db, orderId, 'bank_transfer_pending', detail);
-  return true;
+  return { flagged: true, stored };
 }
 
 /**
@@ -251,7 +301,7 @@ export async function cleanupStaleOrders(env) {
 
     // 銀行振込待ち: Session 完了・未払い → 在庫は確保したまま（フラグも補完）
     if (session?.status === 'complete' && session?.payment_status !== 'paid') {
-      await markBankTransferPending(env.DB, row.order_id, session);
+      await markBankTransferPending(env, row.order_id, session);
       continue;
     }
 

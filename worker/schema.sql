@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_status TEXT NOT NULL DEFAULT '未決済',
   stripe_session_id TEXT,
   stripe_payment_id TEXT,
+  stripe_customer_id TEXT,
+  -- 銀行振込の専用口座（注文ごとに異なる。Stripe の振込手順を JSON で保存）
+  bank_transfer_info TEXT,
   status TEXT NOT NULL DEFAULT '予約',
   admin_note TEXT NOT NULL DEFAULT '',
   archived_at TEXT,

@@ -216,6 +216,110 @@ export function stripePaymentIntentId(session) {
     : session.payment_intent?.id ?? null;
 }
 
+export function stripeCustomerId(session) {
+  if (!session?.customer) return null;
+  return typeof session.customer === 'string'
+    ? session.customer
+    : session.customer?.id ?? null;
+}
+
+/**
+ * 全銀（zengin）形式の振込先を扱いやすい形に落とす。
+ * Stripe は口座の詳細を type と同名のキーに入れるので、そこも見に行く。
+ */
+function normalizeZenginAddress(address) {
+  const z = address?.zengin
+    ?? (address?.type ? address[address.type] : null);
+  if (!z?.account_number) return null;
+  return {
+    bank_name: z.bank_name ?? null,
+    bank_code: z.bank_code ?? null,
+    branch_name: z.branch_name ?? null,
+    branch_code: z.branch_code ?? null,
+    account_type: z.account_type ?? null,
+    account_number: z.account_number ?? null,
+    account_holder_name: z.account_holder_name ?? null,
+  };
+}
+
+/**
+ * 銀行振込の専用口座を取得する。Session の PaymentIntent に付く振込手順を読み、
+ * 取れない場合は Customer の funding_instructions にフォールバックする。
+ */
+export async function fetchBankTransferInstructions(env, { sessionId, customerId, mode } = {}) {
+  const stripeMode = resolveStripeMode({ mode, sessionId });
+  if (!isStripeEnabledForMode(env, stripeMode)) {
+    return { ok: false, reason: 'stripe_disabled' };
+  }
+
+  let resolvedCustomerId = customerId ?? null;
+  let reason = 'no_customer';
+
+  if (sessionId) {
+    try {
+      const session = await stripeFetch(
+        env,
+        `/checkout/sessions/${encodeURIComponent(sessionId)}?expand[]=payment_intent`,
+        { method: 'GET' },
+        stripeMode,
+      );
+      resolvedCustomerId = resolvedCustomerId ?? stripeCustomerId(session);
+      const instructions = session?.payment_intent?.next_action
+        ?.display_bank_transfer_instructions;
+      const addresses = instructions?.financial_addresses ?? [];
+      const zengin = addresses.map(normalizeZenginAddress).find(Boolean);
+      if (zengin) {
+        return {
+          ok: true,
+          info: {
+            customer_id: resolvedCustomerId,
+            amount_remaining: instructions.amount_remaining ?? null,
+            reference: instructions.reference ?? null,
+            ...zengin,
+          },
+        };
+      }
+      reason = instructions ? 'no_zengin_address' : 'no_transfer_instructions';
+    } catch (e) {
+      reason = `session_error:${e.message || 'failed'}`;
+    }
+  }
+
+  if (!resolvedCustomerId) return { ok: false, reason };
+
+  const params = new URLSearchParams({
+    currency: 'jpy',
+    funding_type: 'bank_transfer',
+    'bank_transfer[type]': 'jp_bank_transfer',
+  });
+  try {
+    const funding = await stripeFetch(
+      env,
+      `/customers/${encodeURIComponent(resolvedCustomerId)}/funding_instructions`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      },
+      stripeMode,
+    );
+    const addresses = funding?.bank_transfer?.financial_addresses ?? [];
+    const zengin = addresses.map(normalizeZenginAddress).find(Boolean);
+    if (!zengin) return { ok: false, reason: 'funding_no_zengin_address' };
+    return {
+      ok: true,
+      info: {
+        customer_id: resolvedCustomerId,
+        amount_remaining: null,
+        reference: null,
+        ...zengin,
+      },
+    };
+  } catch (e) {
+    return { ok: false, reason: `funding_error:${e.message || 'failed'}` };
+  }
+}
+
 export async function resolvePaymentIntentId(env, { paymentIntentId, sessionId, mode } = {}) {
   if (paymentIntentId) return paymentIntentId;
   const stripeMode = resolveStripeMode({ mode, sessionId, paymentIntentId });

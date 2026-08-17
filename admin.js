@@ -11,11 +11,13 @@ import {
   PAYMENT_UNPAID,
   PREFECTURES,
   SHIPPING_REGIONS,
+  bankTransferLines,
   calcOrderAmount,
   calcShippingMargin,
+  parseBankTransferInfo,
   summarizeOrderState,
   stripeLiveDashboardPaymentUrl,
-} from '/shared/domain.js?v=20260816d';
+} from '/shared/domain.js?v=20260817a';
 import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       const WORKER_URL = window.location.origin;
@@ -213,7 +215,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
 
         const actions = [
           toRestore ? `・${toRestore}件は実際には振込待ちなので予約に戻して在庫を再確保` : '',
-          toFlag ? `・${toFlag}件に振込待ちの記録を付ける` : '',
+          toFlag ? `・${toFlag}件に振込待ちの記録と振込先を保存` : '',
           toRelease ? `・${toRelease}件は失効済みなのでキャンセルして在庫を戻す` : '',
           toLabel ? `・${toLabel}件にキャンセル理由を書き込む` : '',
         ].filter(Boolean).join('\n');
@@ -225,7 +227,10 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const rest = applied.scanned >= RECONCILE_BATCH
           ? '\n\nまだ残りがあります。もう一度「Stripe照合」を押してください。'
           : '';
-        alert(`${applied.changed}件を更新しました。${rest}`);
+        const bank = applied.bank_info_saved
+          ? `\nうち${applied.bank_info_saved}件の振込先を保存しました。`
+          : '';
+        alert(`${applied.changed}件を更新しました。${bank}${rest}`);
         await loadOrders();
       }
 
@@ -579,6 +584,21 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         return 'payment-unpaid';
       }
 
+      /** 振込先は予約ごとに違う専用口座なので、入金確認の照合用に出す */
+      function renderBankTransferInfo(o) {
+        if ((o.status || ORDER_STATUS_RESERVED) !== ORDER_STATUS_RESERVED) return '';
+        if ((o.payment_status || PAYMENT_UNPAID) !== PAYMENT_UNPAID) return '';
+        const info = parseBankTransferInfo(o);
+        if (!info) return '';
+        const rows = bankTransferLines(info)
+          .map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(String(value))}</dd>`)
+          .join('');
+        return `<details class="bank-info">
+          <summary>振込先（この予約専用）</summary>
+          <dl class="bank-info-dl">${rows}</dl>
+        </details>`;
+      }
+
       function renderOrderStatusCell(o) {
         const status = o.status || ORDER_STATUS_RESERVED;
         const paymentStatus = o.payment_status || PAYMENT_UNPAID;
@@ -594,6 +614,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               <span class="status-badge-label">予約</span> ${esc(fulfillLabel)}
             </span>
           </div>
+          ${renderBankTransferInfo(o)}
         </div>`;
       }
 

@@ -15,6 +15,7 @@ import {
   orderHoldsStock,
   cancelReasonLabel,
   getShippingRegionsFromMap,
+  parseBankTransferInfo,
   validateOrderContactFields,
 } from '../../../shared/domain.js';
 import { json } from './http.js';
@@ -41,7 +42,8 @@ import { maybeSendCancellationEmail, resendConfirmationEmail } from './email.js'
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
   quantity, unit_price, shipping_fee, tax_amount, total_amount,
-  status, payment_status, admin_note, stripe_session_id, stripe_payment_id, created_at`;
+  status, payment_status, admin_note, stripe_session_id, stripe_payment_id,
+  bank_transfer_info, created_at`;
 
 const CONTACT_KEYS = [
   'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
@@ -190,6 +192,9 @@ function buildOrdersCsv(orders, filter) {
     '決済',
     '予約ステータス',
     'キャンセル理由',
+    '振込先銀行',
+    '振込先支店',
+    '振込先口座番号',
     'お客様備考',
     '管理メモ',
     '予約日時',
@@ -198,27 +203,33 @@ function buildOrdersCsv(orders, filter) {
   const lines = [
     `\uFEFFYellow Pearl ${filterLabel}一覧`,
     header.join(','),
-    ...orders.map((o) => [
-      o.order_id,
-      o.last_name,
-      o.first_name,
-      o.last_name_kana,
-      o.first_name_kana,
-      o.postal,
-      o.prefecture,
-      o.address1,
-      o.address2,
-      o.phone,
-      o.email,
-      o.quantity,
-      o.total_amount,
-      o.payment_status,
-      o.status,
-      o.status === ORDER_STATUS_CANCELLED ? cancelReasonLabel(o) : '',
-      o.note,
-      o.admin_note,
-      o.created_at,
-    ].map(csvEscape).join(',')),
+    ...orders.map((o) => {
+      const bank = parseBankTransferInfo(o) ?? {};
+      return [
+        o.order_id,
+        o.last_name,
+        o.first_name,
+        o.last_name_kana,
+        o.first_name_kana,
+        o.postal,
+        o.prefecture,
+        o.address1,
+        o.address2,
+        o.phone,
+        o.email,
+        o.quantity,
+        o.total_amount,
+        o.payment_status,
+        o.status,
+        o.status === ORDER_STATUS_CANCELLED ? cancelReasonLabel(o) : '',
+        bank.bank_name ?? '',
+        bank.branch_name ?? '',
+        bank.account_number ?? '',
+        o.note,
+        o.admin_note,
+        o.created_at,
+      ].map(csvEscape).join(',');
+    }),
   ];
   return lines.join('\r\n');
 }
@@ -326,12 +337,19 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
   const limitRaw = parseInt(url.searchParams.get('limit') || '60', 10);
   const limit = Number.isNaN(limitRaw) ? 60 : Math.min(Math.max(limitRaw, 1), 100);
 
-  // 既に判定済みの予約は除外し、押すたびに残りだけを処理して収束させる
+  // 既に判定済みの予約は除外し、押すたびに残りだけを処理して収束させる。
+  // 振込先が未保存のものは判定済みでも拾い直す（後付けした項目を埋めるため）
   const stateFilter = scope === 'unpaid'
     ? `payment_status = '${PAYMENT_UNPAID}' AND status = '${ORDER_STATUS_RESERVED}'
-       AND NOT EXISTS (
-         SELECT 1 FROM order_events e
-         WHERE e.order_id = o.order_id AND e.event_type = 'bank_transfer_pending'
+       AND (
+         (o.bank_transfer_info IS NULL AND NOT EXISTS (
+           SELECT 1 FROM order_events e
+           WHERE e.order_id = o.order_id AND e.event_type = 'bank_transfer_info_unavailable'
+         ))
+         OR NOT EXISTS (
+           SELECT 1 FROM order_events e
+           WHERE e.order_id = o.order_id AND e.event_type = 'bank_transfer_pending'
+         )
        )`
     : `payment_status = '${PAYMENT_FAILED}' AND status = '${ORDER_STATUS_CANCELLED}'
        AND NOT EXISTS (
@@ -354,6 +372,7 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
   const counts = {};
   const items = [];
   let changed = 0;
+  let bankInfoSaved = 0;
 
   for (const row of rows.results ?? []) {
     const mode = stripeModeFromResourceId(row.stripe_session_id) ?? fallbackMode;
@@ -377,11 +396,15 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
     let action = 'none';
     if (classification === 'bank_transfer_pending') {
       if (scope === 'unpaid') {
-        action = apply
-          ? (await markBankTransferPending(env.DB, row.order_id, session) ? 'flagged' : 'already_flagged')
-          : 'would_flag';
+        if (apply) {
+          const res = await markBankTransferPending(env, row.order_id, session);
+          if (res.stored) bankInfoSaved += 1;
+          action = res.flagged ? 'flagged' : (res.stored ? 'info_stored' : 'already_flagged');
+        } else {
+          action = 'would_flag';
+        }
       } else if (apply) {
-        action = await restoreBankTransferOrder(env.DB, row.order_id, row.quantity, session)
+        action = await restoreBankTransferOrder(env, row.order_id, row.quantity, session)
           ? 'restored'
           : 'restore_failed';
       } else {
@@ -408,7 +431,7 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
         }
       }
     }
-    if (action === 'flagged' || action === 'restored' || action === 'released' || action === 'labeled') {
+    if (['flagged', 'info_stored', 'restored', 'released', 'labeled'].includes(action)) {
       changed += 1;
     }
 
@@ -433,13 +456,15 @@ export async function handleAdminOrdersReconcile(env, CORS, url) {
     apply,
     scanned: items.length,
     changed,
+    bank_info_saved: bankInfoSaved,
     counts,
     items,
   }, 200, CORS);
 }
 
 /** 誤キャンセルされた振込待ちを未決済／予約へ戻し、在庫を再確保する */
-async function restoreBankTransferOrder(db, orderId, quantity, session) {
+async function restoreBankTransferOrder(env, orderId, quantity, session) {
+  const db = env.DB;
   if (!(await decrementStock(db, quantity))) return false;
 
   const restored = await db.prepare(
@@ -455,7 +480,7 @@ async function restoreBankTransferOrder(db, orderId, quantity, session) {
   }
 
   await logOrderEvent(db, orderId, 'restored', 'reconcile:bank_transfer_pending');
-  await markBankTransferPending(db, orderId, session);
+  await markBankTransferPending(env, orderId, session);
   return true;
 }
 

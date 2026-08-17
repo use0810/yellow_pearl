@@ -1,11 +1,16 @@
-import { PAYMENT_PAID, PRODUCT_NAME } from '../../../shared/domain.js';
+import {
+  bankTransferLines,
+  parseBankTransferInfo,
+  PAYMENT_PAID,
+  PRODUCT_NAME,
+} from '../../../shared/domain.js';
 
 const FROM_EMAIL = 'info@yellow-pearl.com';
 const FROM_NAME = 'Yellow Pearl';
 const SHIPPING_NOTE = '発送は2026年9月1日より順次行います。';
 
 const ORDER_EMAIL_SELECT = `order_id, last_name, first_name, email, phone, postal, prefecture,
-  address1, address2, quantity, total_amount, payment_status, status, created_at`;
+  address1, address2, quantity, total_amount, payment_status, status, bank_transfer_info, created_at`;
 
 async function logOrderEvent(db, orderId, eventType, detail = '') {
   await db.prepare(
@@ -217,6 +222,99 @@ async function maybeSendAdminPurchaseNotification(env, order) {
   } catch (e) {
     await logOrderEvent(env.DB, order.order_id, 'admin_purchase_email_failed', e.message || 'send failed');
     return { error: e.message || '運営通知メールの送信に失敗しました' };
+  }
+}
+
+function buildBankTransferBodies(order, info) {
+  const name = `${order.last_name} ${order.first_name} 様`;
+  const amount = `${formatYen(order.total_amount)} 円`;
+  const lines = bankTransferLines(info);
+
+  const text = [
+    name,
+    '',
+    'この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。',
+    'お振込先をご案内いたします。下記口座へお振込いただき次第、ご予約が確定します。',
+    '',
+    `予約番号: ${order.order_id}`,
+    `商品: ${PRODUCT_NAME}`,
+    `数量: ${order.quantity} 本`,
+    `お振込金額: ${amount}（税込・送料込）`,
+    '',
+    '【お振込先】',
+    ...lines.map(([label, value]) => `${label}: ${value}`),
+    '',
+    'この口座はお客様のご予約専用です。他のご予約分と合わせてのお振込はお受けできません。',
+    '複数ご予約いただいている場合は、ご予約ごとに別々にお振込をお願いいたします。',
+    '',
+    'お振込の期限は本メール送信日から14日間です。期限を過ぎますとご予約は自動的にキャンセルとなります。',
+    '振込手数料はお客様のご負担となります。あらかじめご了承ください。',
+    '',
+    '【お届け先】',
+    formatAddress(order),
+    `TEL: ${order.phone}`,
+    '',
+    SHIPPING_NOTE,
+    '',
+    'ご不明点がございましたら、このメールにご返信ください。',
+    '',
+    '郷のきみイエローパール',
+    'サポート担当　湯川',
+  ].join('\n');
+
+  const html = `
+    <p>${name}</p>
+    <p>この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。<br>
+    お振込先をご案内いたします。下記口座へお振込いただき次第、ご予約が確定します。</p>
+    <ul>
+      <li><strong>予約番号:</strong> ${order.order_id}</li>
+      <li><strong>商品:</strong> ${PRODUCT_NAME}</li>
+      <li><strong>数量:</strong> ${order.quantity} 本</li>
+      <li><strong>お振込金額:</strong> ${amount}（税込・送料込）</li>
+    </ul>
+    <p><strong>お振込先</strong><br>
+    ${lines.map(([label, value]) => `${label}: ${value}`).join('<br>')}</p>
+    <p><strong>この口座はお客様のご予約専用です。</strong>他のご予約分と合わせてのお振込はお受けできません。
+    複数ご予約いただいている場合は、ご予約ごとに別々にお振込をお願いいたします。</p>
+    <p>お振込の期限は本メール送信日から<strong>14日間</strong>です。期限を過ぎますとご予約は自動的にキャンセルとなります。<br>
+    振込手数料はお客様のご負担となります。あらかじめご了承ください。</p>
+    <p><strong>お届け先</strong><br>
+    ${formatAddress(order)}<br>
+    TEL: ${order.phone}</p>
+    <p>${SHIPPING_NOTE}</p>
+    <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
+    <p>郷のきみイエローパール<br>サポート担当　湯川</p>
+  `.trim();
+
+  return { text, html };
+}
+
+/** 銀行振込の口座案内（冪等）。振込先が保存済みの予約のみ対象 */
+export async function maybeSendBankTransferEmail(env, orderId) {
+  if (!isEmailEnabled(env)) return { skipped: true, reason: 'no_binding' };
+  if (await hasOrderEvent(env.DB, orderId, 'bank_transfer_email_sent')) {
+    return { skipped: true, reason: 'already_sent' };
+  }
+
+  const order = await fetchOrderForEmail(env.DB, orderId);
+  const info = parseBankTransferInfo(order);
+  if (!order || !info) return { skipped: true, reason: 'no_instructions' };
+
+  const { text, html } = buildBankTransferBodies(order, info);
+  try {
+    await env.EMAIL.send({
+      to: order.email,
+      from: { email: FROM_EMAIL, name: FROM_NAME },
+      replyTo: replyToAddress(env),
+      subject: `【Yellow Pearl】お振込先のご案内（${order.order_id}）`,
+      text,
+      html,
+    });
+    await logOrderEvent(env.DB, orderId, 'bank_transfer_email_sent', order.email);
+    return { ok: true };
+  } catch (e) {
+    await logOrderEvent(env.DB, orderId, 'bank_transfer_email_failed', e.message || 'send failed');
+    return { error: e.message || 'メール送信に失敗しました' };
   }
 }
 

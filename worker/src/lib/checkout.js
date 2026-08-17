@@ -322,7 +322,7 @@ export async function handleCheckoutReturn(env, CORS, sessionId) {
   // 銀行振込など非同期決済: Session 完了後も unpaid のまま振込待ち
   if (session.status === 'complete' || session.status === 'open') {
     if (session.status === 'complete' && session.payment_status !== 'paid') {
-      await markBankTransferPending(env.DB, orderId, session);
+      await markBankTransferPending(env, orderId, session, { notify: true });
     }
     return json({
       ok: true,
@@ -373,7 +373,7 @@ export async function handleStripeWebhook(request, env) {
     if (type === 'checkout.session.completed' && !isStripeSessionPaid(session)) {
       const orderId = stripeOrderId(session);
       if (orderId) {
-        await markBankTransferPending(env.DB, orderId, session);
+        await markBankTransferPending(env, orderId, session, { notify: true });
       }
     } else {
       const result = await processPaidCheckoutSession(env, session);
