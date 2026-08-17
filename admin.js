@@ -10,6 +10,7 @@ import {
   PAYMENT_REFUNDED,
   PAYMENT_UNPAID,
   PREFECTURES,
+  PRODUCT_NAME,
   SHIPPING_REGIONS,
   bankTransferLines,
   calcOrderAmount,
@@ -392,7 +393,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         el.innerHTML = `
           1本あたり　税抜 ${formatYen(unitPrice)} 円 ＋ 消費税（${taxRate}%） ${formatYen(taxPerUnit)} 円
           ＝ <strong>税込 ${formatYen(inclPerUnit)} 円</strong>（商品のみ・送料別）
-          <span class="pricing-preview-note">Stripe には「${esc('Yellow Pearl（イエローパール）')}」と「消費税（商品・${taxRate}%）」の明細行として送信されます。</span>
+          <span class="pricing-preview-note">Stripe には「${esc(PRODUCT_NAME)}」と「消費税（商品・${taxRate}%）」の明細行として送信されます。</span>
         `;
       }
 

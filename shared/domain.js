@@ -1,7 +1,7 @@
 /** Worker・管理画面・カートで共有するドメイン定数・計算 */
 
 export const PRODUCT_ID = 'yellow-pearl';
-export const PRODUCT_NAME = 'Yellow Pearl（イエローパール）';
+export const PRODUCT_NAME = '郷のきみイエローパール(Yellow Pearl)';
 
 export const ORDER_STATUS_RESERVED = '予約';
 export const ORDER_STATUS_DONE = '済み';

@@ -71,7 +71,7 @@ function buildConfirmationBodies(order) {
   const text = [
     `${name}`,
     '',
-    'この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。',
+    `この度は${PRODUCT_NAME}をご予約いただき、ありがとうございます。`,
     'お支払いが完了しました。',
     '',
     `予約番号: ${order.order_id}`,
@@ -90,7 +90,7 @@ function buildConfirmationBodies(order) {
 
   const html = `
     <p>${name}</p>
-    <p>この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。<br>
+    <p>この度は${PRODUCT_NAME}をご予約いただき、ありがとうございます。<br>
     お支払いが完了しました。</p>
     <ul>
       <li><strong>予約番号:</strong> ${order.order_id}</li>
@@ -114,7 +114,7 @@ function buildDelayedConfirmationBodies(order) {
   const text = [
     `${name}`,
     '',
-    'この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。',
+    `この度は${PRODUCT_NAME}をご予約いただき、ありがとうございます。`,
     '',
     'アクセスが集中した影響により、予約確認メールのお届けが遅れましたこと、深くお詫び申し上げます。',
     'お支払いおよびご予約は正常に完了しておりますので、ご安心ください。',
@@ -140,7 +140,7 @@ function buildDelayedConfirmationBodies(order) {
 
   const html = `
     <p>${name}</p>
-    <p>この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。</p>
+    <p>この度は${PRODUCT_NAME}をご予約いただき、ありがとうございます。</p>
     <p>アクセスが集中した影響により、予約確認メールのお届けが遅れましたこと、深くお詫び申し上げます。<br>
     お支払いおよびご予約は正常に完了しておりますので、ご安心ください。</p>
     <p>改めて、ご予約内容をご案内いたします。</p>
@@ -249,7 +249,7 @@ export function buildBankTransferBodies(order, info) {
   const text = [
     name,
     '',
-    'この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。',
+    `この度は${PRODUCT_NAME}をご予約いただき、ありがとうございます。`,
     'お振込先をご案内いたします。下記口座へお振込いただき次第、ご予約が確定します。',
     '',
     `予約番号: ${order.order_id}`,
@@ -280,7 +280,7 @@ export function buildBankTransferBodies(order, info) {
 
   const html = `
     <p>${name}</p>
-    <p>この度は Yellow Pearl（イエローパール）をご予約いただき、ありがとうございます。<br>
+    <p>この度は${PRODUCT_NAME}をご予約いただき、ありがとうございます。<br>
     お振込先をご案内いたします。下記口座へお振込いただき次第、ご予約が確定します。</p>
     <ul>
       <li><strong>予約番号:</strong> ${order.order_id}</li>
