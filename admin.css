@@ -699,9 +699,20 @@
       }
 
       .order-edit-note {
-        font-size: 0.72rem;
-        color: #888;
-        line-height: 1.4;
+        font-size: 0.78rem;
+        line-height: 1.5;
+        color: #b91c1c;
+        background: #fef2f2;
+        border-left: 3px solid #dc2626;
+        border-radius: 0 4px 4px 0;
+        padding: 0.3rem 0.45rem;
+        margin-top: 0.15rem;
+        word-break: break-all;
+        white-space: pre-wrap;
+      }
+
+      .order-edit-note strong {
+        font-weight: 700;
       }
 
       .order-card-edit {

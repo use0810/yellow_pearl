@@ -514,8 +514,13 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         </div>`;
       }
 
+      function renderCustomerNote(o) {
+        if (!o.note) return '';
+        return `<div class="order-edit-note"><strong>お客様備考</strong> ${esc(o.note)}</div>`;
+      }
+
       function renderEditableAddress(o) {
-        const note = o.note ? `<div class="order-edit-note">お客様備考: ${esc(o.note)}</div>` : '';
+        const note = renderCustomerNote(o);
         return `<div class="order-edit-block order-edit-locked">
           <div class="order-edit-row">
             <input type="text" class="oe-postal" value="${esc(o.postal || '')}" placeholder="郵便番号" aria-label="郵便番号" readonly tabindex="-1" />
@@ -693,11 +698,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             ? `${esc(o.last_name)} ${esc(o.first_name)}`
             : renderEditableName(o);
           const contactCell = cancelled ? formatContact(o) : renderEditableContact(o);
-          const note = o.note && cancelled
-            ? `<br><span style="color:#888">お客様備考: ${esc(o.note)}</span>`
-            : '';
           const addressCell = cancelled
-            ? `${esc(formatAddress(o))}${note}`
+            ? `${esc(formatAddress(o))}${renderCustomerNote(o)}`
             : renderEditableAddress(o);
           return `<tr data-order-id="${esc(o.order_id)}">
             <td class="mono">${esc(o.order_id)}</td>
@@ -734,8 +736,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               <dt>メール</dt><dd>${esc(o.email)}</dd>
               <dt>電話</dt><dd>${esc(o.phone)}</dd>
               <dt>住所</dt><dd>${esc(formatAddress(o))}</dd>
-              ${o.note ? `<dt>お客様備考</dt><dd>${esc(o.note)}</dd>` : ''}
             </dl>
+            ${renderCustomerNote(o)}
             ${renderOpsCell(o)}
           </article>
         `;
