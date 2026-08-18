@@ -339,6 +339,13 @@ function buildCancellationBodies(order, { refunded = false } = {}) {
   const refundLine = refunded
     ? '決済済みのご予約のため、返金処理を行いました。カード会社により反映まで数日かかる場合があります。'
     : '未決済のご予約のため、決済は発生していません。';
+  // キャンセル時に Stripe のセッションを失効させるため、発行済みの専用口座は使えなくなる
+  const bankLines = !refunded && parseBankTransferInfo(order)
+    ? [
+      'ご案内しておりましたお振込先は無効となりました。お振込は不要です。',
+      '行き違いでお振込みいただいていた場合は、このメールにご返信ください。',
+    ]
+    : [];
 
   const text = [
     `${name}`,
@@ -347,6 +354,7 @@ function buildCancellationBodies(order, { refunded = false } = {}) {
     '',
     `予約番号: ${order.order_id}`,
     refundLine,
+    ...(bankLines.length ? ['', ...bankLines] : []),
     '',
     'ご不明点がございましたら、このメールにご返信ください。',
   ].join('\n');
@@ -356,6 +364,7 @@ function buildCancellationBodies(order, { refunded = false } = {}) {
     <p>以下のご予約をキャンセルしました。</p>
     <p><strong>予約番号:</strong> ${order.order_id}</p>
     <p>${refundLine}</p>
+    ${bankLines.length ? `<p>${bankLines.join('<br>')}</p>` : ''}
     <p style="color:#666;font-size:12px">ご不明点がございましたら、このメールにご返信ください。</p>
   `.trim();
 
