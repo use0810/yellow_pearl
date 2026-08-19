@@ -30,7 +30,10 @@ import {
   handleAdminBookkeepingExport,
 } from './lib/bookkeeping.js';
 import { handleIndexHtml, isIndexHtmlPath } from './lib/html-seo.js';
-import { retryFailedConfirmationEmails } from './lib/email.js';
+import {
+  retryFailedConfirmationEmails,
+  sendPendingBankTransferExpiredEmails,
+} from './lib/email.js';
 
 async function handleApi(request, env) {
   const url = new URL(request.url);
@@ -178,9 +181,12 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    // 09:20 JST (= 00:20 UTC): 日次クォータ回復後に未送信のお客様確認メールを再送
+    // 09:20 JST (= 00:20 UTC): 日次クォータ回復後の再送と、深夜に期限切れになった予約への案内
     if (event.cron === '20 0 * * *') {
-      ctx.waitUntil(retryFailedConfirmationEmails(env));
+      ctx.waitUntil((async () => {
+        await retryFailedConfirmationEmails(env);
+        await sendPendingBankTransferExpiredEmails(env);
+      })());
       return;
     }
     ctx.waitUntil(cleanupStaleOrders(env));
