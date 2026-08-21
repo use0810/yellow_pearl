@@ -488,6 +488,27 @@
   border-radius: 4px;
 }
 
+.cart-closed-existing {
+  max-width: 520px;
+  margin: 3rem auto 0;
+  padding: 1.5rem;
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 2;
+  color: rgba(232, 217, 176, 0.7);
+  letter-spacing: 0.05em;
+}
+
+.cart-closed-existing p {
+  margin: 0;
+}
+
+.cart-closed-existing .cart-closed-existing-title {
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+
 .complete-icon {
   width: 60px;
   height: 60px;
