@@ -455,6 +455,39 @@
   padding: 4rem 2rem;
 }
 
+/* カート閉鎖の案内。表示・非表示は cart.html のインライン style で切り替える
+   （CSS がキャッシュされていてもフォームが露出しないようにするため） */
+#cart-closed-screen {
+  text-align: center;
+}
+
+.cart-closed-text {
+  font-size: 0.9rem;
+  line-height: 2.2;
+  color: rgba(232, 217, 176, 0.75);
+  max-width: 520px;
+  margin: 0 auto 2.5rem;
+  letter-spacing: 0.05em;
+}
+
+.cart-closed-banner {
+  display: inline-block;
+  max-width: 100%;
+  transition: opacity 0.3s;
+}
+
+.cart-closed-banner:hover {
+  opacity: 0.8;
+}
+
+.cart-closed-banner img {
+  display: block;
+  width: 100%;
+  max-width: 728px;
+  height: auto;
+  border-radius: 4px;
+}
+
 .complete-icon {
   width: 60px;
   height: 60px;

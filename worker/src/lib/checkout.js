@@ -132,6 +132,14 @@ export async function confirmOrderPayment(env, orderId, { sessionId = null, paym
 }
 
 export async function handleCheckout(request, env, CORS) {
+  // カート閉鎖中。キャッシュされたフォームからの送信も弾く。
+  // 再開するときは wrangler.toml の CART_CLOSED を "0" にする
+  if (String(env.CART_CLOSED ?? '') === '1') {
+    return json({
+      error: '現在カート機能を停止しております。さとふるよりお申し込みください。',
+    }, 503, CORS);
+  }
+
   const inv = await fetchInventoryRow(env.DB);
   const stripeMode = inventoryStripeMode(inv);
   if (!isStripeEnabledForMode(env, stripeMode)) {

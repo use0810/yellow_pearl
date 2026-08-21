@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="cart.css" />
   </head>
-  <body>
+  <body class="cart-closed">
     <nav>
       <a class="nav-logo" href="index.html" style="text-decoration: none"
         >YELLOW PEARL</a
@@ -37,8 +37,42 @@
     </nav>
 
     <div class="cart-wrap">
-      <!-- カート画面 -->
-      <div id="cart-screen">
+      <!--
+        カート閉鎖の案内。再開する手順は3つ:
+          1. この div に style="display: none" を付ける
+          2. 下の #cart-screen の style="display: none" を外す
+          3. <body> の class="cart-closed" を外す
+      -->
+      <div id="cart-closed-screen">
+        <div class="cart-header">
+          <span class="section-label">Information</span>
+          <div class="gold-line" style="margin: 0 auto 1.5rem"></div>
+          <h1>カート機能停止中</h1>
+        </div>
+        <p class="cart-closed-text">
+          大変申し訳ございませんが、現在カート機能を停止しております。<br />
+          下記さとふるまでお願いします。
+        </p>
+        <a
+          class="cart-closed-banner"
+          href="https://www.satofull.jp/products/detail.php?product_id=1768636"
+          target="_blank"
+          rel="noopener"
+        >
+          <img
+            src="/assets/image/bnr-satofull-728_90_b.jpg"
+            alt="さとふる ふるさと納税のお申込みはこちら"
+            width="728"
+            height="90"
+          />
+        </a>
+        <div>
+          <a href="index.html" class="back-link">← トップページへ戻る</a>
+        </div>
+      </div>
+
+      <!-- カート画面（閉鎖中は非表示。再開時は style を外す） -->
+      <div id="cart-screen" style="display: none">
         <div class="cart-header reveal">
           <span class="section-label">Reservation</span>
           <div class="gold-line" style="margin: 0 auto 1.5rem"></div>
@@ -300,6 +334,7 @@
       import { applyCartReceptionUI } from "/shared/reception-status.js";
 
       const WORKER_URL = window.location.origin;
+      const CART_CLOSED = document.body.classList.contains("cart-closed");
 
       function initPrefectureSelect() {
         const sel = document.getElementById("prefecture");
@@ -506,7 +541,8 @@
         .getElementById("postal")
         .addEventListener("blur", lookupAddressFromPostal);
 
-      loadStock();
+      // 閉鎖中はフォームを出さないので在庫も取りに行かない
+      if (!CART_CLOSED) loadStock();
 
       function buildReservePayload() {
         return {
@@ -733,6 +769,9 @@
         document.getElementById("step2").classList.add("done");
         document.getElementById("step3").classList.add("active");
         document.getElementById("cart-screen").style.display = "none";
+        // 閉鎖中でも、決済から戻られた方には予約番号を出す
+        const closedScreen = document.getElementById("cart-closed-screen");
+        if (closedScreen) closedScreen.style.display = "none";
         const complete = document.getElementById("complete-screen");
         complete.style.display = "block";
         const textEl = document.getElementById("complete-text");

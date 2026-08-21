@@ -107,7 +107,14 @@
     />
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
+  <!--
+    当サイトのカート閉鎖中。再開する手順は4つ:
+      1. <body> の class="cart-closed" を外す
+      2. 下の .product-limit を「1,000本限定」の表示に戻す
+      3. 予約ボタン2つ（#reserve-btn / #reserve-btn-2）を href="cart.html" に戻す
+      4. cart.html 側の閉鎖解除も行う
+  -->
+  <body class="cart-closed">
     <nav>
       <div class="nav-logo">YELLOW PEARL</div>
       <ul class="nav-links">
@@ -198,16 +205,20 @@
             </div>
 
             <div class="product-limit">
-              <span class="limit-number" id="stock-display">1,000本限定</span>
+              <span class="limit-number" id="stock-display"
+                >当サイトでの受付を停止しております</span
+              >
               <span id="stock-remaining"
-                >（年間限定・数量は選果により変動します）</span
+                >（さとふるにてお申込みいただけます）</span
               >
             </div>
 
             <div class="product-specs">
               <div class="spec-row">
                 <span class="spec-key">価格</span>
-                <span class="spec-val" id="product-price">—</span>
+                <span class="spec-val" id="product-price"
+                  >さとふるにてご確認ください</span
+                >
               </div>
               <div class="spec-row">
                 <span class="spec-key">発送期間</span>
@@ -223,9 +234,34 @@
               </div>
             </div>
 
-            <a class="cta-btn" href="cart.html" id="reserve-btn"
-              >予約する — Reserve</a
+            <a
+              class="cta-btn"
+              href="https://www.satofull.jp/products/detail.php?product_id=1768636"
+              id="reserve-btn"
+              target="_blank"
+              rel="noopener"
+              >さとふるでお申込み — Satofull</a
             >
+
+            <p class="note" style="margin-bottom: 1.5rem">
+              大変申し訳ございませんが、現在カート機能を停止しております。<br />
+              下記さとふるまでお願いします。
+            </p>
+
+            <a
+              href="https://www.satofull.jp/products/detail.php?product_id=1768636"
+              target="_blank"
+              rel="noopener"
+              style="display: block; max-width: 728px; margin: 0 auto 2rem"
+            >
+              <img
+                src="/assets/image/bnr-satofull-728_90_b.jpg"
+                alt="さとふる ふるさと納税のお申込みはこちら"
+                width="728"
+                height="90"
+                style="display: block; width: 100%; height: auto; border-radius: 4px"
+              />
+            </a>
 
             <p class="note">
               ※選果基準を厳しく設定しておりますので、収穫条件が限定されるため日付指定は行えません。発送は9月1日より9月30日の間となります。
@@ -295,8 +331,13 @@
           <br />それが<strong>郷のきみイエローパール</strong><br />
         </p>
         <div style="text-align: center; margin-bottom: 2rem">
-          <a class="cta-btn" href="cart.html" id="reserve-btn-2"
-            >予約する — Reserve</a
+          <a
+            class="cta-btn"
+            href="https://www.satofull.jp/products/detail.php?product_id=1768636"
+            id="reserve-btn-2"
+            target="_blank"
+            rel="noopener"
+            >さとふるでお申込み — Satofull</a
           >
         </div>
         <div class="sep reveal" style="margin: 2rem auto 3rem">
@@ -313,15 +354,18 @@
     <script type="module">
       import { loadLandingStock } from "/shared/stock-ui.js";
 
-      loadLandingStock(window.location.origin, {
-        displayEl: document.getElementById("stock-display"),
-        remainingEl: document.getElementById("stock-remaining"),
-        priceEl: document.getElementById("product-price"),
-        buttons: [
-          document.getElementById("reserve-btn"),
-          document.getElementById("reserve-btn-2"),
-        ],
-      });
+      // 閉鎖中は在庫や残数でさとふるへの案内を上書きさせない
+      if (!document.body.classList.contains("cart-closed")) {
+        loadLandingStock(window.location.origin, {
+          displayEl: document.getElementById("stock-display"),
+          remainingEl: document.getElementById("stock-remaining"),
+          priceEl: document.getElementById("product-price"),
+          buttons: [
+            document.getElementById("reserve-btn"),
+            document.getElementById("reserve-btn-2"),
+          ],
+        });
+      }
 
       // Particle system
       const container = document.getElementById("particles");
