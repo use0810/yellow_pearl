@@ -111,6 +111,7 @@
     当サイトのカート閉鎖中。再開する手順は4つ:
       1. <body> の class="cart-closed" を外す
       2. 下の .product-limit を「1,000本限定」の表示に戻す
+         （#stock-display の style="display: none" を外して中身を書き戻す）
       3. 予約ボタン2つ（#reserve-btn / #reserve-btn-2）を href="cart.html" に戻す
       4. cart.html 側の閉鎖解除も行う
   -->
@@ -205,9 +206,11 @@
             </div>
 
             <div class="product-limit">
-              <span class="limit-number" id="stock-display"
-                >当サイトでの受付を停止しております</span
-              >
+              <span
+                class="limit-number"
+                id="stock-display"
+                style="display: none"
+              ></span>
               <span id="stock-remaining"
                 >（さとふるにてお申込みいただけます）</span
               >
