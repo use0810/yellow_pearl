@@ -352,7 +352,6 @@ export function buildBankTransferExpiredBodies(order) {
     name,
     '',
     'いつも「郷のきみイエローパール」をご愛顧いただき、誠にありがとうございます。',
-    'サポート担当の湯川でございます。',
     '',
     'この度は、「新郷村プレミアムライン 郷のきみイエローパール」をご予約いただき、',
     '重ねて御礼申し上げます。',
@@ -387,14 +386,12 @@ export function buildBankTransferExpiredBodies(order) {
     '',
     SIGN_LINE,
     '郷のきみイエローパール',
-    'サポート担当：湯川',
     SIGN_LINE,
   ].join('\n');
 
   const html = `
     <p>${name}</p>
-    <p>いつも「郷のきみイエローパール」をご愛顧いただき、誠にありがとうございます。<br>
-    サポート担当の湯川でございます。</p>
+    <p>いつも「郷のきみイエローパール」をご愛顧いただき、誠にありがとうございます。</p>
     <p>この度は、「新郷村プレミアムライン 郷のきみイエローパール」をご予約いただき、<br>
     重ねて御礼申し上げます。</p>
     <p>${deadlineLine}<br>
@@ -421,7 +418,7 @@ export function buildBankTransferExpiredBodies(order) {
     <a href="${REORDER_URL}">${REORDER_URL}</a></p>
     <p>またのご利用を、スタッフ一同心よりお待ち申し上げております。</p>
     <hr style="border:none;border-top:1px solid #ddd">
-    <p>郷のきみイエローパール<br>サポート担当：湯川</p>
+    <p>郷のきみイエローパール</p>
   `.trim();
 
   return { text, html };
