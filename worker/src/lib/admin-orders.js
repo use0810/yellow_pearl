@@ -44,6 +44,7 @@ import {
   normalizeDeliveryTime,
   normalizeShipDate,
   shippingLabelFilename,
+  shippingLabelSlipCount,
   todayShipDate,
 } from './shipping-label.js';
 
@@ -776,12 +777,13 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
   const csv = buildShippingLabelCsv(orders, shipDate);
   const filename = shippingLabelFilename(shipDate, batchId);
   const warnings = findShippingLabelWarnings(orders);
+  const slipCount = shippingLabelSlipCount(orders);
 
   await env.DB.prepare(
     `INSERT INTO shipping_label_batches
        (id, ship_date, delivery_time, order_count, filename, csv, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(batchId, shipDate, '', orders.length, filename, csv, adminEmail).run();
+  ).bind(batchId, shipDate, '', slipCount, filename, csv, adminEmail).run();
 
   const statements = [];
   for (const id of targetIds) {
@@ -801,7 +803,7 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
      FROM shipping_label_batches WHERE id = ?`
   ).bind(batchId).first();
 
-  return json({ batch, csv, warnings, skipped }, 200, CORS);
+  return json({ batch, csv, warnings, skipped, order_count: orders.length, slip_count: slipCount }, 200, CORS);
 }
 
 export async function handleAdminShippingLabelList(env, CORS) {

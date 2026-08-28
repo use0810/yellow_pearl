@@ -759,7 +759,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           const addressCell = cancelled
             ? `${esc(formatAddress(o))}${renderCustomerNote(o)}`
             : renderEditableAddress(o);
-          return `<tr class="order-row${noteRowClass(o)}" data-order-id="${esc(o.order_id)}">
+          return `<tr class="order-row${noteRowClass(o)}" data-order-id="${esc(o.order_id)}" data-quantity="${esc(o.quantity ?? 1)}">
             ${renderSelectCell(o)}
             <td class="mono">${esc(o.order_id)}</td>
             <td>${nameCell}</td>
@@ -777,7 +777,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           const cancelled = (o.status || ORDER_STATUS_RESERVED) === ORDER_STATUS_CANCELLED;
           if (cancelled) {
             return `
-          <article class="order-card${noteRowClass(o)}" data-order-id="${esc(o.order_id)}">
+          <article class="order-card${noteRowClass(o)}" data-order-id="${esc(o.order_id)}" data-quantity="${esc(o.quantity ?? 1)}">
             <div class="order-card-head">
               <div>
                 <div class="order-card-name">${esc(o.last_name)} ${esc(o.first_name)}</div>
@@ -802,7 +802,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         `;
           }
           return `
-          <article class="order-card${noteRowClass(o)}" data-order-id="${esc(o.order_id)}">
+          <article class="order-card${noteRowClass(o)}" data-order-id="${esc(o.order_id)}" data-quantity="${esc(o.quantity ?? 1)}">
             <div class="order-card-head">
               <div>
                 ${renderOrderStatusCell(o)}
@@ -980,6 +980,16 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         el.value = jst.toISOString().slice(0, 10);
       }
 
+      function selectedSlipCount() {
+        let total = 0;
+        for (const id of selectedOrderIds) {
+          const row = document.querySelector(`#orders-table-body tr[data-order-id="${CSS.escape(id)}"]`);
+          const n = parseInt(row?.dataset.quantity, 10);
+          total += Number.isFinite(n) && n > 0 ? n : 1;
+        }
+        return total;
+      }
+
       async function createShippingLabels() {
         const ids = [...selectedOrderIds];
         if (!ids.length) return;
@@ -988,9 +998,11 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           alert('出荷予定日を入れてください。');
           return;
         }
+        const slips = selectedSlipCount();
         const ok = confirm(
-          `${ids.length}件の送り状CSV（ヤマトB2クラウド）を作成します。\n`
+          `${ids.length}件の予約から送り状CSV（ヤマトB2クラウド）を作成します。\n`
           + `出荷予定日: ${shipDate}\n`
+          + `伝票: ${slips}枚（1本につき1枚）\n`
           + '時間指定は各予約の操作欄で選んだ値が入ります。\n\n'
           + '作成した予約は「送り状作成済み」タブへ移ります。',
         );
@@ -1005,7 +1017,9 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         await loadOrders();
         await loadShippingLabels();
 
-        const msgs = [`${data.batch?.order_count ?? 0}件の送り状CSVを作成しました。`];
+        const msgs = [
+          `予約${data.order_count ?? ids.length}件・伝票${data.slip_count ?? data.batch?.order_count ?? 0}枚の送り状CSVを作成しました。`,
+        ];
         if (data.skipped?.length) {
           msgs.push('', `対象外だった予約（入金済・未発送・送り状未作成のみ）: ${data.skipped.join(', ')}`);
         }
@@ -1040,7 +1054,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         tbody.innerHTML = batches.map((b) => `<tr data-batch-id="${esc(b.id)}">
           <td style="white-space:nowrap">${esc(b.created_at)}</td>
           <td style="white-space:nowrap">${esc(b.ship_date)}</td>
-          <td class="num">${b.order_count}件</td>
+          <td class="num">${b.order_count}枚</td>
           <td>${esc(b.created_by || '—')}</td>
           <td>
             <div class="ops-actions">

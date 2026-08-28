@@ -142,8 +142,8 @@ const SENDER = {
   name: '新郷村郷のきみの会',
 };
 
-/** 品名は 25 文字まで。正式名は長いので送り状用の短縮名を使う */
-const LABEL_PRODUCT_NAME = '郷のきみイエローパール';
+/** 品名は 25 文字まで。1箱＝1本なので数量は常に 1本 と書く */
+const LABEL_PRODUCT_NAME = '郷のきみイエローパール（トウモロコシ）1本';
 
 /** B2クラウドが受け付けない環境依存文字（ローマ数字・丸数字・省略文字・単位など） */
 const ENV_DEPENDENT = /[\u2116\u2121\u2160-\u217F\u2460-\u24FF\u3220-\u3243\u3280-\u32FF\u3300-\u33FF]/;
@@ -211,11 +211,21 @@ export function normalizeDeliveryTime(raw) {
   return B2_DELIVERY_TIME_CODES.has(code) ? code : '';
 }
 
-function buildRow(order, shipDate, deliveryTime) {
+function packageCount(order) {
+  const n = parseInt(order.quantity, 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/** 1本＝1箱＝1伝票。予約の数量ぶん行数を返す */
+export function shippingLabelSlipCount(orders) {
+  return orders.reduce((sum, o) => sum + packageCount(o), 0);
+}
+
+function buildRow(order, shipDate, deliveryTime, packageNo) {
   const row = new Array(COLUMNS.length).fill('');
   const set = (col, value) => { row[col - 1] = value; };
 
-  set(COL.管理番号, order.order_id);
+  set(COL.管理番号, `${order.order_id}-${packageNo}`);
   set(COL.送り状種類, INVOICE_TYPE);
   set(COL.クール区分, COOL_TYPE);
   set(COL.出荷予定日, shipDate);
@@ -237,7 +247,7 @@ function buildRow(order, shipDate, deliveryTime) {
   set(COL.依頼主住所, SENDER.address);
   set(COL.依頼主名, SENDER.name);
 
-  set(COL.品名1, `${LABEL_PRODUCT_NAME} ${order.quantity ?? 1}本`);
+  set(COL.品名1, LABEL_PRODUCT_NAME);
   set(COL.発行枚数, '1');
   set(COL.お届け予定メール, '0');
   set(COL.お届け完了メール, '0');
@@ -270,9 +280,17 @@ export function findShippingLabelWarnings(orders) {
 
 /** ヘッダー行つき・CRLF・UTF-8 BOM。B2 側の取込開始行は 2 行目にする */
 export function buildShippingLabelCsv(orders, shipDate) {
+  const dataLines = [];
+  for (const o of orders) {
+    const n = packageCount(o);
+    const time = normalizeDeliveryTime(o.delivery_time);
+    for (let i = 1; i <= n; i += 1) {
+      dataLines.push(buildRow(o, shipDate, time, i));
+    }
+  }
   const lines = [
     COLUMNS.map(csvEscape).join(','),
-    ...orders.map((o) => buildRow(o, shipDate, normalizeDeliveryTime(o.delivery_time))),
+    ...dataLines,
   ];
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }
