@@ -698,6 +698,35 @@
         background: #fffdf5;
       }
 
+      /* 備考ありの行はうっすらピンクで囲む。border-collapse では
+         セルの指定が行より優先されるため td 側に枠線を置く */
+      tr.order-row.has-note > td {
+        background: #fff5f8;
+        border-top: 1px solid #f4b8ce;
+        border-bottom: 1px solid #f4b8ce;
+      }
+
+      tr.order-row.has-note > td:first-child {
+        border-left: 1px solid #f4b8ce;
+      }
+
+      tr.order-row.has-note > td:last-child {
+        border-right: 1px solid #f4b8ce;
+      }
+
+      tr.order-row.has-note.is-editing-contact > td {
+        background: #fffdf5;
+      }
+
+      .order-card.has-note {
+        border-color: #f4b8ce;
+        background: #fff5f8;
+      }
+
+      .order-card.has-note.is-editing-contact {
+        background: #fffdf5;
+      }
+
       .order-edit-note {
         font-size: 0.78rem;
         line-height: 1.5;

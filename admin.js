@@ -519,6 +519,12 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         return `<div class="order-edit-note"><strong>お客様備考</strong> ${esc(o.note)}</div>`;
       }
 
+      /** 備考ありの予約は一覧で見落としやすいので行ごと色を変える */
+      function noteRowClass(o) {
+        const hasNote = String(o.note || '').trim() || String(o.admin_note || '').trim();
+        return hasNote ? ' has-note' : '';
+      }
+
       function renderEditableAddress(o) {
         const note = renderCustomerNote(o);
         return `<div class="order-edit-block order-edit-locked">
@@ -701,7 +707,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           const addressCell = cancelled
             ? `${esc(formatAddress(o))}${renderCustomerNote(o)}`
             : renderEditableAddress(o);
-          return `<tr data-order-id="${esc(o.order_id)}">
+          return `<tr class="order-row${noteRowClass(o)}" data-order-id="${esc(o.order_id)}">
             <td class="mono">${esc(o.order_id)}</td>
             <td>${nameCell}</td>
             <td>${contactCell}</td>
@@ -718,7 +724,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           const cancelled = (o.status || ORDER_STATUS_RESERVED) === ORDER_STATUS_CANCELLED;
           if (cancelled) {
             return `
-          <article class="order-card" data-order-id="${esc(o.order_id)}">
+          <article class="order-card${noteRowClass(o)}" data-order-id="${esc(o.order_id)}">
             <div class="order-card-head">
               <div>
                 <div class="order-card-name">${esc(o.last_name)} ${esc(o.first_name)}</div>
@@ -743,7 +749,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         `;
           }
           return `
-          <article class="order-card" data-order-id="${esc(o.order_id)}">
+          <article class="order-card${noteRowClass(o)}" data-order-id="${esc(o.order_id)}">
             <div class="order-card-head">
               <div>
                 ${renderOrderStatusCell(o)}
