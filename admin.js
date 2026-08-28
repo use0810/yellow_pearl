@@ -12,8 +12,8 @@ import {
   PREFECTURES,
   PRODUCT_NAME,
   SHIPPING_REGIONS,
+  B2_DELIVERY_TIMES,
   bankTransferLines,
-  b2DeliveryTimeLabel,
   calcOrderAmount,
   calcShippingMargin,
   parseBankTransferInfo,
@@ -680,6 +680,15 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="stripe-dash-link">Stripe 決済</a>`;
       }
 
+      function renderDeliveryTimeSelect(o) {
+        const current = String(o.delivery_time ?? '');
+        const options = B2_DELIVERY_TIMES.map((t) =>
+          `<option value="${esc(t.value)}"${t.value === current ? ' selected' : ''}>${esc(t.label)}</option>`
+        ).join('');
+        return `<p class="ops-status-hint">時間指定（この予約）</p>
+          <select class="ops-delivery-time" aria-label="配達時間帯" data-saved-value="${esc(current)}">${options}</select>`;
+      }
+
       function renderOpsCell(o) {
         const status = o.status || ORDER_STATUS_RESERVED;
         const stripeLink = renderStripePaymentLink(o);
@@ -706,6 +715,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         return `<div class="ops-cell" data-order-id="${esc(o.order_id)}" data-payment-status="${esc(paymentStatus)}">
           <p class="ops-status-hint">発送ステータス（手動）</p>
           <select class="ops-status" aria-label="予約ステータス">${options}</select>
+          ${renderDeliveryTimeSelect(o)}
           <textarea class="ops-note" placeholder="特記事項（管理者用）">${esc(o.admin_note || '')}</textarea>
           <p class="ops-contact-hint">発送先を変えるときは「発送先を編集」→「保存」</p>
           <div class="ops-actions">
@@ -903,10 +913,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const labelBtn = document.getElementById('orders-label-btn');
         const revertBtn = document.getElementById('orders-label-revert-btn');
         const dateField = document.getElementById('orders-bulk-date-field');
-        const timeField = document.getElementById('orders-bulk-time-field');
         labelBtn.hidden = !isPending;
         dateField.hidden = !isPending;
-        if (timeField) timeField.hidden = !isPending;
         revertBtn.hidden = isPending;
         labelBtn.disabled = selected === 0;
         revertBtn.disabled = selected === 0;
@@ -924,6 +932,30 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       }
 
       function handleOrdersSelectChange(e) {
+        const timeSel = e.target.closest('.ops-delivery-time');
+        if (timeSel) {
+          const container = timeSel.closest('.ops-cell');
+          if (!container) return;
+          const previous = timeSel.dataset.savedValue ?? [...timeSel.options].find((o) => o.defaultSelected)?.value ?? '';
+          timeSel.disabled = true;
+          const status = container.querySelector('.ops-status')?.value;
+          const adminNote = container.querySelector('.ops-note')?.value.trim() ?? '';
+          api(`/api/admin/orders/${encodeURIComponent(container.dataset.orderId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              status,
+              admin_note: adminNote,
+              delivery_time: timeSel.value,
+            }),
+          })
+            .then(() => { timeSel.dataset.savedValue = timeSel.value; })
+            .catch((err) => {
+              timeSel.value = previous;
+              alert(err.message);
+            })
+            .finally(() => { timeSel.disabled = false; });
+          return;
+        }
         const box = e.target.closest('.order-select');
         if (!box) return;
         if (box.checked) selectedOrderIds.add(box.value);
@@ -956,19 +988,17 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           alert('出荷予定日を入れてください。');
           return;
         }
-        const deliveryTime = document.getElementById('orders-delivery-time')?.value ?? '';
-        const timeLabel = b2DeliveryTimeLabel(deliveryTime);
         const ok = confirm(
           `${ids.length}件の送り状CSV（ヤマトB2クラウド）を作成します。\n`
           + `出荷予定日: ${shipDate}\n`
-          + `時間指定: ${timeLabel}\n\n`
+          + '時間指定は各予約の操作欄で選んだ値が入ります。\n\n'
           + '作成した予約は「送り状作成済み」タブへ移ります。',
         );
         if (!ok) return;
 
         const data = await api('/api/admin/shipping-labels', {
           method: 'POST',
-          body: JSON.stringify({ order_ids: ids, ship_date: shipDate, delivery_time: deliveryTime }),
+          body: JSON.stringify({ order_ids: ids, ship_date: shipDate }),
         });
         downloadCsvText(data.csv, data.batch?.filename || 'yellow-pearl-b2.csv');
         selectedOrderIds.clear();
@@ -1004,13 +1034,12 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const tbody = document.getElementById('labels-table-body');
         if (!tbody) return;
         if (!batches.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">送り状CSVはまだありません</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">送り状CSVはまだありません</td></tr>';
           return;
         }
         tbody.innerHTML = batches.map((b) => `<tr data-batch-id="${esc(b.id)}">
           <td style="white-space:nowrap">${esc(b.created_at)}</td>
           <td style="white-space:nowrap">${esc(b.ship_date)}</td>
-          <td>${esc(b2DeliveryTimeLabel(b.delivery_time))}</td>
           <td class="num">${b.order_count}件</td>
           <td>${esc(b.created_by || '—')}</td>
           <td>
@@ -1114,6 +1143,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           ? collectContactFields(scope)
           : null;
         const body = { status, admin_note: adminNote };
+        const deliveryTime = container.querySelector('.ops-delivery-time')?.value;
+        if (deliveryTime !== undefined) body.delivery_time = deliveryTime;
         if (contact) Object.assign(body, contact);
         await api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
           method: 'PUT',

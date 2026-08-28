@@ -51,7 +51,7 @@ const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_nam
   email, phone, postal, prefecture, address1, address2, note,
   quantity, unit_price, shipping_fee, tax_amount, total_amount,
   status, payment_status, admin_note, stripe_session_id, stripe_payment_id,
-  bank_transfer_info, shipping_label_batch_id, shipping_label_at, created_at`;
+  bank_transfer_info, shipping_label_batch_id, shipping_label_at, delivery_time, created_at`;
 
 const CONTACT_KEYS = [
   'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
@@ -669,6 +669,12 @@ export async function handleAdminOrderUpdate(request, env, CORS, orderId) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, 'delivery_time')) {
+    await env.DB.prepare(
+      `UPDATE orders SET delivery_time = ? WHERE order_id = ? AND ${ORDER_NOT_ARCHIVED}`
+    ).bind(normalizeDeliveryTime(body.delivery_time), orderId).run();
+  }
+
   const updated = await env.DB.prepare(
     `SELECT ${ORDER_SELECT} FROM orders WHERE order_id = ?`
   ).bind(orderId).first();
@@ -744,7 +750,6 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
   if (!shipDate) {
     return json({ error: '出荷予定日の形式が正しくありません' }, 400, CORS);
   }
-  const deliveryTime = normalizeDeliveryTime(body.delivery_time);
 
   const placeholders = orderIds.map(() => '?').join(',');
   const rows = await env.DB.prepare(
@@ -768,7 +773,7 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
   const skipped = orderIds.filter((id) => !targetIds.includes(id));
 
   const batchId = generateBatchId();
-  const csv = buildShippingLabelCsv(orders, shipDate, deliveryTime);
+  const csv = buildShippingLabelCsv(orders, shipDate);
   const filename = shippingLabelFilename(shipDate, batchId);
   const warnings = findShippingLabelWarnings(orders);
 
@@ -776,7 +781,7 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
     `INSERT INTO shipping_label_batches
        (id, ship_date, delivery_time, order_count, filename, csv, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(batchId, shipDate, deliveryTime, orders.length, filename, csv, adminEmail).run();
+  ).bind(batchId, shipDate, '', orders.length, filename, csv, adminEmail).run();
 
   const statements = [];
   for (const id of targetIds) {
@@ -787,7 +792,7 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
     ).bind(batchId, id));
     statements.push(env.DB.prepare(
       `INSERT INTO order_events (order_id, event_type, detail) VALUES (?, ?, ?)`
-    ).bind(id, 'shipping_label_created', `${batchId} / ${shipDate} / ${deliveryTime || '指定なし'}`));
+    ).bind(id, 'shipping_label_created', `${batchId} / ${shipDate}`));
   }
   await env.DB.batch(statements);
 

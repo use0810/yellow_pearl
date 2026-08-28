@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>管理画面 | Yellow Pearl</title>
     <link rel="icon" href="/assets/image/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="admin.css?v=20260828c" />
+    <link rel="stylesheet" href="admin.css?v=20260828d" />
   </head>
   <body>
     <div id="auth-error">
@@ -160,6 +160,7 @@
               <strong>キャンセル</strong>は括弧内に理由が出ます（管理者が取消／お客様が決済を中断／決済ページの期限切れ／振込期限切れ など）。
               理由が「不明」のものは<strong>Stripe照合</strong>を押すと後から埋まります。
               <strong>予約ステータス</strong>（未発送／発送済）は発送作業に合わせて手動で変更してください。
+              <strong>時間指定</strong>は予約ごとの操作欄で選びます（B2クラウドの配達時間帯。お客様入力はありません）。
               <strong>送り状作成済み</strong>はヤマトB2クラウド用のCSVを出した予約です（未発送の内訳。選んで未発送に戻せます）。
             </p>
             <form class="orders-search" id="orders-search-form" autocomplete="off" onsubmit="return false;">
@@ -183,17 +184,6 @@
               <label class="orders-bulk-date" id="orders-bulk-date-field">
                 <span>出荷予定日</span>
                 <input type="date" id="orders-ship-date" />
-              </label>
-              <label class="orders-bulk-date" id="orders-bulk-time-field">
-                <span>時間指定</span>
-                <select id="orders-delivery-time" aria-label="配達時間帯（B2クラウド）">
-                  <option value="">指定なし</option>
-                  <option value="0812">午前中</option>
-                  <option value="1416">14〜16時</option>
-                  <option value="1618">16〜18時</option>
-                  <option value="1820">18〜20時</option>
-                  <option value="1921">19〜21時</option>
-                </select>
               </label>
               <button type="button" class="btn btn-primary" id="orders-label-btn">送り状CSVを作成</button>
               <button type="button" class="btn" id="orders-label-revert-btn">未発送に戻す</button>
@@ -239,7 +229,7 @@
               B2クラウドの<strong>「外部データから発行」→「基本レイアウト」</strong>で取り込みます。
               1行目が項目名なので<strong>取込開始行は2行目</strong>にしてください。
               送り状種類は<strong>宅急便（発払い）</strong>、クール区分は<strong>冷蔵</strong>で出力されます。
-              時間指定は管理画面で選んだ値がそのまま入ります（お客様からの指定は受けていません）。
+              時間指定は各予約の操作欄で選び、CSVには予約ごとの値が入ります（お客様からの指定は受けていません）。
               請求先顧客コードは空欄なので、B2クラウドの取込画面で選んでください。
               削除しても予約は「送り状作成済み」のままです（戻すときは一覧で選んで「未発送に戻す」）。
             </p>
@@ -249,14 +239,13 @@
                   <tr>
                     <th>作成日時</th>
                     <th>出荷予定日</th>
-                    <th>時間指定</th>
                     <th class="num">件数</th>
                     <th>作成者</th>
                     <th>操作</th>
                   </tr>
                 </thead>
                 <tbody id="labels-table-body">
-                  <tr><td colspan="6" class="empty-msg">読み込み中...</td></tr>
+                  <tr><td colspan="5" class="empty-msg">読み込み中...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -413,6 +402,6 @@
         <button type="button" class="nav-btn" data-screen="bookkeeping">帳簿</button>
       </nav>
     </div>
-    <script type="module" src="admin.js?v=20260828c"></script>
+    <script type="module" src="admin.js?v=20260828d"></script>
   </body>
 </html>

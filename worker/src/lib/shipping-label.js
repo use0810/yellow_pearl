@@ -269,11 +269,10 @@ export function findShippingLabelWarnings(orders) {
 }
 
 /** ヘッダー行つき・CRLF・UTF-8 BOM。B2 側の取込開始行は 2 行目にする */
-export function buildShippingLabelCsv(orders, shipDate, deliveryTime = '') {
-  const time = normalizeDeliveryTime(deliveryTime);
+export function buildShippingLabelCsv(orders, shipDate) {
   const lines = [
     COLUMNS.map(csvEscape).join(','),
-    ...orders.map((o) => buildRow(o, shipDate, time)),
+    ...orders.map((o) => buildRow(o, shipDate, normalizeDeliveryTime(o.delivery_time))),
   ];
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }

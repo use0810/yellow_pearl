@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS orders (
   -- 送り状 CSV を出した予約（未発送の内訳。NULL なら送り状未作成）
   shipping_label_batch_id TEXT,
   shipping_label_at TEXT,
+  -- 送り状の配達時間帯（B2コード。空は指定なし。お客様入力は持たない）
+  delivery_time TEXT NOT NULL DEFAULT '',
   admin_note TEXT NOT NULL DEFAULT '',
   archived_at TEXT,
   archived_by TEXT,
