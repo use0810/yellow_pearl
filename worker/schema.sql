@@ -60,6 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_shipping_label ON orders(shipping_label_ba
 CREATE TABLE IF NOT EXISTS shipping_label_batches (
   id TEXT PRIMARY KEY,
   ship_date TEXT NOT NULL,
+  delivery_time TEXT NOT NULL DEFAULT '',
   order_count INTEGER NOT NULL DEFAULT 0,
   filename TEXT NOT NULL,
   csv TEXT NOT NULL,

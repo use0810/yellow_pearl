@@ -13,12 +13,13 @@ import {
   PRODUCT_NAME,
   SHIPPING_REGIONS,
   bankTransferLines,
+  b2DeliveryTimeLabel,
   calcOrderAmount,
   calcShippingMargin,
   parseBankTransferInfo,
   summarizeOrderState,
   stripeLiveDashboardPaymentUrl,
-} from '/shared/domain.js?v=20260817a';
+} from '/shared/domain.js?v=20260828c';
 import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       const WORKER_URL = window.location.origin;
@@ -902,8 +903,10 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const labelBtn = document.getElementById('orders-label-btn');
         const revertBtn = document.getElementById('orders-label-revert-btn');
         const dateField = document.getElementById('orders-bulk-date-field');
+        const timeField = document.getElementById('orders-bulk-time-field');
         labelBtn.hidden = !isPending;
         dateField.hidden = !isPending;
+        if (timeField) timeField.hidden = !isPending;
         revertBtn.hidden = isPending;
         labelBtn.disabled = selected === 0;
         revertBtn.disabled = selected === 0;
@@ -953,16 +956,19 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           alert('出荷予定日を入れてください。');
           return;
         }
+        const deliveryTime = document.getElementById('orders-delivery-time')?.value ?? '';
+        const timeLabel = b2DeliveryTimeLabel(deliveryTime);
         const ok = confirm(
           `${ids.length}件の送り状CSV（ヤマトB2クラウド）を作成します。\n`
-          + `出荷予定日: ${shipDate}\n\n`
+          + `出荷予定日: ${shipDate}\n`
+          + `時間指定: ${timeLabel}\n\n`
           + '作成した予約は「送り状作成済み」タブへ移ります。',
         );
         if (!ok) return;
 
         const data = await api('/api/admin/shipping-labels', {
           method: 'POST',
-          body: JSON.stringify({ order_ids: ids, ship_date: shipDate }),
+          body: JSON.stringify({ order_ids: ids, ship_date: shipDate, delivery_time: deliveryTime }),
         });
         downloadCsvText(data.csv, data.batch?.filename || 'yellow-pearl-b2.csv');
         selectedOrderIds.clear();
@@ -998,12 +1004,13 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const tbody = document.getElementById('labels-table-body');
         if (!tbody) return;
         if (!batches.length) {
-          tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">送り状CSVはまだありません</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">送り状CSVはまだありません</td></tr>';
           return;
         }
         tbody.innerHTML = batches.map((b) => `<tr data-batch-id="${esc(b.id)}">
           <td style="white-space:nowrap">${esc(b.created_at)}</td>
           <td style="white-space:nowrap">${esc(b.ship_date)}</td>
+          <td>${esc(b2DeliveryTimeLabel(b.delivery_time))}</td>
           <td class="num">${b.order_count}件</td>
           <td>${esc(b.created_by || '—')}</td>
           <td>

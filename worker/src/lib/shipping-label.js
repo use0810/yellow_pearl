@@ -3,6 +3,8 @@
  * 全 97 列を必ず出し、埋めない列は空文字にする。列の順番が仕様なので入れ替えないこと。
  */
 
+import { B2_DELIVERY_TIMES } from '../../../shared/domain.js';
+
 /** B2クラウド側で選ぶ運用にする列（請求先顧客コードなど）は空にしておく */
 const COLUMNS = [
   'お客様管理番号',
@@ -110,6 +112,7 @@ const COL = Object.freeze({
   送り状種類: 2,
   クール区分: 3,
   出荷予定日: 5,
+  配達時間帯: 7,
   届け先電話: 9,
   届け先郵便番号: 11,
   届け先住所: 12,
@@ -200,7 +203,15 @@ export function todayShipDate() {
   return normalizeShipDate(jst.toISOString().slice(0, 10));
 }
 
-function buildRow(order, shipDate) {
+const B2_DELIVERY_TIME_CODES = new Set(B2_DELIVERY_TIMES.map((t) => t.value));
+
+/** B2 の配達時間帯コード。未指定・不正は空（指定なし） */
+export function normalizeDeliveryTime(raw) {
+  const code = String(raw ?? '').trim();
+  return B2_DELIVERY_TIME_CODES.has(code) ? code : '';
+}
+
+function buildRow(order, shipDate, deliveryTime) {
   const row = new Array(COLUMNS.length).fill('');
   const set = (col, value) => { row[col - 1] = value; };
 
@@ -208,6 +219,7 @@ function buildRow(order, shipDate) {
   set(COL.送り状種類, INVOICE_TYPE);
   set(COL.クール区分, COOL_TYPE);
   set(COL.出荷予定日, shipDate);
+  set(COL.配達時間帯, deliveryTime);
 
   set(COL.届け先電話, cleanText(order.phone));
   set(COL.届け先郵便番号, cleanText(order.postal));
@@ -257,10 +269,11 @@ export function findShippingLabelWarnings(orders) {
 }
 
 /** ヘッダー行つき・CRLF・UTF-8 BOM。B2 側の取込開始行は 2 行目にする */
-export function buildShippingLabelCsv(orders, shipDate) {
+export function buildShippingLabelCsv(orders, shipDate, deliveryTime = '') {
+  const time = normalizeDeliveryTime(deliveryTime);
   const lines = [
     COLUMNS.map(csvEscape).join(','),
-    ...orders.map((o) => buildRow(o, shipDate)),
+    ...orders.map((o) => buildRow(o, shipDate, time)),
   ];
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }

@@ -820,7 +820,8 @@
         color: #475569;
       }
 
-      .orders-bulk-date input {
+      .orders-bulk-date input,
+      .orders-bulk-date select {
         font-size: 0.8rem;
         padding: 0.25rem 0.4rem;
         border: 1px solid #ccc;

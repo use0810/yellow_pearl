@@ -41,6 +41,7 @@ import { maybeSendCancellationEmail, resendConfirmationEmail } from './email.js'
 import {
   buildShippingLabelCsv,
   findShippingLabelWarnings,
+  normalizeDeliveryTime,
   normalizeShipDate,
   shippingLabelFilename,
   todayShipDate,
@@ -743,6 +744,7 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
   if (!shipDate) {
     return json({ error: '出荷予定日の形式が正しくありません' }, 400, CORS);
   }
+  const deliveryTime = normalizeDeliveryTime(body.delivery_time);
 
   const placeholders = orderIds.map(() => '?').join(',');
   const rows = await env.DB.prepare(
@@ -766,15 +768,15 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
   const skipped = orderIds.filter((id) => !targetIds.includes(id));
 
   const batchId = generateBatchId();
-  const csv = buildShippingLabelCsv(orders, shipDate);
+  const csv = buildShippingLabelCsv(orders, shipDate, deliveryTime);
   const filename = shippingLabelFilename(shipDate, batchId);
   const warnings = findShippingLabelWarnings(orders);
 
   await env.DB.prepare(
     `INSERT INTO shipping_label_batches
-       (id, ship_date, order_count, filename, csv, created_by)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).bind(batchId, shipDate, orders.length, filename, csv, adminEmail).run();
+       (id, ship_date, delivery_time, order_count, filename, csv, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(batchId, shipDate, deliveryTime, orders.length, filename, csv, adminEmail).run();
 
   const statements = [];
   for (const id of targetIds) {
@@ -785,12 +787,12 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
     ).bind(batchId, id));
     statements.push(env.DB.prepare(
       `INSERT INTO order_events (order_id, event_type, detail) VALUES (?, ?, ?)`
-    ).bind(id, 'shipping_label_created', `${batchId} / ${shipDate}`));
+    ).bind(id, 'shipping_label_created', `${batchId} / ${shipDate} / ${deliveryTime || '指定なし'}`));
   }
   await env.DB.batch(statements);
 
   const batch = await env.DB.prepare(
-    `SELECT id, ship_date, order_count, filename, created_by, created_at
+    `SELECT id, ship_date, delivery_time, order_count, filename, created_by, created_at
      FROM shipping_label_batches WHERE id = ?`
   ).bind(batchId).first();
 
@@ -799,7 +801,7 @@ export async function handleAdminShippingLabelCreate(request, env, CORS, adminEm
 
 export async function handleAdminShippingLabelList(env, CORS) {
   const rows = await env.DB.prepare(
-    `SELECT id, ship_date, order_count, filename, created_by, created_at
+    `SELECT id, ship_date, delivery_time, order_count, filename, created_by, created_at
      FROM shipping_label_batches ORDER BY created_at DESC, id DESC LIMIT 100`
   ).all();
   return json({ batches: rows.results ?? [] }, 200, CORS);

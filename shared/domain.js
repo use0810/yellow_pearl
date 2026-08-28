@@ -14,6 +14,21 @@ export const FULFILLMENT_LABELS = {
   [ORDER_STATUS_CANCELLED]: 'キャンセル',
 };
 
+/** ヤマト B2クラウド 宅急便（発払い）の配達時間帯コード。空は指定なし */
+export const B2_DELIVERY_TIMES = [
+  { value: '', label: '指定なし' },
+  { value: '0812', label: '午前中' },
+  { value: '1416', label: '14〜16時' },
+  { value: '1618', label: '16〜18時' },
+  { value: '1820', label: '18〜20時' },
+  { value: '1921', label: '19〜21時' },
+];
+
+export function b2DeliveryTimeLabel(code) {
+  const found = B2_DELIVERY_TIMES.find((t) => t.value === String(code ?? ''));
+  return found?.label ?? '指定なし';
+}
+
 export const PAYMENT_UNPAID = '未決済';
 export const PAYMENT_PAID = '決済済';
 export const PAYMENT_FAILED = '失敗';

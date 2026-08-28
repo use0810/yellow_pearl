@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>管理画面 | Yellow Pearl</title>
     <link rel="icon" href="/assets/image/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="admin.css?v=20260828b" />
+    <link rel="stylesheet" href="admin.css?v=20260828c" />
   </head>
   <body>
     <div id="auth-error">
@@ -184,6 +184,17 @@
                 <span>出荷予定日</span>
                 <input type="date" id="orders-ship-date" />
               </label>
+              <label class="orders-bulk-date" id="orders-bulk-time-field">
+                <span>時間指定</span>
+                <select id="orders-delivery-time" aria-label="配達時間帯（B2クラウド）">
+                  <option value="">指定なし</option>
+                  <option value="0812">午前中</option>
+                  <option value="1416">14〜16時</option>
+                  <option value="1618">16〜18時</option>
+                  <option value="1820">18〜20時</option>
+                  <option value="1921">19〜21時</option>
+                </select>
+              </label>
               <button type="button" class="btn btn-primary" id="orders-label-btn">送り状CSVを作成</button>
               <button type="button" class="btn" id="orders-label-revert-btn">未発送に戻す</button>
               <button type="button" class="btn" id="orders-select-clear-btn">選択を解除</button>
@@ -228,6 +239,7 @@
               B2クラウドの<strong>「外部データから発行」→「基本レイアウト」</strong>で取り込みます。
               1行目が項目名なので<strong>取込開始行は2行目</strong>にしてください。
               送り状種類は<strong>宅急便（発払い）</strong>、クール区分は<strong>冷蔵</strong>で出力されます。
+              時間指定は管理画面で選んだ値がそのまま入ります（お客様からの指定は受けていません）。
               請求先顧客コードは空欄なので、B2クラウドの取込画面で選んでください。
               削除しても予約は「送り状作成済み」のままです（戻すときは一覧で選んで「未発送に戻す」）。
             </p>
@@ -237,13 +249,14 @@
                   <tr>
                     <th>作成日時</th>
                     <th>出荷予定日</th>
+                    <th>時間指定</th>
                     <th class="num">件数</th>
                     <th>作成者</th>
                     <th>操作</th>
                   </tr>
                 </thead>
                 <tbody id="labels-table-body">
-                  <tr><td colspan="5" class="empty-msg">読み込み中...</td></tr>
+                  <tr><td colspan="6" class="empty-msg">読み込み中...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -400,6 +413,6 @@
         <button type="button" class="nav-btn" data-screen="bookkeeping">帳簿</button>
       </nav>
     </div>
-    <script type="module" src="admin.js?v=20260828b"></script>
+    <script type="module" src="admin.js?v=20260828c"></script>
   </body>
 </html>
