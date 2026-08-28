@@ -38,12 +38,19 @@ import {
   stripeModeFromResourceId,
 } from './stripe.js';
 import { maybeSendCancellationEmail, resendConfirmationEmail } from './email.js';
+import {
+  buildShippingLabelCsv,
+  findShippingLabelWarnings,
+  normalizeShipDate,
+  shippingLabelFilename,
+  todayShipDate,
+} from './shipping-label.js';
 
 const ORDER_SELECT = `order_id, last_name, first_name, last_name_kana, first_name_kana,
   email, phone, postal, prefecture, address1, address2, note,
   quantity, unit_price, shipping_fee, tax_amount, total_amount,
   status, payment_status, admin_note, stripe_session_id, stripe_payment_id,
-  bank_transfer_info, created_at`;
+  bank_transfer_info, shipping_label_batch_id, shipping_label_at, created_at`;
 
 const CONTACT_KEYS = [
   'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
@@ -110,11 +117,10 @@ function likePattern(raw) {
   return cleaned ? `%${cleaned}%` : '';
 }
 
+const ORDERS_FILTERS = ['pending', 'bank_pending', 'labeled', 'shipped', 'cancelled'];
+
 function normalizeOrdersFilter(raw) {
-  if (raw === 'cancelled' || raw === 'shipped' || raw === 'pending' || raw === 'bank_pending') {
-    return raw;
-  }
-  return 'pending';
+  return ORDERS_FILTERS.includes(raw) ? raw : 'pending';
 }
 
 function buildOrdersListQuery(url) {
@@ -132,8 +138,15 @@ function buildOrdersListQuery(url) {
     where = `status = '${ORDER_STATUS_RESERVED}'
       AND payment_status = '${PAYMENT_UNPAID}'
       AND ${ORDER_NOT_ARCHIVED}`;
+  } else if (filter === 'labeled') {
+    where = `status = '${ORDER_STATUS_RESERVED}'
+      AND shipping_label_batch_id IS NOT NULL
+      AND ${ORDER_NOT_ARCHIVED}`;
   } else {
-    where = `status = '${ORDER_STATUS_RESERVED}' AND ${ORDER_NOT_ARCHIVED}`;
+    // 未発送。送り状を出したものは labeled 側に移すので除く
+    where = `status = '${ORDER_STATUS_RESERVED}'
+      AND shipping_label_batch_id IS NULL
+      AND ${ORDER_NOT_ARCHIVED}`;
   }
 
   const binds = [];
@@ -173,6 +186,7 @@ function buildOrdersCsv(orders, filter) {
     shipped: '発送済',
     cancelled: 'キャンセル',
     bank_pending: '振込待ち',
+    labeled: '送り状作成済み',
   }[filter] || filter;
 
   const header = [
@@ -690,6 +704,175 @@ export async function handleAdminOrderDelete(env, CORS, orderId, adminEmail = ''
 
   await logOrderEvent(env.DB, orderId, 'archived', adminEmail);
   return json({ ok: true }, 200, CORS);
+}
+
+/** 1回の発行で扱える件数。D1 のプレースホルダ数と CSV の行サイズを抑える */
+const MAX_LABEL_ORDERS = 200;
+
+function generateBatchId() {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `SL-${ts}-${rand}`;
+}
+
+function parseOrderIds(raw) {
+  if (!Array.isArray(raw)) return null;
+  const ids = [...new Set(
+    raw.filter((v) => typeof v === 'string').map((v) => v.trim()).filter(Boolean),
+  )];
+  if (!ids.length || ids.length > MAX_LABEL_ORDERS) return null;
+  return ids;
+}
+
+/**
+ * 選んだ予約の送り状 CSV を作り、発行時点の本文ごと残す。
+ * 対象は入金済・未発送・送り状未作成のみ。それ以外は skipped で返す。
+ */
+export async function handleAdminShippingLabelCreate(request, env, CORS, adminEmail = '') {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ error: 'Invalid JSON' }, 400, CORS);
+
+  const orderIds = parseOrderIds(body.order_ids);
+  if (!orderIds) {
+    return json({
+      error: `予約を1〜${MAX_LABEL_ORDERS}件で選んでください`,
+    }, 400, CORS);
+  }
+
+  const shipDate = body.ship_date ? normalizeShipDate(body.ship_date) : todayShipDate();
+  if (!shipDate) {
+    return json({ error: '出荷予定日の形式が正しくありません' }, 400, CORS);
+  }
+
+  const placeholders = orderIds.map(() => '?').join(',');
+  const rows = await env.DB.prepare(
+    `SELECT ${ORDER_SELECT} FROM orders
+     WHERE order_id IN (${placeholders})
+       AND status = '${ORDER_STATUS_RESERVED}'
+       AND payment_status = '${PAYMENT_PAID}'
+       AND shipping_label_batch_id IS NULL
+       AND ${ORDER_NOT_ARCHIVED}
+     ORDER BY id ASC`
+  ).bind(...orderIds).all();
+
+  const orders = rows.results ?? [];
+  if (!orders.length) {
+    return json({
+      error: '送り状を出せる予約がありません（入金済・未発送・送り状未作成のみ）',
+    }, 400, CORS);
+  }
+
+  const targetIds = orders.map((o) => o.order_id);
+  const skipped = orderIds.filter((id) => !targetIds.includes(id));
+
+  const batchId = generateBatchId();
+  const csv = buildShippingLabelCsv(orders, shipDate);
+  const filename = shippingLabelFilename(shipDate, batchId);
+  const warnings = findShippingLabelWarnings(orders);
+
+  await env.DB.prepare(
+    `INSERT INTO shipping_label_batches
+       (id, ship_date, order_count, filename, csv, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(batchId, shipDate, orders.length, filename, csv, adminEmail).run();
+
+  const statements = [];
+  for (const id of targetIds) {
+    statements.push(env.DB.prepare(
+      `UPDATE orders
+       SET shipping_label_batch_id = ?, shipping_label_at = datetime('now', '+9 hours')
+       WHERE order_id = ? AND shipping_label_batch_id IS NULL AND ${ORDER_NOT_ARCHIVED}`
+    ).bind(batchId, id));
+    statements.push(env.DB.prepare(
+      `INSERT INTO order_events (order_id, event_type, detail) VALUES (?, ?, ?)`
+    ).bind(id, 'shipping_label_created', `${batchId} / ${shipDate}`));
+  }
+  await env.DB.batch(statements);
+
+  const batch = await env.DB.prepare(
+    `SELECT id, ship_date, order_count, filename, created_by, created_at
+     FROM shipping_label_batches WHERE id = ?`
+  ).bind(batchId).first();
+
+  return json({ batch, csv, warnings, skipped }, 200, CORS);
+}
+
+export async function handleAdminShippingLabelList(env, CORS) {
+  const rows = await env.DB.prepare(
+    `SELECT id, ship_date, order_count, filename, created_by, created_at
+     FROM shipping_label_batches ORDER BY created_at DESC, id DESC LIMIT 100`
+  ).all();
+  return json({ batches: rows.results ?? [] }, 200, CORS);
+}
+
+export async function handleAdminShippingLabelDownload(env, CORS, batchId) {
+  const batch = await env.DB.prepare(
+    `SELECT filename, csv FROM shipping_label_batches WHERE id = ?`
+  ).bind(batchId).first();
+
+  if (!batch) return json({ error: '送り状CSVが見つかりません' }, 404, CORS);
+
+  return new Response(batch.csv, {
+    status: 200,
+    headers: {
+      ...CORS,
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${batch.filename}"`,
+    },
+  });
+}
+
+/** 履歴の削除だけ。予約の送り状フラグは触らない（戻すのは revert 側） */
+export async function handleAdminShippingLabelDelete(env, CORS, batchId) {
+  const result = await env.DB.prepare(
+    `DELETE FROM shipping_label_batches WHERE id = ?`
+  ).bind(batchId).run();
+
+  if ((result.meta?.changes ?? 0) === 0) {
+    return json({ error: '送り状CSVが見つかりません' }, 404, CORS);
+  }
+  return json({ ok: true }, 200, CORS);
+}
+
+/** 誤操作の差し戻し。送り状フラグを外して未発送に戻す */
+export async function handleAdminShippingLabelRevert(request, env, CORS) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ error: 'Invalid JSON' }, 400, CORS);
+
+  const orderIds = parseOrderIds(body.order_ids);
+  if (!orderIds) {
+    return json({
+      error: `予約を1〜${MAX_LABEL_ORDERS}件で選んでください`,
+    }, 400, CORS);
+  }
+
+  const placeholders = orderIds.map(() => '?').join(',');
+  const rows = await env.DB.prepare(
+    `SELECT order_id, shipping_label_batch_id FROM orders
+     WHERE order_id IN (${placeholders})
+       AND status = '${ORDER_STATUS_RESERVED}'
+       AND shipping_label_batch_id IS NOT NULL
+       AND ${ORDER_NOT_ARCHIVED}`
+  ).bind(...orderIds).all();
+
+  const targets = rows.results ?? [];
+  if (!targets.length) {
+    return json({ error: '未発送に戻せる予約がありません' }, 400, CORS);
+  }
+
+  const statements = [];
+  for (const row of targets) {
+    statements.push(env.DB.prepare(
+      `UPDATE orders SET shipping_label_batch_id = NULL, shipping_label_at = NULL
+       WHERE order_id = ? AND ${ORDER_NOT_ARCHIVED}`
+    ).bind(row.order_id));
+    statements.push(env.DB.prepare(
+      `INSERT INTO order_events (order_id, event_type, detail) VALUES (?, ?, ?)`
+    ).bind(row.order_id, 'shipping_label_reverted', row.shipping_label_batch_id ?? ''));
+  }
+  await env.DB.batch(statements);
+
+  return json({ ok: true, reverted: targets.length }, 200, CORS);
 }
 
 export async function handleAdminStats(env, CORS) {

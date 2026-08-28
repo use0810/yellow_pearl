@@ -34,6 +34,8 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       let orderTotalPages = 1;
       let orderSearchName = '';
       let orderSearchPrefecture = '';
+      /** 送り状CSVの対象。ページを移動しても選択は保つ */
+      const selectedOrderIds = new Set();
       let activeScreen = 'products';
       let accessLogoutUrl = null;
       let bookkeepingData = null;
@@ -412,7 +414,10 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         });
         document.getElementById('screen-title').textContent = SCREEN_TITLES[name] || '';
         if (name === 'stats') loadStats().catch((err) => alert(err.message));
-        if (name === 'orders') loadOrders().catch((err) => alert(err.message));
+        if (name === 'orders') {
+          loadOrders().catch((err) => alert(err.message));
+          loadShippingLabels().catch((err) => alert(err.message));
+        }
         if (name === 'bookkeeping') loadBookkeeping().catch((err) => alert(err.message));
       }
 
@@ -525,6 +530,39 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         return hasNote ? ' has-note' : '';
       }
 
+      /** 送り状の対象を選べるのは未発送と送り状作成済みのタブだけ */
+      function ordersSelectable() {
+        return orderFilter === 'pending' || orderFilter === 'labeled';
+      }
+
+      /** 送り状を出せるのは入金済・未発送のみ */
+      function orderSelectableRow(o) {
+        return (o.status || ORDER_STATUS_RESERVED) === ORDER_STATUS_RESERVED
+          && (o.payment_status || PAYMENT_UNPAID) === PAYMENT_PAID;
+      }
+
+      function renderSelectCell(o, { tag = 'td' } = {}) {
+        if (!ordersSelectable()) {
+          return tag === 'td' ? '<td class="orders-select-col"></td>' : '';
+        }
+        const selectable = orderSelectableRow(o);
+        const checked = selectedOrderIds.has(o.order_id) ? ' checked' : '';
+        const disabled = selectable ? '' : ' disabled';
+        const title = selectable ? '' : ' title="入金済の予約のみ選べます"';
+        const input = `<input type="checkbox" class="order-select" value="${esc(o.order_id)}"
+          aria-label="${esc(o.order_id)} を選択"${checked}${disabled}${title} />`;
+        return tag === 'td'
+          ? `<td class="orders-select-col">${input}</td>`
+          : `<label class="order-card-select">${input}<span>選択</span></label>`;
+      }
+
+      /** 送り状を出した日を一覧で分かるようにする */
+      function renderShippingLabelNote(o) {
+        if (!o.shipping_label_at) return '';
+        const stamp = String(o.shipping_label_at).slice(0, 16);
+        return `<div class="order-label-note">送り状作成済み ${esc(stamp)}</div>`;
+      }
+
       function renderEditableAddress(o) {
         const note = renderCustomerNote(o);
         return `<div class="order-edit-block order-edit-locked">
@@ -626,6 +664,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               <span class="status-badge-label">予約</span> ${esc(fulfillLabel)}
             </span>
           </div>
+          ${renderShippingLabelNote(o)}
           ${renderBankTransferInfo(o)}
         </div>`;
       }
@@ -684,6 +723,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         const emptyLabels = {
           pending: '未発送の予約なし',
           bank_pending: '振込待ちの予約なし',
+          labeled: '送り状作成済みの予約なし',
           shipped: '発送済みの予約なし',
           cancelled: 'キャンセルなし',
         };
@@ -693,8 +733,9 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         }
 
         if (!orders.length) {
-          tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">${emptyLabel}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="10" class="empty-msg">${emptyLabel}</td></tr>`;
           cards.innerHTML = `<p class="empty-msg">${emptyLabel}</p>`;
+          updateOrdersBulkUI();
           return;
         }
 
@@ -708,6 +749,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             ? `${esc(formatAddress(o))}${renderCustomerNote(o)}`
             : renderEditableAddress(o);
           return `<tr class="order-row${noteRowClass(o)}" data-order-id="${esc(o.order_id)}">
+            ${renderSelectCell(o)}
             <td class="mono">${esc(o.order_id)}</td>
             <td>${nameCell}</td>
             <td>${contactCell}</td>
@@ -754,7 +796,10 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
               <div>
                 ${renderOrderStatusCell(o)}
               </div>
-              <div class="order-card-id">${esc(o.order_id)}</div>
+              <div class="order-card-head-right">
+                ${renderSelectCell(o, { tag: 'label' })}
+                <div class="order-card-id">${esc(o.order_id)}</div>
+              </div>
             </div>
             <div class="order-card-edit">
               <p class="order-edit-label">お名前</p>
@@ -773,12 +818,15 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           </article>
         `;
         }).join('');
+
+        updateOrdersBulkUI();
       }
 
       function updateOrdersFilterUI() {
         const titles = {
           pending: '未発送一覧',
           bank_pending: '振込待ち一覧',
+          labeled: '送り状作成済み一覧',
           shipped: '発送済一覧',
           cancelled: 'キャンセル一覧',
         };
@@ -827,6 +875,190 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         if (prefEl) prefEl.value = orderSearchPrefecture;
       }
 
+      /** 表示中のページで選べる予約（テーブルはスマホでも DOM 上にある） */
+      function visibleSelectableIds() {
+        return [...document.querySelectorAll('#orders-table-body .order-select:not(:disabled)')]
+          .map((el) => el.value);
+      }
+
+      function syncOrderSelectBoxes(orderId, checked) {
+        document.querySelectorAll(`.order-select[value="${CSS.escape(orderId)}"]`).forEach((el) => {
+          el.checked = checked;
+        });
+      }
+
+      function updateOrdersBulkUI() {
+        const bar = document.getElementById('orders-bulk');
+        if (!bar) return;
+        const selectable = ordersSelectable();
+        document.getElementById('screen-orders')?.classList.toggle('orders-selectable', selectable);
+        bar.hidden = !selectable;
+        if (!selectable) return;
+
+        const selected = selectedOrderIds.size;
+        const isPending = orderFilter === 'pending';
+        document.getElementById('orders-bulk-count').textContent = `${selected}件を選択中`;
+
+        const labelBtn = document.getElementById('orders-label-btn');
+        const revertBtn = document.getElementById('orders-label-revert-btn');
+        const dateField = document.getElementById('orders-bulk-date-field');
+        labelBtn.hidden = !isPending;
+        dateField.hidden = !isPending;
+        revertBtn.hidden = isPending;
+        labelBtn.disabled = selected === 0;
+        revertBtn.disabled = selected === 0;
+
+        const visible = visibleSelectableIds();
+        const selectAll = document.getElementById('orders-select-all');
+        selectAll.disabled = visible.length === 0;
+        selectAll.checked = visible.length > 0 && visible.every((id) => selectedOrderIds.has(id));
+      }
+
+      function clearOrderSelection() {
+        selectedOrderIds.clear();
+        document.querySelectorAll('.order-select').forEach((el) => { el.checked = false; });
+        updateOrdersBulkUI();
+      }
+
+      function handleOrdersSelectChange(e) {
+        const box = e.target.closest('.order-select');
+        if (!box) return;
+        if (box.checked) selectedOrderIds.add(box.value);
+        else selectedOrderIds.delete(box.value);
+        syncOrderSelectBoxes(box.value, box.checked);
+        updateOrdersBulkUI();
+      }
+
+      function downloadCsvText(csv, filename) {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
+      function initShipDateInput() {
+        const el = document.getElementById('orders-ship-date');
+        if (!el || el.value) return;
+        const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+        el.value = jst.toISOString().slice(0, 10);
+      }
+
+      async function createShippingLabels() {
+        const ids = [...selectedOrderIds];
+        if (!ids.length) return;
+        const shipDate = document.getElementById('orders-ship-date').value;
+        if (!shipDate) {
+          alert('出荷予定日を入れてください。');
+          return;
+        }
+        const ok = confirm(
+          `${ids.length}件の送り状CSV（ヤマトB2クラウド）を作成します。\n`
+          + `出荷予定日: ${shipDate}\n\n`
+          + '作成した予約は「送り状作成済み」タブへ移ります。',
+        );
+        if (!ok) return;
+
+        const data = await api('/api/admin/shipping-labels', {
+          method: 'POST',
+          body: JSON.stringify({ order_ids: ids, ship_date: shipDate }),
+        });
+        downloadCsvText(data.csv, data.batch?.filename || 'yellow-pearl-b2.csv');
+        selectedOrderIds.clear();
+        await loadOrders();
+        await loadShippingLabels();
+
+        const msgs = [`${data.batch?.order_count ?? 0}件の送り状CSVを作成しました。`];
+        if (data.skipped?.length) {
+          msgs.push('', `対象外だった予約（入金済・未発送・送り状未作成のみ）: ${data.skipped.join(', ')}`);
+        }
+        if (data.warnings?.length) {
+          msgs.push('', '取り込む前に確認してください:', ...data.warnings);
+        }
+        alert(msgs.join('\n'));
+      }
+
+      async function revertShippingLabels() {
+        const ids = [...selectedOrderIds];
+        if (!ids.length) return;
+        const ok = confirm(`${ids.length}件を未発送に戻します。よろしいですか？`);
+        if (!ok) return;
+
+        const data = await api('/api/admin/shipping-labels/revert', {
+          method: 'POST',
+          body: JSON.stringify({ order_ids: ids }),
+        });
+        selectedOrderIds.clear();
+        await loadOrders();
+        alert(`${data.reverted ?? 0}件を未発送に戻しました。`);
+      }
+
+      function renderShippingLabelBatches(batches) {
+        const tbody = document.getElementById('labels-table-body');
+        if (!tbody) return;
+        if (!batches.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">送り状CSVはまだありません</td></tr>';
+          return;
+        }
+        tbody.innerHTML = batches.map((b) => `<tr data-batch-id="${esc(b.id)}">
+          <td style="white-space:nowrap">${esc(b.created_at)}</td>
+          <td style="white-space:nowrap">${esc(b.ship_date)}</td>
+          <td class="num">${b.order_count}件</td>
+          <td>${esc(b.created_by || '—')}</td>
+          <td>
+            <div class="ops-actions">
+              <button type="button" class="btn label-download-btn" data-batch-id="${esc(b.id)}">CSV</button>
+              <button type="button" class="btn btn-danger label-delete-btn" data-batch-id="${esc(b.id)}">削除</button>
+            </div>
+          </td>
+        </tr>`).join('');
+      }
+
+      async function loadShippingLabels() {
+        const data = await api('/api/admin/shipping-labels');
+        renderShippingLabelBatches(data.batches ?? []);
+      }
+
+      async function downloadShippingLabelBatch(batchId) {
+        const res = await fetch(
+          `${WORKER_URL}/api/admin/shipping-labels/${encodeURIComponent(batchId)}/download.csv`,
+          { credentials: 'include' },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'CSV の取得に失敗しました');
+        }
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `yellow-pearl-b2-${batchId}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
+      async function deleteShippingLabelBatch(batchId) {
+        const ok = confirm(
+          'この送り状CSVの履歴を削除します。\n'
+          + '予約は「送り状作成済み」のままです（戻すときは一覧で選んで「未発送に戻す」）。',
+        );
+        if (!ok) return;
+        await api(`/api/admin/shipping-labels/${encodeURIComponent(batchId)}`, { method: 'DELETE' });
+        await loadShippingLabels();
+      }
+
+      function handleLabelsClick(e) {
+        const downloadBtn = e.target.closest('.label-download-btn');
+        if (downloadBtn) {
+          downloadShippingLabelBatch(downloadBtn.dataset.batchId).catch((err) => alert(err.message));
+          return;
+        }
+        const deleteBtn = e.target.closest('.label-delete-btn');
+        if (deleteBtn) {
+          deleteShippingLabelBatch(deleteBtn.dataset.batchId).catch((err) => alert(err.message));
+        }
+      }
+
       async function loadOrders({ preserveScroll = true } = {}) {
         const scrollY = preserveScroll ? window.scrollY : 0;
         const params = new URLSearchParams({
@@ -855,6 +1087,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         orderSearchName = document.getElementById('orders-search-name').value.trim();
         orderSearchPrefecture = document.getElementById('orders-search-prefecture').value;
         orderPage = 1;
+        selectedOrderIds.clear();
         return loadOrders();
       }
 
@@ -1141,6 +1374,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           if (orderFilter === btn.dataset.ordersFilter) return;
           orderFilter = btn.dataset.ordersFilter;
           orderPage = 1;
+          selectedOrderIds.clear();
           loadOrders().catch((err) => alert(err.message));
         });
       });
@@ -1178,6 +1412,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         orderSearchName = '';
         orderSearchPrefecture = '';
         orderPage = 1;
+        selectedOrderIds.clear();
         syncOrdersSearchUI();
         loadOrders().catch((err) => alert(err.message));
       });
@@ -1196,6 +1431,43 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       document.getElementById('orders-table-body').addEventListener('click', handleOrdersClick);
       document.getElementById('orders-cards').addEventListener('click', handleOrdersClick);
+      document.getElementById('orders-table-body').addEventListener('change', handleOrdersSelectChange);
+      document.getElementById('orders-cards').addEventListener('change', handleOrdersSelectChange);
+
+      document.getElementById('orders-select-all')?.addEventListener('change', (e) => {
+        const { checked } = e.currentTarget;
+        visibleSelectableIds().forEach((id) => {
+          if (checked) selectedOrderIds.add(id);
+          else selectedOrderIds.delete(id);
+          syncOrderSelectBoxes(id, checked);
+        });
+        updateOrdersBulkUI();
+      });
+
+      document.getElementById('orders-select-clear-btn')?.addEventListener('click', () => {
+        clearOrderSelection();
+      });
+
+      document.getElementById('orders-label-btn')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        createShippingLabels()
+          .catch((err) => alert(err.message))
+          .finally(() => updateOrdersBulkUI());
+      });
+
+      document.getElementById('orders-label-revert-btn')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        revertShippingLabels()
+          .catch((err) => alert(err.message))
+          .finally(() => updateOrdersBulkUI());
+      });
+
+      document.getElementById('labels-table-body')?.addEventListener('click', handleLabelsClick);
+      document.getElementById('labels-reload-btn')?.addEventListener('click', () => {
+        loadShippingLabels().catch((err) => alert(err.message));
+      });
 
       document.getElementById('logout-btn').addEventListener('click', () => {
         logoutAdmin();
@@ -1207,6 +1479,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       initBookkeepingYearSelect();
       initOrdersSearchPrefecture();
+      initShipDateInput();
       document.getElementById('bk-year').addEventListener('change', () => {
         loadBookkeeping().catch((err) => alert(err.message));
       });

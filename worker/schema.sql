@@ -45,9 +45,25 @@ CREATE TABLE IF NOT EXISTS orders (
   -- 銀行振込の専用口座（注文ごとに異なる。Stripe の振込手順を JSON で保存）
   bank_transfer_info TEXT,
   status TEXT NOT NULL DEFAULT '予約',
+  -- 送り状 CSV を出した予約（未発送の内訳。NULL なら送り状未作成）
+  shipping_label_batch_id TEXT,
+  shipping_label_at TEXT,
   admin_note TEXT NOT NULL DEFAULT '',
   archived_at TEXT,
   archived_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_shipping_label ON orders(shipping_label_batch_id);
+
+-- 送り状 CSV の発行履歴。発行時点の本文をそのまま持つ
+CREATE TABLE IF NOT EXISTS shipping_label_batches (
+  id TEXT PRIMARY KEY,
+  ship_date TEXT NOT NULL,
+  order_count INTEGER NOT NULL DEFAULT 0,
+  filename TEXT NOT NULL,
+  csv TEXT NOT NULL,
+  created_by TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))
 );
 

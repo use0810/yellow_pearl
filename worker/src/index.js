@@ -17,6 +17,11 @@ import {
   handleAdminOrdersReconcile,
   handleAdminOrderUpdate,
   handleAdminResendConfirmationEmail,
+  handleAdminShippingLabelCreate,
+  handleAdminShippingLabelDelete,
+  handleAdminShippingLabelDownload,
+  handleAdminShippingLabelList,
+  handleAdminShippingLabelRevert,
   handleAdminStats,
 } from './lib/admin-orders.js';
 import {
@@ -143,6 +148,30 @@ async function handleApi(request, env) {
 
     if (url.pathname === '/api/admin/orders/reconcile' && request.method === 'GET') {
       return handleAdminOrdersReconcile(env, CORS, url);
+    }
+
+    if (url.pathname === '/api/admin/shipping-labels' && request.method === 'GET') {
+      return handleAdminShippingLabelList(env, CORS);
+    }
+
+    if (url.pathname === '/api/admin/shipping-labels' && request.method === 'POST') {
+      return handleAdminShippingLabelCreate(request, env, CORS, auth.email ?? '');
+    }
+
+    if (url.pathname === '/api/admin/shipping-labels/revert' && request.method === 'POST') {
+      return handleAdminShippingLabelRevert(request, env, CORS);
+    }
+
+    const labelDownloadMatch = url.pathname.match(
+      /^\/api\/admin\/shipping-labels\/([^/]+)\/download\.csv$/,
+    );
+    if (labelDownloadMatch && request.method === 'GET') {
+      return handleAdminShippingLabelDownload(env, CORS, labelDownloadMatch[1]);
+    }
+
+    const labelMatch = url.pathname.match(/^\/api\/admin\/shipping-labels\/([^/]+)$/);
+    if (labelMatch && request.method === 'DELETE') {
+      return handleAdminShippingLabelDelete(env, CORS, labelMatch[1]);
     }
 
     const resendEmailMatch = url.pathname.match(
