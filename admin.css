@@ -592,6 +592,24 @@
         background: #fff;
       }
 
+      .orders-search-check {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin: 0;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        flex: 0 0 auto;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .orders-search-check input {
+        width: auto;
+        margin: 0;
+        accent-color: #db2777;
+      }
+
       .orders-search .btn {
         font-size: 0.78rem;
         padding: 0.4rem 0.75rem;

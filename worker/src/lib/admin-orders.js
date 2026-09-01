@@ -125,11 +125,17 @@ function normalizeOrdersFilter(raw) {
   return ORDERS_FILTERS.includes(raw) ? raw : 'pending';
 }
 
+function truthyParam(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
 function buildOrdersListQuery(url) {
   const filter = normalizeOrdersFilter(url.searchParams.get('filter') || 'pending');
   const nameLike = likePattern(url.searchParams.get('name') || '');
   const prefectureRaw = (url.searchParams.get('prefecture') || '').trim();
   const prefecture = PREFECTURES.includes(prefectureRaw) ? prefectureRaw : '';
+  const hasNote = truthyParam(url.searchParams.get('has_note'));
 
   let where;
   if (filter === 'cancelled') {
@@ -166,11 +172,18 @@ function buildOrdersListQuery(url) {
     where += ' AND prefecture = ?';
     binds.push(prefecture);
   }
+  if (hasNote) {
+    where += ` AND (
+      TRIM(COALESCE(note, '')) != ''
+      OR TRIM(COALESCE(admin_note, '')) != ''
+    )`;
+  }
 
   return {
     filter,
     nameLike,
     prefecture,
+    hasNote,
     where,
     binds,
   };
@@ -283,7 +296,7 @@ export async function handleAdminOrders(env, CORS, url) {
   const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
   const limit = Number.isNaN(limitRaw) ? 50 : Math.min(Math.max(limitRaw, 1), 100);
   const page = Number.isNaN(pageRaw) ? 1 : Math.max(pageRaw, 1);
-  const { filter, nameLike, prefecture, where, binds } = buildOrdersListQuery(url);
+  const { filter, nameLike, prefecture, hasNote, where, binds } = buildOrdersListQuery(url);
 
   const countRow = await env.DB.prepare(
     `SELECT COUNT(*) AS total FROM orders WHERE ${where}`
@@ -304,6 +317,7 @@ export async function handleAdminOrders(env, CORS, url) {
     filter,
     name: nameLike ? nameLike.slice(1, -1) : '',
     prefecture,
+    has_note: hasNote,
     page: safePage,
     limit,
     total,

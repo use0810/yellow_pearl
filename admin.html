@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>管理画面 | Yellow Pearl</title>
     <link rel="icon" href="/assets/image/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="admin.css?v=20260828e" />
+    <link rel="stylesheet" href="admin.css?v=20260901a" />
   </head>
   <body>
     <div id="auth-error">
@@ -172,6 +172,10 @@
                 <select id="orders-search-prefecture">
                   <option value="">都道府県（すべて）</option>
                 </select>
+              </label>
+              <label class="orders-search-check">
+                <input type="checkbox" id="orders-search-has-note" />
+                備考ありのみ
               </label>
               <button type="submit" class="btn btn-primary" id="orders-search-btn">絞り込み</button>
               <button type="button" class="btn" id="orders-search-clear">クリア</button>
@@ -402,6 +406,6 @@
         <button type="button" class="nav-btn" data-screen="bookkeeping">帳簿</button>
       </nav>
     </div>
-    <script type="module" src="admin.js?v=20260828e"></script>
+    <script type="module" src="admin.js?v=20260901a"></script>
   </body>
 </html>

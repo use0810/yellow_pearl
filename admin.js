@@ -35,6 +35,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       let orderTotalPages = 1;
       let orderSearchName = '';
       let orderSearchPrefecture = '';
+      let orderSearchHasNote = false;
       /** 送り状CSVの対象。ページを移動しても選択は保つ */
       const selectedOrderIds = new Set();
       let activeScreen = 'products';
@@ -155,10 +156,15 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
         URL.revokeObjectURL(a.href);
       }
 
-      async function downloadOrdersCsv() {
-        const params = new URLSearchParams({ filter: orderFilter });
+      function appendOrdersSearchParams(params) {
         if (orderSearchName) params.set('name', orderSearchName);
         if (orderSearchPrefecture) params.set('prefecture', orderSearchPrefecture);
+        if (orderSearchHasNote) params.set('has_note', '1');
+        return params;
+      }
+
+      async function downloadOrdersCsv() {
+        const params = appendOrdersSearchParams(new URLSearchParams({ filter: orderFilter }));
         const res = await fetch(
           `${WORKER_URL}/api/admin/orders/export.csv?${params}`,
           { credentials: 'include' },
@@ -739,7 +745,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
           cancelled: 'キャンセルなし',
         };
         let emptyLabel = emptyLabels[orderFilter] || '予約なし';
-        if (orderSearchName || orderSearchPrefecture) {
+        if (orderSearchName || orderSearchPrefecture || orderSearchHasNote) {
           emptyLabel = '条件に一致する予約なし';
         }
 
@@ -882,8 +888,10 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       function syncOrdersSearchUI() {
         const nameEl = document.getElementById('orders-search-name');
         const prefEl = document.getElementById('orders-search-prefecture');
+        const noteEl = document.getElementById('orders-search-has-note');
         if (nameEl) nameEl.value = orderSearchName;
         if (prefEl) prefEl.value = orderSearchPrefecture;
+        if (noteEl) noteEl.checked = orderSearchHasNote;
       }
 
       /** 表示中のページで選べる予約（テーブルはスマホでも DOM 上にある） */
@@ -1111,13 +1119,11 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
 
       async function loadOrders({ preserveScroll = true } = {}) {
         const scrollY = preserveScroll ? window.scrollY : 0;
-        const params = new URLSearchParams({
+        const params = appendOrdersSearchParams(new URLSearchParams({
           filter: orderFilter,
           page: String(orderPage),
           limit: String(ORDERS_PAGE_SIZE),
-        });
-        if (orderSearchName) params.set('name', orderSearchName);
-        if (orderSearchPrefecture) params.set('prefecture', orderSearchPrefecture);
+        }));
         const data = await api(`/api/admin/orders?${params}`);
         if (data.page && data.page !== orderPage) {
           orderPage = data.page;
@@ -1136,6 +1142,7 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
       function applyOrdersSearch() {
         orderSearchName = document.getElementById('orders-search-name').value.trim();
         orderSearchPrefecture = document.getElementById('orders-search-prefecture').value;
+        orderSearchHasNote = !!document.getElementById('orders-search-has-note')?.checked;
         orderPage = 1;
         selectedOrderIds.clear();
         return loadOrders();
@@ -1460,9 +1467,13 @@ import { resolveReceptionStatus } from '/shared/reception-status.js';
             btn.textContent = 'Stripe照合';
           });
       });
+      document.getElementById('orders-search-has-note')?.addEventListener('change', () => {
+        applyOrdersSearch().catch((err) => alert(err.message));
+      });
       document.getElementById('orders-search-clear')?.addEventListener('click', () => {
         orderSearchName = '';
         orderSearchPrefecture = '';
+        orderSearchHasNote = false;
         orderPage = 1;
         selectedOrderIds.clear();
         syncOrdersSearchUI();
